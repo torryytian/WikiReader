@@ -42,8 +42,15 @@ nonisolated enum SpeechEvent: Equatable, Sendable {
     case willSpeak(id: Int, range: NSRange)
     /// The utterance was spoken to the end (not emitted when it is stopped or replaced).
     case finished(id: Int)
-    /// The utterance can't be spoken, e.g. a cloud voice without network. `message` is shown to the user.
-    case failed(id: Int, message: String)
+    /// The utterance can't be spoken, e.g. a cloud voice without network.
+    case failed(id: Int, failure: SpeechFailure)
+}
+
+/// Why speech failed, for the user.
+nonisolated struct SpeechFailure: Equatable, Sendable {
+    var message: String
+    /// The user can fix it in Settings (e.g. a missing or rejected API key) rather than by retrying.
+    var isFixableInSettings = false
 }
 
 /// Playback speed choices shown in the player bar.

@@ -52,12 +52,19 @@ struct AutoScrollTests {
     }
 
     @Test func doesNotScrollWhileWordIsComfortablyVisible() async throws {
-        // Off-screen text only has estimated positions in TextKit 2; the first scroll lays it out
-        // and may need one correction. Speak the next word too to let it settle.
+        // Off-screen text only has estimated positions in TextKit 2, and laying out text above the
+        // target can shift it again, so the first scrolls may need corrections. Speak neighboring
+        // positions until the view stops moving, then the next word on the same line mustn't scroll.
         try await speak(block: 8)
-        try await speak(block: 8, offset: 1)
+        var position = 1
+        for _ in 0..<5 {
+            let before = offset
+            try await speak(block: 8, offset: position)
+            position += 1
+            if offset == before { break }
+        }
         let settled = offset
-        try await speak(block: 8, offset: 4)  // next word, same line
+        try await speak(block: 8, offset: position + 2)
         #expect(offset == settled)
     }
 

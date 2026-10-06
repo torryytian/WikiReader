@@ -275,9 +275,9 @@ struct SettingsView: View {
             case .finished:
                 previewingVoice = nil
                 cacheSize = SpeechAudioCache.standard.totalSize()
-            case .failed(_, let message):
+            case .failed(_, let failure):
                 previewingVoice = nil
-                previewError = message
+                previewError = failure.message
             case .started, .willSpeak:
                 break
             }

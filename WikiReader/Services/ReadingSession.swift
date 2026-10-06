@@ -31,7 +31,7 @@ final class ReadingSession {
     /// need a moment to generate audio).
     private(set) var isWaitingForAudio = false
     /// Why speech stopped unexpectedly; cleared on the next play.
-    private(set) var errorMessage: String?
+    private(set) var failure: SpeechFailure?
 
     /// Called whenever reading moves to another block, so the position can be saved.
     @ObservationIgnored var onBlockChange: (Int) -> Void = { _ in }
@@ -60,7 +60,7 @@ final class ReadingSession {
     /// Continues where speech left off: the paused word, else the start of `currentBlock`.
     func play() {
         guard !blocks.isEmpty, state != .playing else { return }
-        errorMessage = nil
+        failure = nil
         if state == .paused && hasActiveUtterance {
             engine.resume()
             state = .playing
@@ -116,8 +116,8 @@ final class ReadingSession {
         }
     }
 
-    func dismissError() {
-        errorMessage = nil
+    func dismissFailure() {
+        failure = nil
     }
 
     /// Switches to another engine (e.g. the system voice after a cloud voice failed), keeping the
@@ -128,7 +128,7 @@ final class ReadingSession {
         engine.onEvent = nil  // late events from the old engine must not reach us
         engine = newEngine
         newEngine.onEvent = { [weak self] event in self?.handle(event) }
-        errorMessage = nil
+        failure = nil
         Log.speech.info("Speech engine replaced")
         if state == .playing {
             speakCurrentBlock(from: wordOffset)
@@ -214,14 +214,14 @@ final class ReadingSession {
             guard id == utteranceID else { return }
             isWaitingForAudio = false
             spokenWord = Position(block: currentBlock, range: range)
-        case .failed(let id, let message):
+        case .failed(let id, let failure):
             guard id == utteranceID else { return }
             // Keep the place: play retries from the last word heard.
-            Log.speech.error("Speech failed in block \(self.currentBlock): \(message, privacy: .public)")
+            Log.speech.error("Speech failed in block \(self.currentBlock): \(failure.message, privacy: .public)")
             resumeOffset = spokenWord?.range.location ?? 0
             hasActiveUtterance = false
             isWaitingForAudio = false
-            errorMessage = message
+            self.failure = failure
             state = .paused
         case .finished(let id):
             guard id == utteranceID else { return }

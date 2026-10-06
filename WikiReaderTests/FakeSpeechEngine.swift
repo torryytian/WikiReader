@@ -34,8 +34,8 @@ final class FakeSpeechEngine: SpeechEngine {
     }
 
     /// Pretends the given (default: last) utterance failed.
-    func emitFailed(_ message: String, id: Int? = nil) {
-        onEvent?(.failed(id: id ?? lastSpoken!.id, message: message))
+    func emitFailed(_ message: String, fixableInSettings: Bool = false, id: Int? = nil) {
+        onEvent?(.failed(id: id ?? lastSpoken!.id, failure: SpeechFailure(message: message, isFixableInSettings: fixableInSettings)))
     }
 
     /// Pretends the last utterance reached the word at `range` (relative to its whole text).

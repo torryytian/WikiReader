@@ -255,11 +255,11 @@ struct ReadingSessionTests {
         engine.emitWord(NSRange(location: 7, length: 4))  // "born"
         engine.emitFailed("No network")
         #expect(session.state == .paused)
-        #expect(session.errorMessage == "No network")
+        #expect(session.failure == SpeechFailure(message: "No network"))
         #expect(!session.isWaitingForAudio)
 
         session.play()  // retry from the last word heard, as a new utterance
-        #expect(session.errorMessage == nil)
+        #expect(session.failure == nil)
         #expect(engine.lastSpoken?.startOffset == 7)
         #expect(!engine.calls.contains(.resume))
     }
@@ -271,7 +271,7 @@ struct ReadingSessionTests {
         session.next()
         engine.emitFailed("Late error", id: oldID)
         #expect(session.state == .playing)
-        #expect(session.errorMessage == nil)
+        #expect(session.failure == nil)
     }
 
     // MARK: - Switching engines
@@ -284,7 +284,7 @@ struct ReadingSessionTests {
 
         let fallback = FakeSpeechEngine()
         session.replaceEngine(fallback)
-        #expect(session.errorMessage == nil)
+        #expect(session.failure == nil)
         #expect(session.state == .paused)
         session.play()
         #expect(fallback.lastSpoken?.startOffset == 7)

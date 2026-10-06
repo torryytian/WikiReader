@@ -237,7 +237,8 @@ struct OpenAISpeechEngineTests {
         let engine = makeEngine(key: nil)
         engine.speak(SpeechUtterance(id: 1, text: "No key.", rate: .normal))
         try await wait { !recorder.events.isEmpty }
-        #expect(recorder.events == [.failed(id: 1, message: OpenAITTSError.missingKey.message)])
+        #expect(recorder.events == [.failed(id: 1, failure: OpenAITTSError.missingKey.failure)])
+        #expect(OpenAITTSError.missingKey.failure.isFixableInSettings)
         #expect(await requestCount == 0)
     }
 
@@ -245,7 +246,9 @@ struct OpenAISpeechEngineTests {
         let engine = makeEngine(status: 401)
         engine.speak(SpeechUtterance(id: 1, text: "Bad key.", rate: .normal))
         try await wait { !recorder.events.isEmpty }
-        #expect(recorder.events == [.failed(id: 1, message: OpenAITTSError.invalidKey.message)])
+        #expect(recorder.events == [.failed(id: 1, failure: OpenAITTSError.invalidKey.failure)])
+        #expect(OpenAITTSError.invalidKey.failure.isFixableInSettings)
+        #expect(!OpenAITTSError.rateLimited.failure.isFixableInSettings)
         #expect(recorder.clips.isEmpty)
     }
 }

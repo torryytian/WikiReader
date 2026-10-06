@@ -13,6 +13,7 @@ struct ReaderView: View {
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
     /// Whether the session currently uses a cloud engine (and so could fall back to the system voice).
     @State private var usesCloudEngine = false
+    @State private var isShowingSettings = false
     @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
 
     var body: some View {
@@ -37,19 +38,24 @@ struct ReaderView: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     // One opaque bottom area, so article text scrolling underneath never shows through.
                     VStack(spacing: 0) {
-                        if let message = session.errorMessage {
+                        if let failure = session.failure {
                             SpeechErrorBanner(
                                 title: usesCloudEngine ? "OpenAI voice unavailable" : "Reading stopped",
-                                message: message,
+                                failure: failure,
+                                onOpenSettings: { isShowingSettings = true },
+                                onRetry: session.play,
                                 onUseSystemVoice: usesCloudEngine ? { useSystemVoice(in: session) } : nil,
-                                onDismiss: session.dismissError
+                                onDismiss: session.dismissFailure
                             )
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                         PlayerBar(session: session)
                     }
                     .background(.bar)
-                    .animation(.default, value: session.errorMessage)
+                    .animation(.default, value: session.failure)
+                }
+                .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
+                    SettingsView()
                 }
             }
         }
@@ -92,6 +98,15 @@ struct ReaderView: View {
         case .openAI:
             usesCloudEngine = true
             return OpenAISpeechEngine(voice: openAIVoice)
+        }
+    }
+
+    /// Settings may have a new key, engine or voice: rebuild the engine (keeping the place) and,
+    /// if reading can work now, continue where it stopped.
+    private func settingsClosed(_ session: ReadingSession) {
+        session.replaceEngine(makeEngine())
+        if engineChoice == .system || KeychainStore.openAIKey.read() != nil {
+            session.play()
         }
     }
 

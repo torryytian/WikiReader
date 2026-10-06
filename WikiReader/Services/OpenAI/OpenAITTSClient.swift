@@ -24,6 +24,10 @@ nonisolated enum OpenAITTSError: Error, Equatable {
     /// The audio couldn't be saved or played back.
     case audio(String)
 
+    var failure: SpeechFailure {
+        SpeechFailure(message: message, isFixableInSettings: self == .missingKey || self == .invalidKey)
+    }
+
     /// Shown to the user in the reader.
     var message: String {
         switch self {

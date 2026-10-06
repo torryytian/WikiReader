@@ -210,7 +210,7 @@ final class OpenAISpeechEngine: SpeechEngine {
     private func fail(_ playback: Playback, _ error: OpenAITTSError) {
         Log.speech.error("OpenAI speech failed: \(error.message, privacy: .public)")
         stopPlayback()
-        onEvent?(.failed(id: playback.id, message: error.message))
+        onEvent?(.failed(id: playback.id, failure: error.failure))
     }
 
     // MARK: - Audio files

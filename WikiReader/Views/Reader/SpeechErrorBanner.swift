@@ -3,7 +3,9 @@ import SwiftUI
 /// Shown above the player bar when speech stopped because of an error (e.g. no key for a cloud voice).
 struct SpeechErrorBanner: View {
     let title: String
-    let message: String
+    let failure: SpeechFailure
+    var onOpenSettings: () -> Void
+    var onRetry: () -> Void
     /// Offered only when a fallback exists, i.e. a cloud voice failed.
     var onUseSystemVoice: (() -> Void)?
     var onDismiss: () -> Void
@@ -18,24 +20,25 @@ struct SpeechErrorBanner: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                Text(message)
+                Text(failure.message)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    // The main way out depends on the problem: fix the key, or simply try again.
+                    if failure.isFixableInSettings {
+                        Button("Open Settings", action: onOpenSettings)
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        Button("Retry", action: onRetry)
+                            .buttonStyle(.borderedProminent)
+                    }
                     if let onUseSystemVoice {
                         Button("Use iPhone Voice", action: onUseSystemVoice)
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        Text("or press Play to retry")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Press Play to retry.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .buttonStyle(.bordered)
                     }
                 }
+                .controlSize(.small)
                 .padding(.top, 2)
             }
 
@@ -63,7 +66,9 @@ struct SpeechErrorBanner: View {
         Spacer()
         SpeechErrorBanner(
             title: "OpenAI voice unavailable",
-            message: "No OpenAI API key. Add one in Settings.",
+            failure: OpenAITTSError.missingKey.failure,
+            onOpenSettings: {},
+            onRetry: {},
             onUseSystemVoice: {},
             onDismiss: {}
         )
