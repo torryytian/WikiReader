@@ -216,6 +216,22 @@ struct ReadingSessionTests {
         #expect(engine.spoken.count == 3)  // restarted block 0
     }
 
+    // MARK: - Preparing ahead
+
+    @Test func eachBlockPreparesOnlyTheNextOne() {
+        let session = makeSession()
+        session.play()
+        #expect(engine.prepared == ["Early life"])
+        engine.emitFinished()
+        #expect(engine.prepared == ["Early life", "He was born in Ulm."])
+    }
+
+    @Test func lastBlockPreparesNothing() {
+        let session = makeSession(startBlock: 3)
+        session.play()
+        #expect(engine.prepared.isEmpty)
+    }
+
     // MARK: - Waiting and failures
 
     @Test func waitsForAudioUntilStarted() {

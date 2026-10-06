@@ -13,6 +13,13 @@ protocol SpeechEngine: AnyObject {
     func pause()
     func resume()
     func stop()
+    /// Hint that `text` is likely to be spoken next, so audio that takes time to produce can be
+    /// prepared in advance. Engines that speak instantly ignore it.
+    func prepare(_ text: String)
+}
+
+extension SpeechEngine {
+    func prepare(_ text: String) {}
 }
 
 nonisolated struct SpeechUtterance: Equatable, Sendable {

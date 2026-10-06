@@ -170,6 +170,10 @@ final class ReadingSession {
             pauseAfter: block.kind == .heading ? Self.pauseAfterHeading : 0
         ))
         Log.speech.info("Speaking block \(self.currentBlock) from offset \(start) at \(self.rate.label, privacy: .public)")
+        // Let engines that need time to produce audio get the next block ready (only one ahead).
+        if currentBlock + 1 < blocks.count {
+            engine.prepare(blocks[currentBlock + 1].text)
+        }
     }
 
     private func discardUtterance() {

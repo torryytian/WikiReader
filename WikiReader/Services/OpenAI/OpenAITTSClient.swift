@@ -21,6 +21,8 @@ nonisolated enum OpenAITTSError: Error, Equatable {
     case server(status: Int)
     case network(String)
     case badResponse
+    /// The audio couldn't be saved or played back.
+    case audio(String)
 
     /// Shown to the user in the reader.
     var message: String {
@@ -33,6 +35,7 @@ nonisolated enum OpenAITTSError: Error, Equatable {
         case .server(let status): "OpenAI had a problem (HTTP \(status)). Try again later."
         case .network(let detail): "Couldn't reach OpenAI: \(detail)"
         case .badResponse: "OpenAI returned an unexpected response."
+        case .audio(let detail): "Couldn't play the generated audio: \(detail)"
         }
     }
 }

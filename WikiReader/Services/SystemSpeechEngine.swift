@@ -24,7 +24,7 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     }
 
     func speak(_ utterance: SpeechUtterance) {
-        activateAudioSession()
+        SpokenAudioSession.activate()
         let text = utterance.text as NSString
         let start = min(max(utterance.startOffset, 0), text.length)
         let spoken = AVSpeechUtterance(string: text.substring(from: start))
@@ -52,29 +52,7 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     func stop() {
         current = nil
         synthesizer.stopSpeaking(at: .immediate)
-        deactivateAudioSession()
-    }
-
-    // MARK: - Audio session
-
-    /// "Spoken audio" playback: audible with the silent switch on, and other apps' audio
-    /// is paused rather than mixed underneath.
-    private func activateAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio)
-            try session.setActive(true)
-        } catch {
-            Log.speech.error("Audio session activation failed: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func deactivateAudioSession() {
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            Log.speech.error("Audio session deactivation failed: \(error.localizedDescription, privacy: .public)")
-        }
+        SpokenAudioSession.deactivate()
     }
 
     // MARK: - Events
