@@ -55,6 +55,15 @@ nonisolated enum VoiceSelection {
         rankedEnglishVoices(voices).first
     }
 
+    /// The user's chosen voice if it is still installed (voices can be deleted in Settings),
+    /// otherwise the best installed English voice.
+    static func voice(preferring identifier: String?, from voices: [VoiceInfo]) -> VoiceInfo? {
+        if let identifier, let chosen = voices.first(where: { $0.identifier == identifier }) {
+            return chosen
+        }
+        return bestEnglishVoice(voices)
+    }
+
     /// Voices installed on this device. Premium and Enhanced voices must be downloaded by the user in
     /// Settings → Accessibility → Spoken Content (Read & Speak) → Voices.
     static func installedVoices() -> [VoiceInfo] {

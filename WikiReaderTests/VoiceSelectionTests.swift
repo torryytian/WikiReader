@@ -32,6 +32,17 @@ struct VoiceSelectionTests {
         #expect(VoiceSelection.bestEnglishVoice(voices)?.name == "Eddy")
     }
 
+    @Test func chosenVoiceIsUsedWhileInstalled() {
+        let voices = [voice("Ava", "en-US", .premium), voice("Karen", "en-AU", .standard)]
+        #expect(VoiceSelection.voice(preferring: "com.apple.voice.compact.en-AU.Karen", from: voices)?.name == "Karen")
+    }
+
+    @Test func missingOrNoChoiceFallsBackToBest() {
+        let voices = [voice("Karen", "en-AU", .standard), voice("Ava", "en-US", .premium)]
+        #expect(VoiceSelection.voice(preferring: "com.apple.voice.premium.en-US.Deleted", from: voices)?.name == "Ava")
+        #expect(VoiceSelection.voice(preferring: nil, from: voices)?.name == "Ava")
+    }
+
     @Test func qualityComesFirst() {
         let voices = [
             voice("Samantha", "en-US", .standard),

@@ -11,12 +11,12 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     /// by object, so this maps them back; callbacks for any other utterance are stale and dropped.
     private var current: (utterance: ObjectIdentifier, id: Int)?
 
-    /// - Parameter voiceIdentifier: A specific voice; nil picks the best installed English voice.
-    ///   Voices are always chosen explicitly: `AVSpeechSynthesisVoice(language:)` has been seen
-    ///   to ignore the user's chosen voice on iOS 26.
+    /// - Parameter voiceIdentifier: The voice to use; if nil or no longer installed, the best
+    ///   installed English voice. Voices are always chosen explicitly: `AVSpeechSynthesisVoice(language:)`
+    ///   has been seen to ignore the user's chosen voice on iOS 26.
     init(voiceIdentifier: String? = nil) {
-        let identifier = voiceIdentifier ?? VoiceSelection.bestEnglishVoice(VoiceSelection.installedVoices())?.identifier
-        voice = identifier.flatMap(AVSpeechSynthesisVoice.init(identifier:))
+        let chosen = VoiceSelection.voice(preferring: voiceIdentifier, from: VoiceSelection.installedVoices())
+        voice = chosen.flatMap { AVSpeechSynthesisVoice(identifier: $0.identifier) }
         super.init()
         synthesizer.delegate = self
         Log.speech.info("Using voice \(self.voice?.name ?? "system default", privacy: .public) (\(self.voice?.identifier ?? "-", privacy: .public))")

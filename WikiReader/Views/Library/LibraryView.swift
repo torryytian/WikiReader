@@ -8,6 +8,7 @@ struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var path: [Article] = []
     @State private var isAddingArticle = false
+    @State private var isShowingSettings = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -41,6 +42,11 @@ struct LibraryView: View {
                 ReaderView(article: article)
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Settings", systemImage: "gearshape") {
+                        isShowingSettings = true
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Article", systemImage: "plus") {
                         isAddingArticle = true
@@ -51,6 +57,9 @@ struct LibraryView: View {
                 AddArticleView { article in
                     path = [article]
                 }
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                SettingsView()
             }
         }
     }

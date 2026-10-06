@@ -8,6 +8,8 @@ struct ReaderView: View {
     // times, and laying out the article or starting a speech engine each time would be wasteful.
     @State private var document: ArticleDocument?
     @State private var session: ReadingSession?
+    @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
+    @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
 
     var body: some View {
         Group {
@@ -34,6 +36,10 @@ struct ReaderView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: session?.rate) { _, rate in
+            // The player's speed is also the default for next time.
+            if let rate { rateValue = rate.rawValue }
+        }
         .onAppear(perform: prepare)
         .onDisappear {
             session?.stop()
@@ -50,7 +56,8 @@ struct ReaderView: View {
         let session = ReadingSession(
             blocks: blocks,
             startBlock: article.lastReadBlockIndex,
-            engine: SystemSpeechEngine()
+            rate: SpeechRate(rawValue: rateValue) ?? .normal,
+            engine: SystemSpeechEngine(voiceIdentifier: voiceIdentifier)
         )
         session.onBlockChange = { [article] block in
             article.lastReadBlockIndex = block
