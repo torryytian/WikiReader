@@ -24,5 +24,7 @@ struct ReaderView: View {
             Tapped \(request.word, privacy: .public) -> term \(request.term, privacy: .public), \
             hasDefinition: \(request.hasDefinition, privacy: .public)
             """)
+        // Phase 3: pause speech here before showing the dictionary.
+        DictionaryPresenter.present(request)
     }
 }
