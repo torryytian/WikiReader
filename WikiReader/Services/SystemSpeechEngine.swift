@@ -37,7 +37,9 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     }
 
     func pause() {
-        synthesizer.pauseSpeaking(at: .word)
+        // Immediate, not at the next word boundary: by the time a pause request arrives the synthesizer
+        // has often started the following word, which it then repeats after continueSpeaking.
+        synthesizer.pauseSpeaking(at: .immediate)
     }
 
     func resume() {
