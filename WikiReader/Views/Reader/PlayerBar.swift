@@ -53,6 +53,5 @@ struct PlayerBar: View {
         .labelStyle(.iconOnly)
         .padding(.horizontal)
         .padding(.vertical, 6)
-        .background(.bar)
     }
 }

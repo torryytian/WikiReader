@@ -116,6 +116,10 @@ final class ReadingSession {
         }
     }
 
+    func dismissError() {
+        errorMessage = nil
+    }
+
     /// Switches to another engine (e.g. the system voice after a cloud voice failed), keeping the
     /// place: if playing, the new engine continues from the current word.
     func replaceEngine(_ newEngine: SpeechEngine) {

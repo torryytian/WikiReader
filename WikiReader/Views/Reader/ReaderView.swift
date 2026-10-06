@@ -35,15 +35,21 @@ struct ReaderView: View {
                 )
                 .ignoresSafeArea(edges: .bottom)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
+                    // One opaque bottom area, so article text scrolling underneath never shows through.
                     VStack(spacing: 0) {
                         if let message = session.errorMessage {
                             SpeechErrorBanner(
+                                title: usesCloudEngine ? "OpenAI voice unavailable" : "Reading stopped",
                                 message: message,
-                                onUseSystemVoice: usesCloudEngine ? { useSystemVoice(in: session) } : nil
+                                onUseSystemVoice: usesCloudEngine ? { useSystemVoice(in: session) } : nil,
+                                onDismiss: session.dismissError
                             )
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                         PlayerBar(session: session)
                     }
+                    .background(.bar)
+                    .animation(.default, value: session.errorMessage)
                 }
             }
         }
