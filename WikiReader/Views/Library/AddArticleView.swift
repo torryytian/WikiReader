@@ -1,3 +1,4 @@
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -70,17 +71,22 @@ struct AddArticleView: View {
         errorMessage = nil
         isLoading = true
         let input = input
+        Log.importing.info("Import started, input: \(input, privacy: .public)")
         importTask = Task {
             defer { isLoading = false }
             do {
                 let imported = try await ArticleImporter().importArticle(from: input)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    Log.importing.info("Import cancelled: \(imported.title, privacy: .public)")
+                    return
+                }
                 let article = try save(imported)
                 dismiss()
                 onAdded(article)
             } catch is CancellationError {
-                return
+                Log.importing.info("Import cancelled")
             } catch {
+                Log.importing.error("Import failed for input \(input, privacy: .public): \(String(describing: error), privacy: .public)")
                 if !Task.isCancelled { errorMessage = error.localizedDescription }
             }
         }
@@ -90,11 +96,15 @@ struct AddArticleView: View {
     private func save(_ imported: ImportedArticle) throws -> Article {
         let title = imported.title
         let existing = try modelContext.fetch(FetchDescriptor<Article>(predicate: #Predicate { $0.title == title }))
-        if let article = existing.first { return article }
+        if let article = existing.first {
+            Log.importing.info("Already saved, opening existing: \(title, privacy: .public)")
+            return article
+        }
 
         let article = Article(title: imported.title, sourceURL: imported.sourceURL, blocks: imported.blocks)
         modelContext.insert(article)
         try modelContext.save()
+        Log.importing.info("Saved \(title, privacy: .public) with \(imported.blocks.count) blocks")
         return article
     }
 }
