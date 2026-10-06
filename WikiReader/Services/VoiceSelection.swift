@@ -24,18 +24,26 @@ nonisolated struct VoiceInfo: Equatable, Sendable {
     var quality: Quality
     /// Novelty voices ("Bubbles", "Bad News", ...) and the user's Personal Voice aren't suitable for reading.
     var isNoveltyOrPersonal: Bool
+
+    /// Older synthesizer generations (MacinTalk "Fred", "Kathy", ...; Eloquence "Eddy", "Flo", ...)
+    /// sound clearly worse than current Apple voices of the same nominal quality.
+    var isLegacy: Bool {
+        identifier.hasPrefix("com.apple.speech.synthesis.voice.") || identifier.hasPrefix("com.apple.eloquence.")
+    }
 }
 
 nonisolated enum VoiceSelection {
     /// Accents in order of preference when voices are otherwise equal.
     static let preferredLanguages = ["en-US", "en-GB", "en-AU", "en-IE", "en-CA", "en-ZA", "en-IN"]
 
-    /// English voices suitable for reading, best first: by quality, then accent preference, then name.
+    /// English voices suitable for reading, best first: by quality, then current before legacy voices,
+    /// then accent preference, then name.
     static func rankedEnglishVoices(_ voices: [VoiceInfo]) -> [VoiceInfo] {
         voices
             .filter { $0.language.hasPrefix("en") && !$0.isNoveltyOrPersonal }
             .sorted { a, b in
                 if a.quality != b.quality { return a.quality > b.quality }
+                if a.isLegacy != b.isLegacy { return !a.isLegacy }
                 let rankA = preferredLanguages.firstIndex(of: a.language) ?? preferredLanguages.count
                 let rankB = preferredLanguages.firstIndex(of: b.language) ?? preferredLanguages.count
                 if rankA != rankB { return rankA < rankB }

@@ -3,9 +3,33 @@ import Testing
 
 struct VoiceSelectionTests {
     private func voice(
-        _ name: String, _ language: String, _ quality: VoiceInfo.Quality, novelty: Bool = false
+        _ name: String, _ language: String, _ quality: VoiceInfo.Quality,
+        novelty: Bool = false, identifier: String? = nil
     ) -> VoiceInfo {
-        VoiceInfo(identifier: "id.\(name)", name: name, language: language, quality: quality, isNoveltyOrPersonal: novelty)
+        VoiceInfo(
+            identifier: identifier ?? "com.apple.voice.compact.\(language).\(name)",
+            name: name, language: language, quality: quality, isNoveltyOrPersonal: novelty
+        )
+    }
+
+    /// The English voices a fresh iOS 27 simulator has (all "standard" quality).
+    @Test func simulatorVoicesPickSamanthaNotFred() {
+        let voices = [
+            voice("Daniel", "en-GB", .standard, identifier: "com.apple.voice.super-compact.en-GB.Daniel"),
+            voice("Samantha", "en-US", .standard, identifier: "com.apple.voice.super-compact.en-US.Samantha"),
+            voice("Fred", "en-US", .standard, identifier: "com.apple.speech.synthesis.voice.Fred"),
+            voice("Kathy", "en-US", .standard, identifier: "com.apple.speech.synthesis.voice.Kathy"),
+            voice("Albert", "en-US", .standard, novelty: true, identifier: "com.apple.speech.synthesis.voice.Albert"),
+        ]
+        #expect(VoiceSelection.rankedEnglishVoices(voices).map(\.name) == ["Samantha", "Daniel", "Fred", "Kathy"])
+    }
+
+    @Test func legacyVoiceLosesOnlyAtEqualQuality() {
+        let voices = [
+            voice("Eddy", "en-US", .enhanced, identifier: "com.apple.eloquence.en-US.Eddy"),
+            voice("Samantha", "en-US", .standard),
+        ]
+        #expect(VoiceSelection.bestEnglishVoice(voices)?.name == "Eddy")
     }
 
     @Test func qualityComesFirst() {
