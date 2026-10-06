@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import UIKit
 
@@ -62,9 +63,12 @@ struct ArticleTextView: UIViewRepresentable {
 
         private var spokenRange: NSRange?
         private var spokenBlock: Int?
-        /// Set when the user scrolls during speech: stop following until speech reaches another block,
-        /// so reading back a few lines isn't yanked away.
+        /// Set while following is paused because the user scrolled during speech, so reading back a few
+        /// lines isn't yanked away. Holds the block being spoken when the user started scrolling.
         private var followPausedInBlock: Int?
+        private var resumeFollowing: DispatchWorkItem?
+        /// How long after the user's scrolling stops before the view follows speech again.
+        static var followResumeDelay: TimeInterval = 3
 
         private static let tapColor = UIColor.tintColor.withAlphaComponent(0.25)
         private static let spokenColor = UIColor { traits in
@@ -94,8 +98,8 @@ struct ArticleTextView: UIViewRepresentable {
             guard let range, NSMaxRange(range) <= storage.length else { return }
             storage.addAttribute(.backgroundColor, value: Self.spokenColor, range: range)
 
-            if let paused = followPausedInBlock, paused != block {
-                followPausedInBlock = nil
+            if let paused = followPausedInBlock, paused != block, !textView.isTracking {
+                resumeFollowingSpeech(reason: "speech reached block \(block ?? -1)")
             }
             if followPausedInBlock == nil {
                 scrollToKeepVisible(range, in: textView)
@@ -120,13 +124,46 @@ struct ArticleTextView: UIViewRepresentable {
 
             let maxOffset = max(textView.contentSize.height + insets.bottom - textView.bounds.height, -insets.top)
             let target = min(max(wordRect.minY - insets.top - visibleHeight / 3, -insets.top), maxOffset)
+            Log.speech.info("Auto-scroll to y=\(Int(target)) for word at y=\(Int(wordRect.minY))")
             textView.setContentOffset(CGPoint(x: 0, y: target), animated: true)
         }
 
+        // Following pauses when the user starts scrolling during speech, and resumes once their
+        // scrolling has stopped for a moment or speech moves on to another block, whichever comes first.
+
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            if spokenRange != nil {
-                followPausedInBlock = spokenBlock
+            resumeFollowing?.cancel()
+            guard spokenRange != nil, followPausedInBlock == nil else { return }
+            followPausedInBlock = spokenBlock
+            Log.speech.info("Follow paused: user scrolling")
+        }
+
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            if !decelerate { scheduleResumeFollowing() }
+        }
+
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            scheduleResumeFollowing()
+        }
+
+        private func scheduleResumeFollowing() {
+            guard followPausedInBlock != nil else { return }
+            resumeFollowing?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.resumeFollowingSpeech(reason: "scrolling stopped")
             }
+            resumeFollowing = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.followResumeDelay, execute: work)
+        }
+
+        private func resumeFollowingSpeech(reason: String) {
+            resumeFollowing?.cancel()
+            resumeFollowing = nil
+            guard followPausedInBlock != nil else { return }
+            followPausedInBlock = nil
+            Log.speech.info("Follow resumed: \(reason, privacy: .public)")
+            // No scroll here: the next spoken word scrolls into view. While speech is paused
+            // nothing is spoken, so browsing the article doesn't get pulled back.
         }
 
         // MARK: Tap to look up
