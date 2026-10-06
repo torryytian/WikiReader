@@ -274,6 +274,39 @@ struct ReadingSessionTests {
         #expect(session.errorMessage == nil)
     }
 
+    // MARK: - Switching engines
+
+    @Test func replacingAfterFailureContinuesWithNewEngine() {
+        let session = makeSession(startBlock: 2)
+        session.play()
+        engine.emitWord(NSRange(location: 7, length: 4))
+        engine.emitFailed("No network")
+
+        let fallback = FakeSpeechEngine()
+        session.replaceEngine(fallback)
+        #expect(session.errorMessage == nil)
+        #expect(session.state == .paused)
+        session.play()
+        #expect(fallback.lastSpoken?.startOffset == 7)
+        #expect(fallback.lastSpoken?.text == "He was born in Ulm.")
+    }
+
+    @Test func replacingWhilePlayingSwitchesImmediately() {
+        let session = makeSession(startBlock: 2)
+        session.play()
+        engine.emitWord(NSRange(location: 7, length: 4))
+        let oldID = engine.lastSpoken!.id
+
+        let fallback = FakeSpeechEngine()
+        session.replaceEngine(fallback)
+        #expect(engine.calls.last == .stop)
+        #expect(fallback.lastSpoken?.startOffset == 7)
+        #expect(session.isPlaying)
+
+        engine.onEvent?(.finished(id: oldID))  // the old engine is detached
+        #expect(session.currentBlock == 2)
+    }
+
     // MARK: - Position set from scrolling
 
     @Test func scrolledPositionAppliesWhenStopped() {

@@ -9,6 +9,10 @@ struct ReaderView: View {
     @State private var document: ArticleDocument?
     @State private var session: ReadingSession?
     @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
+    @AppStorage(SettingsKeys.speechEngine) private var engineChoice = SpeechEngineChoice.system
+    @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
+    /// Whether the session currently uses a cloud engine (and so could fall back to the system voice).
+    @State private var usesCloudEngine = false
     @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
 
     var body: some View {
@@ -31,7 +35,15 @@ struct ReaderView: View {
                 )
                 .ignoresSafeArea(edges: .bottom)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    PlayerBar(session: session)
+                    VStack(spacing: 0) {
+                        if let message = session.errorMessage {
+                            SpeechErrorBanner(
+                                message: message,
+                                onUseSystemVoice: usesCloudEngine ? { useSystemVoice(in: session) } : nil
+                            )
+                        }
+                        PlayerBar(session: session)
+                    }
                 }
             }
         }
@@ -57,13 +69,32 @@ struct ReaderView: View {
             blocks: blocks,
             startBlock: article.lastReadBlockIndex,
             rate: SpeechRate(rawValue: rateValue) ?? .normal,
-            engine: SystemSpeechEngine(voiceIdentifier: voiceIdentifier)
+            engine: makeEngine()
         )
         session.onBlockChange = { [article] block in
             article.lastReadBlockIndex = block
             Log.app.info("Reading position saved: block \(block)")
         }
         self.session = session
+    }
+
+    private func makeEngine() -> SpeechEngine {
+        switch engineChoice {
+        case .system:
+            usesCloudEngine = false
+            return SystemSpeechEngine(voiceIdentifier: voiceIdentifier)
+        case .openAI:
+            usesCloudEngine = true
+            return OpenAISpeechEngine(voice: openAIVoice)
+        }
+    }
+
+    /// For this reading only: settings keep the cloud voice for next time.
+    private func useSystemVoice(in session: ReadingSession) {
+        Log.speech.info("Falling back to the system voice for this article")
+        usesCloudEngine = false
+        session.replaceEngine(SystemSpeechEngine(voiceIdentifier: voiceIdentifier))
+        session.play()
     }
 
     private func lookUpWord(at range: NSRange, in document: ArticleDocument, pausing session: ReadingSession) {

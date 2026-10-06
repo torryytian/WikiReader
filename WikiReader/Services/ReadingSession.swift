@@ -37,7 +37,7 @@ final class ReadingSession {
     @ObservationIgnored var onBlockChange: (Int) -> Void = { _ in }
 
     @ObservationIgnored private let blocks: [ContentBlock]
-    @ObservationIgnored private let engine: SpeechEngine
+    @ObservationIgnored private var engine: SpeechEngine
     /// Id of the utterance we're waiting on; events with other ids are stale.
     @ObservationIgnored private var utteranceID = 0
     /// Whether the engine holds a (possibly paused) utterance for `currentBlock` that `resume` can continue.
@@ -113,6 +113,23 @@ final class ReadingSession {
             resumeOffset = wordOffset
         case .stopped:
             break
+        }
+    }
+
+    /// Switches to another engine (e.g. the system voice after a cloud voice failed), keeping the
+    /// place: if playing, the new engine continues from the current word.
+    func replaceEngine(_ newEngine: SpeechEngine) {
+        let wordOffset = spokenWord?.range.location ?? resumeOffset
+        discardUtterance()
+        engine.onEvent = nil  // late events from the old engine must not reach us
+        engine = newEngine
+        newEngine.onEvent = { [weak self] event in self?.handle(event) }
+        errorMessage = nil
+        Log.speech.info("Speech engine replaced")
+        if state == .playing {
+            speakCurrentBlock(from: wordOffset)
+        } else {
+            resumeOffset = wordOffset
         }
     }
 

@@ -31,6 +31,15 @@ struct PlayerBar: View {
                 .font(.system(size: 48))
                 .frame(width: 72, height: 56)
                 .contentTransition(.symbolEffect(.replace))
+                .overlay {
+                    // A cloud voice may take a moment to generate audio before sound starts.
+                    if session.isPlaying && session.isWaitingForAudio {
+                        ProgressView()
+                            .controlSize(.large)
+                            .allowsHitTesting(false)
+                            .accessibilityLabel("Loading audio")
+                    }
+                }
 
             Button("Next Paragraph", systemImage: "forward.end.fill", action: session.next)
                 .font(.title2)
