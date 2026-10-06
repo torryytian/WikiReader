@@ -1,0 +1,73 @@
+import UIKit
+
+/// The whole article as one attributed string, plus where each block lives in it.
+/// `blockRanges[i]` is the range of `blocks[i]`; speech, highlighting and
+/// "start reading from this paragraph" all map between blocks and text through it.
+struct ArticleDocument {
+    let attributedText: NSAttributedString
+    let blockRanges: [NSRange]
+    /// Range of the article title shown above the first block.
+    let titleRange: NSRange
+
+    init(title: String, blocks: [ContentBlock]) {
+        let text = NSMutableAttributedString()
+
+        let titleStart = text.length
+        text.append(NSAttributedString(string: title, attributes: Self.attributes(for: .title)))
+        titleRange = NSRange(location: titleStart, length: text.length - titleStart)
+
+        var ranges: [NSRange] = []
+        ranges.reserveCapacity(blocks.count)
+        for block in blocks {
+            text.append(NSAttributedString(string: "\n"))
+            let style: Style = block.kind == .heading ? .heading(level: block.level) : .paragraph
+            let start = text.length
+            text.append(NSAttributedString(string: block.text, attributes: Self.attributes(for: style)))
+            ranges.append(NSRange(location: start, length: text.length - start))
+        }
+
+        attributedText = text
+        blockRanges = ranges
+    }
+
+    // MARK: - Styling
+
+    enum Style {
+        case title
+        case heading(level: Int)
+        case paragraph
+    }
+
+    static func attributes(for style: Style) -> [NSAttributedString.Key: Any] {
+        let paragraph = NSMutableParagraphStyle()
+        let font: UIFont
+        switch style {
+        case .title:
+            font = scaledFont(.largeTitle, weight: .bold)
+            paragraph.paragraphSpacing = 12
+        case .heading(let level):
+            switch level {
+            case ...2: font = scaledFont(.title2, weight: .bold)
+            case 3: font = scaledFont(.title3, weight: .semibold)
+            default: font = scaledFont(.headline, weight: .semibold)
+            }
+            paragraph.paragraphSpacingBefore = level <= 2 ? 24 : 16
+            paragraph.paragraphSpacing = 8
+        case .paragraph:
+            font = UIFont.preferredFont(forTextStyle: .body).withSize(19)
+            paragraph.lineSpacing = 5
+            paragraph.paragraphSpacing = 14
+        }
+        return [
+            .font: font,
+            .foregroundColor: UIColor.label,  // adapts to dark mode
+            .paragraphStyle: paragraph,
+        ]
+    }
+
+    private static func scaledFont(_ style: UIFont.TextStyle, weight: UIFont.Weight) -> UIFont {
+        let base = UIFont.preferredFont(forTextStyle: style)
+        let font = UIFont.systemFont(ofSize: base.pointSize, weight: weight)
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: font)
+    }
+}
