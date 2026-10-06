@@ -14,13 +14,17 @@ struct ArticleTextView: UIViewRepresentable {
     var onWordTapped: (NSRange) -> Void = { _ in }
     /// Called with the index of a long-pressed block (the title counts as block 0).
     var onBlockLongPressed: (Int) -> Void = { _ in }
+    /// Block to show at the top when the article first appears.
+    var initialBlock = 0
+    /// Called with the block at the top of the screen after the user scrolls and lets go.
+    var onScrollSettled: (Int) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+        let textView = LayoutReportingTextView()
         textView.isEditable = false
         // Selection would compete with tap-to-look-up.
         textView.isSelectable = false
@@ -36,8 +40,14 @@ struct ArticleTextView: UIViewRepresentable {
         let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
         textView.addGestureRecognizer(longPress)
 
-        context.coordinator.textView = textView
-        context.coordinator.show(document)
+        let coordinator = context.coordinator
+        coordinator.textView = textView
+        coordinator.show(document)
+        if initialBlock > 0 {
+            // The view has no size yet; scroll once it has been laid out.
+            coordinator.pendingScrollBlock = initialBlock
+            textView.onLayout = { [weak coordinator] in coordinator?.performPendingScroll() }
+        }
         return textView
     }
 
@@ -45,6 +55,7 @@ struct ArticleTextView: UIViewRepresentable {
         let coordinator = context.coordinator
         coordinator.onWordTapped = onWordTapped
         coordinator.onBlockLongPressed = onBlockLongPressed
+        coordinator.onScrollSettled = onScrollSettled
         coordinator.show(document)
         coordinator.showSpokenWord(spokenWord, inBlock: spokenBlock)
     }
@@ -55,6 +66,8 @@ struct ArticleTextView: UIViewRepresentable {
         weak var textView: UITextView?
         var onWordTapped: (NSRange) -> Void = { _ in }
         var onBlockLongPressed: (Int) -> Void = { _ in }
+        var onScrollSettled: (Int) -> Void = { _ in }
+        var pendingScrollBlock: Int?
 
         private var document: ArticleDocument?
         private var shownText: NSAttributedString?
@@ -108,13 +121,7 @@ struct ArticleTextView: UIViewRepresentable {
 
         /// Keeps the spoken word on screen: once it gets near an edge, scroll it to a third of the way down.
         private func scrollToKeepVisible(_ range: NSRange, in textView: UITextView) {
-            guard !textView.isTracking, !textView.isDecelerating,
-                  let start = textView.position(from: textView.beginningOfDocument, offset: range.location),
-                  let end = textView.position(from: start, offset: range.length),
-                  let textRange = textView.textRange(from: start, to: end)
-            else { return }
-            let wordRect = textView.firstRect(for: textRange)
-            guard !wordRect.isNull, !wordRect.isInfinite else { return }
+            guard !textView.isTracking, !textView.isDecelerating, let wordRect = textView.rect(of: range) else { return }
 
             let insets = textView.adjustedContentInset
             let visibleTop = textView.contentOffset.y + insets.top
@@ -122,10 +129,54 @@ struct ArticleTextView: UIViewRepresentable {
             let comfortable = visibleTop + visibleHeight * 0.1 ... visibleTop + visibleHeight * 0.8
             guard !comfortable.contains(wordRect.minY) || !comfortable.contains(wordRect.maxY) else { return }
 
-            let maxOffset = max(textView.contentSize.height + insets.bottom - textView.bounds.height, -insets.top)
-            let target = min(max(wordRect.minY - insets.top - visibleHeight / 3, -insets.top), maxOffset)
+            let target = textView.clampedOffset(wordRect.minY - insets.top - visibleHeight / 3)
             Log.speech.info("Auto-scroll to y=\(Int(target)) for word at y=\(Int(wordRect.minY))")
             textView.setContentOffset(CGPoint(x: 0, y: target), animated: true)
+        }
+
+        // MARK: Reading position
+
+        func performPendingScroll() {
+            guard pendingScrollBlock != nil, let textView, textView.bounds.height > 0 else { return }
+            // Not from inside layoutSubviews: scrolling there would re-enter layout.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let block = pendingScrollBlock else { return }
+                pendingScrollBlock = nil
+                scroll(toBlock: block)
+            }
+        }
+
+        /// Puts the start of a block at the top of the screen.
+        func scroll(toBlock block: Int) {
+            guard let textView, let document, document.blockRanges.indices.contains(block) else { return }
+            let start = NSRange(location: document.blockRanges[block].location, length: 1)
+            // Off-screen positions are estimates in TextKit 2 until laid out, so measure again
+            // after each jump until the position stops moving.
+            for _ in 0..<4 {
+                guard let rect = textView.rect(of: start) else { return }
+                let target = textView.clampedOffset(rect.minY - textView.adjustedContentInset.top - 8)
+                guard abs(target - textView.contentOffset.y) >= 1 else { break }
+                textView.setContentOffset(CGPoint(x: 0, y: target), animated: false)
+                textView.layoutIfNeeded()
+            }
+            Log.app.info("Restored reading position: block \(block)")
+        }
+
+        /// The block whose text is at the top of the visible area.
+        func topVisibleBlock() -> Int? {
+            guard let textView, let document else { return nil }
+            let point = CGPoint(
+                x: textView.textContainerInset.left + 1,
+                y: textView.contentOffset.y + textView.adjustedContentInset.top + textView.textContainerInset.top
+            )
+            guard let position = textView.closestPosition(to: point) else { return nil }
+            return document.blockIndex(nearest: textView.offset(from: textView.beginningOfDocument, to: position))
+        }
+
+        private func reportScrollSettled() {
+            if let block = topVisibleBlock() {
+                onScrollSettled(block)
+            }
         }
 
         // Following pauses when the user starts scrolling during speech, and resumes once their
@@ -139,11 +190,15 @@ struct ArticleTextView: UIViewRepresentable {
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-            if !decelerate { scheduleResumeFollowing() }
+            if !decelerate {
+                scheduleResumeFollowing()
+                reportScrollSettled()
+            }
         }
 
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
             scheduleResumeFollowing()
+            reportScrollSettled()
         }
 
         private func scheduleResumeFollowing() {
@@ -209,5 +264,34 @@ struct ArticleTextView: UIViewRepresentable {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             onBlockLongPressed(block)
         }
+    }
+}
+
+/// A text view that reports layout passes, so work that needs a real size can wait for one.
+final class LayoutReportingTextView: UITextView {
+    var onLayout: (() -> Void)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?()
+    }
+}
+
+extension UITextView {
+    /// On-screen rect (content coordinates) of the first line of a text range.
+    func rect(of range: NSRange) -> CGRect? {
+        guard let start = position(from: beginningOfDocument, offset: range.location),
+              let end = position(from: start, offset: range.length),
+              let textRange = textRange(from: start, to: end)
+        else { return nil }
+        let rect = firstRect(for: textRange)
+        return rect.isNull || rect.isInfinite ? nil : rect
+    }
+
+    /// A vertical content offset limited to the scrollable range.
+    func clampedOffset(_ y: CGFloat) -> CGFloat {
+        let insets = adjustedContentInset
+        let maxOffset = max(contentSize.height + insets.bottom - bounds.height, -insets.top)
+        return min(max(y, -insets.top), maxOffset)
     }
 }

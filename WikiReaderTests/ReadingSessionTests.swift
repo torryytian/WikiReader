@@ -216,6 +216,37 @@ struct ReadingSessionTests {
         #expect(engine.spoken.count == 3)  // restarted block 0
     }
 
+    // MARK: - Position set from scrolling
+
+    @Test func scrolledPositionAppliesWhenStopped() {
+        var saved: [Int] = []
+        let session = makeSession()
+        session.onBlockChange = { saved.append($0) }
+        session.moveWhileStopped(to: 3)
+        #expect(session.currentBlock == 3)
+        #expect(saved == [3])
+        session.play()
+        #expect(engine.lastSpoken?.text == "He moved to Munich.")
+    }
+
+    @Test func scrolledPositionIsIgnoredWhilePlayingOrPaused() {
+        let session = makeSession()
+        session.play()
+        session.moveWhileStopped(to: 3)
+        #expect(session.currentBlock == 0)
+        session.pause()
+        session.moveWhileStopped(to: 3)
+        #expect(session.currentBlock == 0)
+        session.play()
+        #expect(engine.calls.last == .resume)
+    }
+
+    @Test func scrolledPositionOutOfRangeIsIgnored() {
+        let session = makeSession()
+        session.moveWhileStopped(to: 42)
+        #expect(session.currentBlock == 0)
+    }
+
     // MARK: - Speed
 
     @Test func rateChangeWhilePlayingRestartsAtCurrentWord() {

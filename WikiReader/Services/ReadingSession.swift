@@ -112,6 +112,13 @@ final class ReadingSession {
         }
     }
 
+    /// Sets where reading will start, e.g. the paragraph the user scrolled to.
+    /// Ignored while playing or paused: the spoken position wins then.
+    func moveWhileStopped(to block: Int) {
+        guard state == .stopped, blocks.indices.contains(block) else { return }
+        move(to: block)
+    }
+
     func stop() {
         guard state != .stopped || hasActiveUtterance else { return }
         discardUtterance()

@@ -1,4 +1,5 @@
 import OSLog
+import SwiftData
 import SwiftUI
 
 struct ReaderView: View {
@@ -19,6 +20,11 @@ struct ReaderView: View {
                     onBlockLongPressed: { block in
                         Log.speech.info("Long press: start at block \(block)")
                         session.start(at: block)
+                    },
+                    initialBlock: article.lastReadBlockIndex,
+                    onScrollSettled: { block in
+                        // Scrolling only moves the reading position when nothing is being read.
+                        session.moveWhileStopped(to: block)
                     }
                 )
                 .ignoresSafeArea(edges: .bottom)
@@ -29,7 +35,11 @@ struct ReaderView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: prepare)
-        .onDisappear { session?.stop() }
+        .onDisappear {
+            session?.stop()
+            // Save now rather than waiting for autosave, so the position survives the app being killed.
+            try? article.modelContext?.save()
+        }
     }
 
     private func prepare() {
@@ -44,6 +54,7 @@ struct ReaderView: View {
         )
         session.onBlockChange = { [article] block in
             article.lastReadBlockIndex = block
+            Log.app.info("Reading position saved: block \(block)")
         }
         self.session = session
     }
