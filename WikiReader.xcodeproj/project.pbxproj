@@ -6,11 +6,27 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		AE3340E53074BF5100567558 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AE8AEE9F3074A1620041C43A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AE8AEEA63074A1620041C43A;
+			remoteInfo = WikiReader;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		AE3340E13074BF5100567558 /* WikiReaderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WikiReaderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE8AEEA73074A1620041C43A /* WikiReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WikiReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AE3340E23074BF5100567558 /* WikiReaderTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WikiReaderTests;
+			sourceTree = "<group>";
+		};
 		AE8AEEA93074A1620041C43A /* WikiReader */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = WikiReader;
@@ -19,6 +35,11 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AE3340DE3074BF5100567558 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 		AE8AEEA43074A1620041C43A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -31,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				AE8AEEA93074A1620041C43A /* WikiReader */,
+				AE3340E23074BF5100567558 /* WikiReaderTests */,
 				AE8AEEA83074A1620041C43A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				AE8AEEA73074A1620041C43A /* WikiReader.app */,
+				AE3340E13074BF5100567558 /* WikiReaderTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -46,6 +69,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AE3340E03074BF5100567558 /* WikiReaderTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE3340E93074BF5100567558 /* Build configuration list for PBXNativeTarget "WikiReaderTests" */;
+			buildPhases = (
+				AE3340DD3074BF5100567558 /* Sources */,
+				AE3340DE3074BF5100567558 /* Frameworks */,
+				AE3340DF3074BF5100567558 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AE3340E63074BF5100567558 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AE3340E23074BF5100567558 /* WikiReaderTests */,
+			);
+			name = WikiReaderTests;
+			productName = WikiReaderTests;
+			productReference = AE3340E13074BF5100567558 /* WikiReaderTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		AE8AEEA63074A1620041C43A /* WikiReader */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AE8AEEB23074A1630041C43A /* Build configuration list for PBXNativeTarget "WikiReader" */;
@@ -74,6 +118,10 @@
 				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
+					AE3340E03074BF5100567558 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = AE8AEEA63074A1620041C43A;
+					};
 					AE8AEEA63074A1620041C43A = {
 						CreatedOnToolsVersion = 27.0;
 					};
@@ -94,11 +142,17 @@
 			projectRoot = "";
 			targets = (
 				AE8AEEA63074A1620041C43A /* WikiReader */,
+				AE3340E03074BF5100567558 /* WikiReaderTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AE3340DF3074BF5100567558 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 		AE8AEEA53074A1620041C43A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
@@ -107,6 +161,11 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AE3340DD3074BF5100567558 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		AE8AEEA33074A1620041C43A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -114,7 +173,57 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AE3340E63074BF5100567558 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AE8AEEA63074A1620041C43A /* WikiReader */;
+			targetProxy = AE3340E53074BF5100567558 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		AE3340E73074BF5100567558 /* Debug configuration for PBXNativeTarget "WikiReaderTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tik.tian.com.WikiReaderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WikiReader.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WikiReader";
+			};
+			name = Debug;
+		};
+		AE3340E83074BF5100567558 /* Release configuration for PBXNativeTarget "WikiReaderTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tik.tian.com.WikiReaderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WikiReader.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WikiReader";
+			};
+			name = Release;
+		};
 		AE8AEEB03074A1630041C43A /* Debug configuration for PBXProject "WikiReader" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -297,6 +406,14 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AE3340E93074BF5100567558 /* Build configuration list for PBXNativeTarget "WikiReaderTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE3340E73074BF5100567558 /* Debug configuration for PBXNativeTarget "WikiReaderTests" */,
+				AE3340E83074BF5100567558 /* Release configuration for PBXNativeTarget "WikiReaderTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
 		AE8AEEA23074A1620041C43A /* Build configuration list for PBXProject "WikiReader" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

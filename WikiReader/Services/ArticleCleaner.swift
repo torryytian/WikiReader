@@ -128,13 +128,19 @@ nonisolated enum ArticleCleaner {
     /// is dropped, so `(/ˈaɪnstaɪn/ EYEN-styne; German: [ˈalbɛʁt] ⓘ; 14 March 1879 – 1955)`
     /// becomes `(14 March 1879 – 1955)`, and parentheses left empty are removed entirely.
     static func removingPronunciation(_ text: String) -> String {
-        var text = text.replacing(#/(\s*)\(([^()]*)\)/#) { match in
-            let (whole, leadingSpace, content) = match.output
-            let parts = content.split(separator: ";", omittingEmptySubsequences: false)
-            let kept = parts.filter { !isPronunciation($0) }
-            if kept.count == parts.count { return String(whole) }
-            let joined = kept.map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: "; ")
-            return joined.isEmpty ? "" : "\(leadingSpace)(\(joined))"
+        // Innermost parentheses first; repeat so "(French: [paʁi] (listen))" is handled from the inside out.
+        var text = text
+        for _ in 0..<3 {
+            let updated = text.replacing(#/(\s*)\(([^()]*)\)/#) { match in
+                let (whole, leadingSpace, content) = match.output
+                let parts = content.split(separator: ";", omittingEmptySubsequences: false)
+                let kept = parts.filter { !isPronunciation($0) }
+                if kept.count == parts.count { return String(whole) }
+                let joined = kept.map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: "; ")
+                return joined.isEmpty ? "" : "\(leadingSpace)(\(joined))"
+            }
+            if updated == text { break }
+            text = updated
         }
         // IPA outside parentheses, e.g. "known as Lutetia [lytesja]".
         text = text.replacing(#/\s*(\[[^\[\]\n]{1,60}\]|/[^/\s][^/\n]{0,58}/)/#) { match in
@@ -173,7 +179,8 @@ nonisolated enum ArticleCleaner {
         var text = text
         text = text.replacing(#/\(\s*[,;:]*\s*\)/#, with: "")      // "( )", "( ; )"
         text = text.replacing(#/\s+([,.;:!?)])/#) { String($0.output.1) }  // "word ," -> "word,"
-        text = text.replacing(#/\(\s+/#, with: "(")
+        text = text.replacing(#/\(\s*[,;:]?\s*/#, with: "(")         // "( ; Latin)" -> "(Latin)"
+        text = text.replacing(#/\s*[,;:]\s*\)/#, with: ")")           // "(Latin; )" -> "(Latin)"
         text = text.replacing(#/,(?:\s*,)+/#, with: ",")             // ", , ," -> ","
         text = text.replacing(#/,\s*([.;:])/#) { String($0.output.1) }  // ", ." -> "."
         text = text.replacing(#/\s{2,}/#, with: " ")
