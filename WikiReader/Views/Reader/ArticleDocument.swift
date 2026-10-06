@@ -30,6 +30,24 @@ struct ArticleDocument {
         blockRanges = ranges
     }
 
+    /// Index of the block containing a text location, or nil for the title and separators.
+    func blockIndex(containing location: Int) -> Int? {
+        // Blocks are in text order, so binary search would work; linear is plenty for a few hundred blocks.
+        blockRanges.firstIndex { NSLocationInRange(location, $0) }
+    }
+
+    /// The paragraph (or heading, or title) containing `range`, and `range` expressed inside it.
+    /// Used to give the lemmatizer the surrounding sentence.
+    func context(for range: NSRange) -> (text: String, wordRange: Range<String.Index>)? {
+        let container = blockIndex(containing: range.location).map { blockRanges[$0] } ?? titleRange
+        guard NSIntersectionRange(container, range).length == range.length else { return nil }
+
+        let text = (attributedText.string as NSString).substring(with: container)
+        let local = NSRange(location: range.location - container.location, length: range.length)
+        guard let wordRange = Range(local, in: text) else { return nil }
+        return (text, wordRange)
+    }
+
     // MARK: - Styling
 
     enum Style {

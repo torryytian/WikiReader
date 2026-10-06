@@ -7,4 +7,5 @@ nonisolated enum Log {
 
     static let app = Logger(subsystem: subsystem, category: "App")
     static let importing = Logger(subsystem: subsystem, category: "Import")
+    static let lookup = Logger(subsystem: subsystem, category: "Lookup")
 }
