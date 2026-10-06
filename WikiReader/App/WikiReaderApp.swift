@@ -6,6 +6,7 @@ import SwiftUI
 struct WikiReaderApp: App {
     init() {
         Log.app.info("App launched")
+        DictionaryLookup.prepareLemmaModel()
     }
 
     var body: some Scene {
