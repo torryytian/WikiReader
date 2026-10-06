@@ -4,6 +4,7 @@
 
 WikiReader：iPhone 上的英语阅读 App，抓取 Wikipedia 正文、朗读、点词查词典。
 完整需求和分阶段验收标准见 @SPEC.md
+各阶段进度、开发中做出的决定和待办见 @PROGRESS.md（每完成一个阶段或做出重要决定后更新它）
 
 ## 关于我
 
@@ -39,7 +40,7 @@ WikiReaderTests/
 - 每次改完代码：编译通过 → 在 iOS 模拟器里运行 → 亲自点一遍改动涉及的界面，确认效果。
 - 命令行编译（模拟器名称用 `xcrun simctl list devices available` 查）：
   `xcodebuild -scheme WikiReader -destination 'platform=iOS Simulator,name=iPhone 17' build`
-  跑单元测试把 `build` 换成 `test`。
+  跑单元测试把 `build` 换成 `test`，并加上 `-parallel-testing-enabled NO -collect-test-diagnostics never`（否则测试失败时 xcodebuild 会卡约 10 分钟收集诊断，并行测试还会克隆、关掉 iPhone 17 模拟器）。
 - URL 解析和正文清洗必须有单元测试。测试用本地 fixture：先用 curl（带上下面的 User-Agent）抓一份真实的 API 返回，存进 `WikiReaderTests/Fixtures/`，测试运行时不访问网络。建议的样本：Albert Einstein（长文）、Paris（首句有音标）、Pythagorean theorem（有公式）。
 - 你验证不了的部分，明确告诉我需要在真机上验收：朗读音质、高亮和声音是否同步、真机上的系统词典。
 
