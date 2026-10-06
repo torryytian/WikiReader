@@ -77,6 +77,23 @@ struct WordHitTests {
         #expect(document.blockIndex(containing: range.location) == 1)
     }
 
+    @Test func blockRangeMapsToFullText() throws {
+        let full = document.attributedText.string as NSString
+        let inBlock = NSRange(location: 3, length: 7)  // "studies" in block 1
+        let mapped = try #require(document.textRange(of: inBlock, inBlock: 1))
+        #expect(full.substring(with: mapped) == "studies")
+        #expect(document.textRange(of: NSRange(location: 0, length: 999), inBlock: 1) == nil)
+        #expect(document.textRange(of: inBlock, inBlock: 9) == nil)
+    }
+
+    @Test func nearestBlockForTitleAndLineBreaks() {
+        #expect(document.blockIndex(nearest: 0) == 0)  // title -> first block
+        let lineBreak = document.blockRanges[1].location - 1
+        #expect(document.blockIndex(nearest: lineBreak) == 1)
+        #expect(document.blockIndex(nearest: document.blockRanges[2].location) == 2)
+        #expect(document.blockIndex(nearest: document.attributedText.length + 5) == nil)
+    }
+
     @Test func contextForTitle() throws {
         let range = (document.attributedText.string as NSString).range(of: "Albert")
         let context = try #require(document.context(for: range))

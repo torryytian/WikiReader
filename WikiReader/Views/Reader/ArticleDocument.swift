@@ -36,6 +36,19 @@ struct ArticleDocument {
         blockRanges.firstIndex { NSLocationInRange(location, $0) }
     }
 
+    /// The block at a text location, or the next block for the title and the line breaks between blocks.
+    func blockIndex(nearest location: Int) -> Int? {
+        blockIndex(containing: location) ?? blockRanges.firstIndex { $0.location > location }
+    }
+
+    /// Full-text range of a range inside a block.
+    func textRange(of range: NSRange, inBlock block: Int) -> NSRange? {
+        guard blockRanges.indices.contains(block) else { return nil }
+        let blockRange = blockRanges[block]
+        guard NSMaxRange(range) <= blockRange.length else { return nil }
+        return NSRange(location: blockRange.location + range.location, length: range.length)
+    }
+
     /// The paragraph (or heading, or title) containing `range`, and `range` expressed inside it.
     /// Used to give the lemmatizer the surrounding sentence.
     func context(for range: NSRange) -> (text: String, wordRange: Range<String.Index>)? {
