@@ -56,4 +56,5 @@ WikiReaderTests/
 
 - 访问 Wikipedia 的每个请求都带 User-Agent：`WikiReader/0.1 (personal app; contact: torryytian@gmail.com)`
 - 只在我添加文章时请求 Wikipedia，不预取、不批量抓。
+- 选用 OpenAI 朗读时，只为当前段和下一段请求 `api.openai.com` 生成音频；生成结果缓存在本地，不重复请求，不批量生成全文。
 - 任何 API Key 都不写进代码、不提交到 git。以后接云端服务时，Key 在 App 的设置页输入，存 Keychain。
