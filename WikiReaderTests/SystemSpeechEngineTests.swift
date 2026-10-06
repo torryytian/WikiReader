@@ -31,6 +31,7 @@ struct SystemSpeechEngineTests {
         engine.speak(SpeechUtterance(id: 1, text: text, rate: .faster))
         try await wait { recorder.events.contains(.finished(id: 1)) }
 
+        #expect(recorder.events.first == .started(id: 1))
         #expect(recorder.events.last == .finished(id: 1))
         let words = recorder.events.compactMap { event -> NSRange? in
             if case .willSpeak(1, let range) = event { range } else { nil }
@@ -39,6 +40,20 @@ struct SystemSpeechEngineTests {
         for range in words {
             #expect(NSMaxRange(range) <= (text as NSString).length)
         }
+        engine.stop()
+    }
+
+    @Test func startOffsetSkipsTextButReportsWholeTextRanges() async throws {
+        let text = "Skipped part. Spoken part."
+        let start = (text as NSString).range(of: "Spoken").location
+        engine.speak(SpeechUtterance(id: 1, text: text, startOffset: start, rate: .faster))
+        try await wait { recorder.events.contains(.finished(id: 1)) }
+
+        let words = recorder.events.compactMap { event -> String? in
+            if case .willSpeak(1, let range) = event { (text as NSString).substring(with: range) } else { nil }
+        }
+        #expect(words.first == "Spoken")
+        #expect(!words.contains("Skipped"))
         engine.stop()
     }
 

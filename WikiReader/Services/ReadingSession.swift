@@ -27,6 +27,11 @@ final class ReadingSession {
     /// The word being spoken; nil when nothing is being spoken.
     private(set) var spokenWord: Position?
     private(set) var rate: SpeechRate
+    /// True between asking the engine to speak and sound actually starting (a cloud voice may
+    /// need a moment to generate audio).
+    private(set) var isWaitingForAudio = false
+    /// Why speech stopped unexpectedly; cleared on the next play.
+    private(set) var errorMessage: String?
 
     /// Called whenever reading moves to another block, so the position can be saved.
     @ObservationIgnored var onBlockChange: (Int) -> Void = { _ in }
@@ -37,8 +42,6 @@ final class ReadingSession {
     @ObservationIgnored private var utteranceID = 0
     /// Whether the engine holds a (possibly paused) utterance for `currentBlock` that `resume` can continue.
     @ObservationIgnored private var hasActiveUtterance = false
-    /// UTF-16 offset in the block where the current utterance's text starts (non-zero after a speed change).
-    @ObservationIgnored private var utteranceStart = 0
     /// UTF-16 offset in the block to start from on the next `speakCurrentBlock`.
     @ObservationIgnored private var resumeOffset = 0
 
@@ -57,6 +60,7 @@ final class ReadingSession {
     /// Continues where speech left off: the paused word, else the start of `currentBlock`.
     func play() {
         guard !blocks.isEmpty, state != .playing else { return }
+        errorMessage = nil
         if state == .paused && hasActiveUtterance {
             engine.resume()
             state = .playing
@@ -151,17 +155,17 @@ final class ReadingSession {
 
     private func speakCurrentBlock(from offset: Int? = nil) {
         let block = blocks[currentBlock]
-        let text = block.text as NSString
-        let start = min(offset ?? resumeOffset, text.length)
+        let start = min(offset ?? resumeOffset, (block.text as NSString).length)
         resumeOffset = 0
 
         utteranceID += 1
-        utteranceStart = start
         hasActiveUtterance = true
+        isWaitingForAudio = true
         state = .playing
         engine.speak(SpeechUtterance(
             id: utteranceID,
-            text: text.substring(from: start),
+            text: block.text,
+            startOffset: start,
             rate: rate,
             pauseAfter: block.kind == .heading ? Self.pauseAfterHeading : 0
         ))
@@ -172,20 +176,32 @@ final class ReadingSession {
         guard hasActiveUtterance else { return }
         engine.stop()
         hasActiveUtterance = false
+        isWaitingForAudio = false
         utteranceID += 1  // anything still in flight from the old utterance is now stale
     }
 
     private func handle(_ event: SpeechEvent) {
         switch event {
+        case .started(let id):
+            guard id == utteranceID else { return }
+            isWaitingForAudio = false
         case .willSpeak(let id, let range):
             guard id == utteranceID else { return }
-            spokenWord = Position(
-                block: currentBlock,
-                range: NSRange(location: utteranceStart + range.location, length: range.length)
-            )
+            isWaitingForAudio = false
+            spokenWord = Position(block: currentBlock, range: range)
+        case .failed(let id, let message):
+            guard id == utteranceID else { return }
+            // Keep the place: play retries from the last word heard.
+            Log.speech.error("Speech failed in block \(self.currentBlock): \(message, privacy: .public)")
+            resumeOffset = spokenWord?.range.location ?? 0
+            hasActiveUtterance = false
+            isWaitingForAudio = false
+            errorMessage = message
+            state = .paused
         case .finished(let id):
             guard id == utteranceID else { return }
             hasActiveUtterance = false
+            isWaitingForAudio = false
             spokenWord = nil
             if currentBlock + 1 < blocks.count {
                 move(to: currentBlock + 1)

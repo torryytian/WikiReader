@@ -24,7 +24,17 @@ final class FakeSpeechEngine: SpeechEngine {
     func resume() { calls.append(.resume) }
     func stop() { calls.append(.stop) }
 
-    /// Pretends the last utterance reached the word at `range` (relative to its text).
+    /// Pretends sound started for the given (default: last) utterance.
+    func emitStarted(id: Int? = nil) {
+        onEvent?(.started(id: id ?? lastSpoken!.id))
+    }
+
+    /// Pretends the given (default: last) utterance failed.
+    func emitFailed(_ message: String, id: Int? = nil) {
+        onEvent?(.failed(id: id ?? lastSpoken!.id, message: message))
+    }
+
+    /// Pretends the last utterance reached the word at `range` (relative to its whole text).
     func emitWord(_ range: NSRange, id: Int? = nil) {
         onEvent?(.willSpeak(id: id ?? lastSpoken!.id, range: range))
     }

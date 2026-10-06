@@ -216,6 +216,48 @@ struct ReadingSessionTests {
         #expect(engine.spoken.count == 3)  // restarted block 0
     }
 
+    // MARK: - Waiting and failures
+
+    @Test func waitsForAudioUntilStarted() {
+        let session = makeSession()
+        session.play()
+        #expect(session.isWaitingForAudio)
+        engine.emitStarted()
+        #expect(!session.isWaitingForAudio)
+    }
+
+    @Test func firstWordAlsoEndsWaiting() {
+        let session = makeSession()
+        session.play()
+        engine.emitWord(NSRange(location: 0, length: 6))
+        #expect(!session.isWaitingForAudio)
+    }
+
+    @Test func failurePausesAndKeepsThePlace() {
+        let session = makeSession(startBlock: 2)
+        session.play()
+        engine.emitWord(NSRange(location: 7, length: 4))  // "born"
+        engine.emitFailed("No network")
+        #expect(session.state == .paused)
+        #expect(session.errorMessage == "No network")
+        #expect(!session.isWaitingForAudio)
+
+        session.play()  // retry from the last word heard, as a new utterance
+        #expect(session.errorMessage == nil)
+        #expect(engine.lastSpoken?.startOffset == 7)
+        #expect(!engine.calls.contains(.resume))
+    }
+
+    @Test func staleFailureIsIgnored() {
+        let session = makeSession()
+        session.play()
+        let oldID = engine.lastSpoken!.id
+        session.next()
+        engine.emitFailed("Late error", id: oldID)
+        #expect(session.state == .playing)
+        #expect(session.errorMessage == nil)
+    }
+
     // MARK: - Position set from scrolling
 
     @Test func scrolledPositionAppliesWhenStopped() {
@@ -255,10 +297,11 @@ struct ReadingSessionTests {
         engine.emitWord(NSRange(location: 7, length: 4))  // "born"
         session.setRate(.fast)
 
-        #expect(engine.lastSpoken?.text == "born in Ulm.")
+        // The whole block is passed with a start offset, so cloud engines can reuse its audio.
+        #expect(engine.lastSpoken?.text == "He was born in Ulm.")
+        #expect(engine.lastSpoken?.startOffset == 7)
         #expect(engine.lastSpoken?.rate == .fast)
-        // Ranges from the restarted utterance map back to the full block.
-        engine.emitWord(NSRange(location: 5, length: 2))  // "in"
+        engine.emitWord(NSRange(location: 12, length: 2))  // "in"
         #expect(session.spokenWord == .init(block: 2, range: NSRange(location: 12, length: 2)))
     }
 
@@ -272,7 +315,8 @@ struct ReadingSessionTests {
         #expect(engine.calls.last == .stop)
 
         session.play()
-        #expect(engine.lastSpoken?.text == "born in Ulm.")
+        #expect(engine.lastSpoken?.text == "He was born in Ulm.")
+        #expect(engine.lastSpoken?.startOffset == 7)
         #expect(engine.lastSpoken?.rate == .slow)
     }
 

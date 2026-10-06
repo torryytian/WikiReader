@@ -7,9 +7,10 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
 
     private let synthesizer = AVSpeechSynthesizer()
     private let voice: AVSpeechSynthesisVoice?
-    /// The utterance being spoken and the caller's id for it. Delegate callbacks identify utterances
-    /// by object, so this maps them back; callbacks for any other utterance are stale and dropped.
-    private var current: (utterance: ObjectIdentifier, id: Int)?
+    /// The utterance being spoken, the caller's id for it, and where in the caller's text it starts.
+    /// Delegate callbacks identify utterances by object, so this maps them back; callbacks for any
+    /// other utterance are stale and dropped.
+    private var current: (utterance: ObjectIdentifier, id: Int, startOffset: Int)?
 
     /// - Parameter voiceIdentifier: The voice to use; if nil or no longer installed, the best
     ///   installed English voice. Voices are always chosen explicitly: `AVSpeechSynthesisVoice(language:)`
@@ -24,11 +25,13 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
 
     func speak(_ utterance: SpeechUtterance) {
         activateAudioSession()
-        let spoken = AVSpeechUtterance(string: utterance.text)
+        let text = utterance.text as NSString
+        let start = min(max(utterance.startOffset, 0), text.length)
+        let spoken = AVSpeechUtterance(string: text.substring(from: start))
         spoken.voice = voice
         spoken.rate = utterance.rate.systemRate
         spoken.postUtteranceDelay = utterance.pauseAfter
-        current = (ObjectIdentifier(spoken), utterance.id)
+        current = (ObjectIdentifier(spoken), utterance.id, start)
 
         if synthesizer.isSpeaking || synthesizer.isPaused {
             synthesizer.stopSpeaking(at: .immediate)
@@ -76,9 +79,10 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
 
     // MARK: - Events
 
-    private func deliver(_ utterance: ObjectIdentifier, _ makeEvent: (Int) -> SpeechEvent) {
+    /// Passes on an event for the current utterance; `makeEvent` gets its id and start offset.
+    private func deliver(_ utterance: ObjectIdentifier, _ makeEvent: (_ id: Int, _ startOffset: Int) -> SpeechEvent) {
         guard let current, current.utterance == utterance else { return }
-        onEvent?(makeEvent(current.id))
+        onEvent?(makeEvent(current.id, current.startOffset))
     }
 }
 
@@ -86,6 +90,13 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
 // `nonisolated`: they take only Sendable values out of the callback (an object identifier and a
 // range) and hop to the main actor, where all of this class's state lives.
 extension SystemSpeechEngine: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        let key = ObjectIdentifier(utterance)
+        Task { @MainActor in
+            self.deliver(key) { id, _ in .started(id: id) }
+        }
+    }
+
     nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
         willSpeakRangeOfSpeechString characterRange: NSRange,
@@ -93,14 +104,17 @@ extension SystemSpeechEngine: AVSpeechSynthesizerDelegate {
     ) {
         let key = ObjectIdentifier(utterance)
         Task { @MainActor in
-            self.deliver(key) { .willSpeak(id: $0, range: characterRange) }
+            // The synthesizer only saw the text from startOffset on; report ranges in the whole text.
+            self.deliver(key) { id, startOffset in
+                .willSpeak(id: id, range: NSRange(location: startOffset + characterRange.location, length: characterRange.length))
+            }
         }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         let key = ObjectIdentifier(utterance)
         Task { @MainActor in
-            self.deliver(key) { .finished(id: $0) }
+            self.deliver(key) { id, _ in .finished(id: id) }
         }
     }
 }

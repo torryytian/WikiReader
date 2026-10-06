@@ -18,17 +18,25 @@ protocol SpeechEngine: AnyObject {
 nonisolated struct SpeechUtterance: Equatable, Sendable {
     /// Chosen by the caller to recognize this utterance's events.
     var id: Int
+    /// The whole block, even when starting part-way: engines that generate audio per text (cloud TTS)
+    /// can then reuse what they already have for this block instead of generating new audio.
     var text: String
+    /// UTF-16 offset in `text` to start speaking from (e.g. resuming at a word after a speed change).
+    var startOffset = 0
     var rate: SpeechRate
     /// Silence after the text, e.g. a short pause after a heading.
     var pauseAfter: TimeInterval = 0
 }
 
 nonisolated enum SpeechEvent: Equatable, Sendable {
-    /// About to speak `range` (UTF-16, relative to the utterance text).
+    /// Sound has started. Can come noticeably after `speak` when audio has to be generated first.
+    case started(id: Int)
+    /// About to speak `range` (UTF-16, relative to the whole utterance text, not to `startOffset`).
     case willSpeak(id: Int, range: NSRange)
     /// The utterance was spoken to the end (not emitted when it is stopped or replaced).
     case finished(id: Int)
+    /// The utterance can't be spoken, e.g. a cloud voice without network. `message` is shown to the user.
+    case failed(id: Int, message: String)
 }
 
 /// Playback speed choices shown in the player bar.
