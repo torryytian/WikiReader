@@ -14,7 +14,6 @@ struct ReaderView: View {
     /// Whether the session currently uses a cloud engine (and so could fall back to the system voice).
     @State private var usesCloudEngine = false
     @State private var isShowingSettings = false
-    @State private var wordCard: WordCard?
     @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
 
     var body: some View {
@@ -61,9 +60,6 @@ struct ReaderView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $wordCard) { card in
-            WordCardView(request: card.request, voiceIdentifier: voiceIdentifier)
-        }
         .onChange(of: session?.rate) { _, rate in
             // The player's speed is also the default for next time.
             if let rate { rateValue = rate.rawValue }
@@ -129,8 +125,8 @@ struct ReaderView: View {
             Tapped \(request.word, privacy: .public) -> term \(request.term, privacy: .public), \
             hasDefinition: \(request.hasDefinition, privacy: .public)
             """)
-        // Looking up pauses reading; it stays paused after the card closes until Play is pressed.
+        // Looking up pauses reading; it stays paused after the dictionary closes until Play is pressed.
         session.pause()
-        wordCard = WordCard(request: request)
+        DictionaryPresenter.present(request)
     }
 }

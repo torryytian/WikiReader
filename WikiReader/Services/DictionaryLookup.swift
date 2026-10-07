@@ -13,12 +13,6 @@ nonisolated struct WordLookupRequest: Equatable, Sendable {
     var hasDefinition: Bool
     /// The sentence containing the word.
     var sentence: String
-
-    /// The form that was looked up instead of the word ("run" for "running"), or nil when it is the
-    /// word itself (ignoring case).
-    var baseForm: String? {
-        term.caseInsensitiveCompare(word) == .orderedSame ? nil : term
-    }
 }
 
 /// Picks the term to look up for a tapped word: the word itself, then simpler forms of it

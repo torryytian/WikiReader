@@ -64,6 +64,14 @@ nonisolated enum VoiceSelection {
         return bestEnglishVoice(voices)
     }
 
+    /// The voice for pronouncing single words: American English, since that is the standard wanted there.
+    /// The user's chosen voice if it is American, otherwise the best American voice; with no American
+    /// voice installed, whatever `voice(preferring:from:)` gives.
+    static func americanVoice(preferring identifier: String?, from voices: [VoiceInfo]) -> VoiceInfo? {
+        let american = voices.filter { $0.language == "en-US" }
+        return voice(preferring: identifier, from: american) ?? voice(preferring: identifier, from: voices)
+    }
+
     /// Voices installed on this device. Premium and Enhanced voices must be downloaded by the user in
     /// Settings → Accessibility → Spoken Content (Read & Speak) → Voices.
     static func installedVoices() -> [VoiceInfo] {

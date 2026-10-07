@@ -86,28 +86,4 @@ struct DictionaryLookupTests {
         let result = try request("studies", in: text, knowing: [])
         #expect(result.sentence == "He studies physics in Zurich.")
     }
-
-    // MARK: - Base form shown on the word card
-
-    @Test func baseFormIsShownWhenAnotherFormWasLookedUp() throws {
-        // "Einstein's" has no entry of its own, so the form without the possessive is looked up instead.
-        let result = try request("Einstein's", in: "Einstein's theory was confirmed.", knowing: ["Einstein"])
-        #expect(result.baseForm == "Einstein")
-    }
-
-    @Test func baseFormIsHiddenWhenTheWordItselfWasLookedUp() throws {
-        let result = try request("studies", in: "He studies physics.", knowing: ["studies"])
-        #expect(result.baseForm == nil)
-    }
-
-    @Test func baseFormIgnoresCase() throws {
-        // Sentence-initial "Physics" is looked up as "physics": same word, nothing to point out.
-        let result = try request("Physics", in: "Physics is hard.", knowing: ["physics"])
-        #expect(result.baseForm == nil)
-    }
-
-    @Test func baseFormIsHiddenWhenNothingWasFound() throws {
-        let result = try request("Zzyzx", in: "Zzyzx is a place.", knowing: [])
-        #expect(result.baseForm == nil)
-    }
 }

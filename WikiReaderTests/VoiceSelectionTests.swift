@@ -90,4 +90,21 @@ struct VoiceSelectionTests {
         #expect(Set(rates).count == rates.count)
         #expect(SpeechRate.normal.systemRate == 0.5)
     }
+
+    // MARK: - Pronouncing single words
+
+    @Test func wordsUseTheChosenVoiceWhenItIsAmerican() {
+        let voices = [voice("Ava", "en-US", .premium), voice("Zoe", "en-US", .enhanced)]
+        #expect(VoiceSelection.americanVoice(preferring: "com.apple.voice.compact.en-US.Zoe", from: voices)?.name == "Zoe")
+    }
+
+    @Test func wordsSkipABritishChosenVoice() {
+        let voices = [voice("Daniel", "en-GB", .premium), voice("Samantha", "en-US", .standard)]
+        #expect(VoiceSelection.americanVoice(preferring: "com.apple.voice.compact.en-GB.Daniel", from: voices)?.name == "Samantha")
+    }
+
+    @Test func wordsFallBackToAnyEnglishVoiceWithoutAnAmericanOne() {
+        let voices = [voice("Daniel", "en-GB", .standard)]
+        #expect(VoiceSelection.americanVoice(preferring: nil, from: voices)?.name == "Daniel")
+    }
 }
