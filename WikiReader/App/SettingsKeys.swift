@@ -13,15 +13,8 @@ nonisolated enum SettingsKeys {
     static let openAIVoice = "openAIVoice"
 }
 
-/// Which engine reads articles aloud.
-nonisolated enum SpeechEngineChoice: String, CaseIterable, Sendable {
+/// Which engine reads articles aloud. Chosen by picking a voice (see `VoiceChoice`).
+nonisolated enum SpeechEngineChoice: String, Sendable {
     case system
     case openAI
-
-    var label: String {
-        switch self {
-        case .system: "iPhone Voices"
-        case .openAI: "OpenAI"
-        }
-    }
 }

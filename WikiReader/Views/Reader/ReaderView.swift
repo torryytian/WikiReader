@@ -55,7 +55,8 @@ struct ReaderView: View {
                     .animation(.default, value: session.failure)
                 }
                 .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
-                    SettingsView()
+                    // Only opened from the error banner, where the fix is a voice or an API key.
+                    SettingsView(opensVoicePage: true)
                 }
             }
         }
