@@ -5,6 +5,7 @@
 WikiReader：iPhone 上的英语阅读 App，抓取 Wikipedia 正文、朗读、点词查词典。
 完整需求和分阶段验收标准见 @SPEC.md
 各阶段进度、开发中做出的决定和待办见 @PROGRESS.md（每完成一个阶段或做出重要决定后更新它）
+**接手（新会话、换电脑）先读 PROGRESS.md 第 0 节**；上一个长会话的完整过程记录在 `docs/SESSION-2026-10-07-08.md`（需要时读，不是自动加载）。
 
 ## 关于我
 
@@ -24,12 +25,15 @@ WikiReader：iPhone 上的英语阅读 App，抓取 Wikipedia 正文、朗读、
 
 ```
 WikiReader/
-  App/          入口、全局配置
+  App/          入口、全局配置（SettingsKeys 是所有设置项的键）
   Models/       SwiftData 模型
-  Services/     WikipediaClient、ArticleCleaner、SpeechEngine、DictionaryLookup
-  Views/        Library、Reader、Settings
+  Services/     WikipediaClient、ArticleCleaner、SpeechEngine、DictionaryLookup、VoiceChoice
+    OpenAI/     朗读（TTS）、聊天请求层、单词讲解、翻译、缓存
+  Views/        Library、Reader（阅读页、词典、翻译面板）、Settings
 WikiReaderTests/
   Fixtures/     测试用的 API 返回样本
+tools/          辅助脚本（make_icon.swift 生成 App 图标）
+docs/           会话记录
 ```
 
 - 工程用 Xcode 16 及以上创建，源码目录是同步文件夹：新的 .swift 文件放进 `WikiReader/` 就会自动参与编译。
@@ -43,15 +47,26 @@ WikiReaderTests/
   跑单元测试把 `build` 换成 `test`，并加上 `-parallel-testing-enabled NO -collect-test-diagnostics never`（否则测试失败时 xcodebuild 会卡约 10 分钟收集诊断，并行测试还会克隆、关掉 iPhone 15 Pro Max 模拟器）。
 - URL 解析和正文清洗必须有单元测试。测试用本地 fixture：先用 curl（带上下面的 User-Agent）抓一份真实的 API 返回，存进 `WikiReaderTests/Fixtures/`，测试运行时不访问网络。建议的样本：Albert Einstein（长文）、Paris（首句有音标）、Pythagorean theorem（有公式）。
 - 你验证不了的部分，明确告诉我需要在真机上验收：朗读音质、高亮和声音是否同步、真机上的系统词典。
+- 模拟器没有点击自动化，但可以用临时的启动参数（如自动打开第一篇文章、直接显示某个菜单）加 `xcrun simctl io … screenshot` 截图来看布局；临时代码看完必须删掉，不要提交。细节见 PROGRESS.md 第 6 节。
 
 ## 工作方式
 
-- 按 SPEC.md 的阶段顺序推进，一次只做一个阶段。开始一个阶段前先给我一个简短计划，我确认后再写代码。
+- 按 SPEC.md 的阶段顺序推进，一次只做一个阶段。开始一个新阶段或较大的新功能前，用几句话说明做法，然后直接开始，不用等我确认；只有真正的取舍、会改规则（比如联网行为）或需要我动手时才停下来问。我明确说"先做界面稿/先给方案，确认后再改代码"时，才等我确认。
 - 每完成一个能编译运行的小步，就 `git commit` 一次。
 - 同一个错误连续修了 3 次还没解决，就停下来，告诉我你的判断、试过什么、还有哪些方案，由我决定。
 - 不要为了让编译通过而删除功能、注释掉代码或跳过测试。
 - 遇到 Swift 并发相关的编译错误（Sendable、actor 隔离），按正确的方式修，不要用 `@unchecked Sendable`、`nonisolated(unsafe)` 之类的写法硬绕过去；拿不准时先给我解释原因。
 - 需要我手动操作的（Xcode 里的签名和 Capabilities、真机运行、iPhone 系统设置），写成清楚的步骤。
+
+## 协作偏好（2026-10-08 会话总结，我明确说过的）
+
+- **一直干活，别每个细节都问。** 我说过"那你搞嘛，不要一步一步都得我确认"。不要为了小事停下来等我点头。
+- **长时间干活别沉默。** 我两次问过"你在干啥？怎么没回应了？"。连续做很多步时，每隔一会儿用一两句话说明在做什么，消息之间不要空白。
+- **界面要好看，我会直接说"太丑了"。** 改完界面先自己用模拟器截图看一遍（做法见 PROGRESS.md 第 6 节），有明显问题先改再汇报。
+- **汇报要诚实，说清楚验证了什么。** 点击、长按、滑动和真机上的表现你没法自动化，没亲眼看到的就写"未验证"，不要写"已验证"。
+- 汇报用中文，先说结论，再说细节；少用内部术语，iOS 特有的概念解释一两句。
+- 不要自作主张 `git push`（上一台开发机没有 GitHub 凭据，推送一直是我自己做）。commit 随时可以做。
+- 做不到的事直接说做不到并说明原因和替代方案（例如系统词典里的 "Search Web" 去不掉），不要硬做一个脆弱的 hack。
 
 ## 网络与安全
 
