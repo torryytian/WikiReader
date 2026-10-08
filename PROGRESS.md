@@ -73,6 +73,11 @@
 
 ## 3. 已知问题 / 待办
 
+**换电脑接手时先看这几条（2026-10-08 晚）**
+- 系统词典界面里的 "Search Web" 去不掉（系统自己画的）。用户决定**保留**。曾提过的替代方案 B（点词后先弹自己的词卡：AI 讲解自动加载并缓存 + 发音按钮 + "System Dictionary" 入口；没 Key/没网时直接弹系统词典）**没做**，用户没选它。
+- 手机上还没装最近这几版（抓取超时、Voice 页、AI 按钮、沉浸式阅读页、新菜单）。装机命令见第 4 节。
+- 阅读页所有触摸操作（点上/下边缘出菜单、长按选择、段末 Translate、左边缘滑动返回）都只在代码层面和截图层面验证过，没有人点过。请先在模拟器或真机上点一遍。
+
 - [ ] **OpenAI 限流自动重试**：新账号/低等级账号容易遇到 429（首次试听连续 3 次被限流）。建议：仅对限流重试，按 `Retry-After` 或 1/2/4 秒，最多 3 次。待用户决定。
 - [ ] 真机验收：Premium 声音音质、高亮同步（系统声音）、系统词典与英汉释义。
 - [ ] 行内公式删除后句子缺词（见上）。
@@ -89,3 +94,6 @@
 - 没有模拟器点击自动化：界面验收由用户点，Claude 通过 `os_log`（subsystem `tik.tian.com.WikiReader`）和 SwiftData 数据库核对。各功能关键事件都有日志。
 - Mac 常用 iPhone 热点；热点开了"低数据模式"时，系统的大文件下载（模拟器运行时等）会停住不动。
 - 真机运行需在 Xcode 里配置签名（Personal Team，免费账号 7 天后需重新安装）。
+- 命令行装真机：`xcodebuild -scheme WikiReader -destination 'id=<手机 UDID>' -derivedDataPath <目录> -allowProvisioningUpdates DEVELOPMENT_TEAM=<团队 ID> build`，再 `xcrun devicectl device install app --device <UDID> <.app 路径>` 和 `xcrun devicectl device process launch --device <UDID> tik.tian.com.WikiReader`。手机必须解锁并连线（`xcrun devicectl list devices` 里状态是 connected）。首次需在手机「设置 → 通用 → VPN 与设备管理」里信任开发者。
+- 模拟器的 OpenAI Key 存在模拟器自己的钥匙串里；换电脑后要在设置页重新输入。
+- 想在模拟器里直接看某个界面：没有点击自动化，可以临时加启动参数（如 `-debugOpenFirst` 自动打开第一篇文章），用 `xcrun simctl launch` 带参数启动，再 `xcrun simctl io <设备> screenshot` 截图；看完要把临时代码删掉。
