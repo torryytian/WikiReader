@@ -23,12 +23,10 @@ struct ReaderView: View {
     @AppStorage(SettingsKeys.readerTheme) private var theme = ReaderStyle.Theme.system
     @AppStorage(SettingsKeys.readerDarkLevel) private var darkLevel = ReaderStyle.defaultDarkLevel
     @State private var blocks: [ContentBlock] = []
-    @State private var isShowingStyle = false
     @State private var translation: PassageTranslationModel?
     /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
     @State private var showsTopBar = false
     @State private var showsBottomBar = false
-    @Environment(\.dismiss) private var dismiss
 
     private var style: ReaderStyle {
         ReaderStyle(
@@ -66,7 +64,10 @@ struct ReaderView: View {
 
                 VStack(spacing: 0) {
                     if showsTopBar {
-                        ReaderTopBar(title: article.title, onBack: { dismiss() }, onStyle: { isShowingStyle = true })
+                        ReaderTopMenu(
+                            fontFamily: $fontFamily, fontSize: $fontSize, lineSpacing: $lineSpacing,
+                            margins: $margins, theme: $theme, darkLevel: $darkLevel
+                        )
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     Spacer(minLength: 0)
@@ -99,15 +100,6 @@ struct ReaderView: View {
                 .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
                     // Only opened from the error banner, where the fix is a voice or an API key.
                     SettingsView(opensVoicePage: true)
-                }
-                .sheet(isPresented: $isShowingStyle) {
-                    ReaderStylePanel(
-                        fontFamily: $fontFamily, fontSize: $fontSize, lineSpacing: $lineSpacing,
-                        margins: $margins, theme: $theme, darkLevel: $darkLevel
-                    )
-                    // Tall enough to show every setting; the text behind stays visible and live.
-                    .presentationDetents([.fraction(0.62), .large])
-                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.62)))
                 }
                 .sheet(item: $translation) { model in
                     TranslationView(model: model)

@@ -30,79 +30,46 @@ extension View {
     }
 }
 
-/// Menu at the top of the reader, shown when the reader taps near the top edge: back, the title, text settings.
-/// A full-width bar in the page color, so it reads as part of the page rather than as pieces over the text.
-struct ReaderTopBar: View {
-    let title: String
-    let onBack: () -> Void
-    let onStyle: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Back")
-
-            Text(title)
-                .font(.headline)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
-
-            Button(action: onStyle) {
-                // Two sizes of "A", the usual sign for text settings.
-                (Text("A").font(.system(size: 14, weight: .semibold)) + Text("A").font(.system(size: 21, weight: .semibold)))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Text Settings")
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 2)
-        .readerBar(edge: .top)
-        // Taps on the menu's own parts must not reach the text underneath and toggle the menu.
-        .contentShape(Rectangle())
-        .onTapGesture {}
-    }
-}
-
-/// Typography panel: theme, font, size, line spacing and margins. Changes apply to the article behind it right away.
-struct ReaderStylePanel: View {
+/// Menu at the top of the reader, shown when the reader taps near the top edge. It holds the text settings
+/// directly (size, theme, font, spacing, margins); going back is the swipe from the left edge.
+/// Changes apply to the article behind it right away.
+struct ReaderTopMenu: View {
     @Binding var fontFamily: ReaderStyle.FontFamily
     @Binding var fontSize: Double
     @Binding var lineSpacing: ReaderStyle.LineSpacing
     @Binding var margins: ReaderStyle.Margins
     @Binding var theme: ReaderStyle.Theme
     @Binding var darkLevel: Double
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    card("Theme") { themeCard }
-                    card("Font") { fontCard }
-                    card("Layout") { layoutCard }
-
-                    Button("Reset to Default", action: reset)
-                        .font(.subheadline)
-                        .padding(.top, 2)
+        VStack(spacing: 16) {
+            sizeRow
+            themeRow
+            fontRow
+            VStack(spacing: 10) {
+                segmentedRow("Spacing") {
+                    Picker("Line Spacing", selection: $lineSpacing) {
+                        ForEach(ReaderStyle.LineSpacing.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
                 }
-                .padding(16)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Text Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                segmentedRow("Margins") {
+                    Picker("Margins", selection: $margins) {
+                        ForEach(ReaderStyle.Margins.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
                 }
             }
+            Button("Reset to Default", action: reset)
+                .font(.footnote)
         }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 14)
+        .readerBar(edge: .top)
+        .animation(.easeInOut(duration: 0.2), value: theme)
+        // Taps on the menu's own parts must not reach the text underneath and toggle the menu.
+        .contentShape(Rectangle())
+        .onTapGesture {}
     }
 
     private func reset() {
@@ -115,23 +82,26 @@ struct ReaderStylePanel: View {
         darkLevel = standard.darkLevel
     }
 
-    private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.footnote.weight(.semibold))
+    // MARK: - Size
+
+    private var sizeRow: some View {
+        HStack(spacing: 12) {
+            Text("A").font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary)
+            Slider(value: $fontSize, in: ReaderStyle.sizeRange, step: 1) {
+                Text("Size")
+            }
+            Text("A").font(.system(size: 24, weight: .medium)).foregroundStyle(.secondary)
+            Text("\(Int(fontSize))")
+                .font(.subheadline.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            content()
+                .frame(width: 26, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
     }
 
     // MARK: - Theme
 
-    private var themeCard: some View {
-        VStack(spacing: 16) {
+    private var themeRow: some View {
+        VStack(spacing: 12) {
             HStack {
                 ForEach(ReaderStyle.Theme.allCases, id: \.self) { option in
                     themeButton(option)
@@ -141,22 +111,16 @@ struct ReaderStylePanel: View {
 
             // The dark theme's background can be moved between a soft charcoal and almost black.
             if theme == .dark {
-                HStack(spacing: 12) {
-                    Image(systemName: "moon.fill")
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    Slider(value: $darkLevel, in: 0...1) {
-                        Text("Darkness")
-                    } minimumValueLabel: {
-                        Text("Soft").font(.caption).foregroundStyle(.secondary)
-                    } maximumValueLabel: {
-                        Text("Deep").font(.caption).foregroundStyle(.secondary)
-                    }
+                Slider(value: $darkLevel, in: 0...1) {
+                    Text("Darkness")
+                } minimumValueLabel: {
+                    Text("Soft").font(.caption).foregroundStyle(.secondary)
+                } maximumValueLabel: {
+                    Text("Deep").font(.caption).foregroundStyle(.secondary)
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: theme)
     }
 
     private func themeButton(_ option: ReaderStyle.Theme) -> some View {
@@ -165,46 +129,31 @@ struct ReaderStylePanel: View {
         return Button {
             theme = option
         } label: {
-            VStack(spacing: 7) {
+            VStack(spacing: 5) {
                 Text("Aa")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color(option.text))
-                    .frame(width: 54, height: 54)
+                    .frame(width: 44, height: 44)
                     .background(Color(background), in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.5))
                     .padding(3)
                     .overlay(Circle().strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2.5))
                 Text(option.label)
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(isSelected ? .semibold : .regular)
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
             }
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(option.label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Font
 
-    private var fontCard: some View {
-        VStack(spacing: 16) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                ForEach(ReaderStyle.FontFamily.allCases, id: \.self) { family in
-                    fontButton(family)
-                }
-            }
-
-            HStack(spacing: 12) {
-                Text("A").font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary)
-                Slider(value: $fontSize, in: ReaderStyle.sizeRange, step: 1) {
-                    Text("Size")
-                }
-                Text("A").font(.system(size: 24, weight: .medium)).foregroundStyle(.secondary)
-                Text("\(Int(fontSize))")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 26, alignment: .trailing)
+    private var fontRow: some View {
+        HStack(spacing: 8) {
+            ForEach(ReaderStyle.FontFamily.allCases, id: \.self) { family in
+                fontButton(family)
             }
         }
     }
@@ -215,44 +164,28 @@ struct ReaderStylePanel: View {
         return Button {
             fontFamily = family
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Text("Aa")
-                    .font(Font(family.font(size: 26, weight: .regular) as CTFont))
+                    .font(Font(family.font(size: 22, weight: .regular) as CTFont))
                 Text(family.label)
-                    .font(.caption)
+                    .font(.system(size: 10))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundStyle(isSelected ? Color.accentColor : .primary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color(.tertiarySystemFill))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 1.5)
             )
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(family.label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    // MARK: - Layout
-
-    private var layoutCard: some View {
-        VStack(spacing: 14) {
-            segmentedRow("Line Spacing") {
-                Picker("Line Spacing", selection: $lineSpacing) {
-                    ForEach(ReaderStyle.LineSpacing.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
-            }
-            segmentedRow("Margins") {
-                Picker("Margins", selection: $margins) {
-                    ForEach(ReaderStyle.Margins.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
-            }
-        }
     }
 
     private func segmentedRow<Content: View>(_ title: String, @ViewBuilder picker: () -> Content) -> some View {
@@ -263,7 +196,7 @@ struct ReaderStylePanel: View {
             picker()
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 240)
         }
     }
 }
