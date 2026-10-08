@@ -100,3 +100,36 @@ struct SavedWordHighlightTests {
         #expect(doc.ranges(ofWords: ["example"]).isEmpty)
     }
 }
+
+@MainActor
+struct SavedWordMeaningTests {
+    private func request(_ word: String) -> WordLookupRequest {
+        WordLookupRequest(word: word, term: word, hasDefinition: true, sentence: "A sentence.")
+    }
+
+    @Test func meaningIsKeptWithTheWord() {
+        let article = Article(title: "Paris", sourceURL: ArticleInput.articleURL(forTitle: "Paris"), blocks: [.paragraph("A")])
+        article.toggleSavedWord(request("wreckage"), meaning: "残骸")
+        #expect(article.savedWords.first?.meaning == "残骸")
+    }
+
+    @Test func meaningCanBeAddedLater() {
+        let article = Article(title: "Paris", sourceURL: ArticleInput.articleURL(forTitle: "Paris"), blocks: [.paragraph("A")])
+        article.toggleSavedWord(request("wreckage"))
+        #expect(article.savedWords.first?.meaning == nil)
+        article.setMeaning("残骸", forTerm: "Wreckage")
+        #expect(article.savedWords.first?.meaning == "残骸")
+    }
+
+    @Test func meaningForAnUnsavedWordIsIgnored() {
+        let article = Article(title: "Paris", sourceURL: ArticleInput.articleURL(forTitle: "Paris"), blocks: [.paragraph("A")])
+        article.setMeaning("残骸", forTerm: "wreckage")
+        #expect(article.savedWords.isEmpty)
+    }
+
+    @Test func wordsSavedBeforeMeaningsExistStillDecode() throws {
+        let old = #"[{"word":"alpha","term":"alpha","sentence":"s","savedAt":0}]"#
+        let words = try JSONDecoder().decode([SavedWord].self, from: Data(old.utf8))
+        #expect(words.first?.meaning == nil)
+    }
+}

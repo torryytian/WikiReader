@@ -65,6 +65,9 @@ struct ArticleTextView: UIViewRepresentable {
 
         let swipe = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSwipe(_:)))
         swipe.delegate = context.coordinator
+        // Also react to a two-finger swipe on a trackpad (what the Simulator and iPad with a pointer send),
+        // not only to a finger or a pressed mouse button, like the system's own swipe back.
+        swipe.allowedScrollTypesMask = .all
         textView.addGestureRecognizer(swipe)
 
         let coordinator = context.coordinator

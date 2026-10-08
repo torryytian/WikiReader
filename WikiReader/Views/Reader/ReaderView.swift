@@ -245,8 +245,10 @@ struct ReaderView: View {
 
     /// The dictionary's bookmark button saves into this article's own word list.
     private func saving(for request: WordLookupRequest) -> WordSaving {
-        WordSaving(isSaved: article.isSaved(term: request.term)) { [article] in
-            article.toggleSavedWord(request)
-        }
+        WordSaving(
+            isSaved: article.isSaved(term: request.term),
+            toggle: { [article] meaning in article.toggleSavedWord(request, meaning: meaning) },
+            setMeaning: { [article] meaning in article.setMeaning(meaning, forTerm: request.term) }
+        )
     }
 }

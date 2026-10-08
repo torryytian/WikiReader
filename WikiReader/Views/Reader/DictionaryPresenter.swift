@@ -11,6 +11,8 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
     private let request: WordLookupRequest
     private let pronouncer: WordPronouncer
     private let saving: WordSaving?
+    /// The meaning from an AI explanation opened on this screen; saved along with the word.
+    private var meaning: String?
 
     init(request: WordLookupRequest, voiceIdentifier: String?, saving: WordSaving?) {
         self.request = request
@@ -57,9 +59,9 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         }
         let button = floatingButton(title: nil, symbol: "bookmark", label: "") { }
         configure(button, isSaved: saving.isSaved)
-        button.addAction(UIAction { [weak button] _ in
+        button.addAction(UIAction { [weak self, weak button] _ in
             guard let button else { return }
-            configure(button, isSaved: saving.toggle())
+            configure(button, isSaved: saving.toggle(self?.meaning))
         }, for: .primaryActionTriggered)
         return button
     }
@@ -78,6 +80,11 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
 
     private func showExplanation() {
         let model = WordExplanationModel(word: request.word, sentence: request.sentence)
+        model.onLoaded = { [weak self] explanation in
+            guard let self else { return }
+            meaning = explanation.meaning
+            saving?.setMeaning(explanation.meaning)
+        }
         let sheet = UIHostingController(rootView: WordExplanationView(model: model))
         sheet.sheetPresentationController?.detents = [.medium(), .large()]
         present(sheet, animated: true)
@@ -92,7 +99,10 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
 /// How the dictionary screen saves its word: the current state, and a toggle that returns the new state.
 struct WordSaving {
     var isSaved: Bool
-    var toggle: () -> Bool
+    /// Saves or removes the word, given a meaning to keep if one is known. Returns the new state.
+    var toggle: (String?) -> Bool
+    /// Gives an already saved word a meaning.
+    var setMeaning: (String) -> Void
 }
 
 /// Shows the iOS system dictionary for a lookup request.

@@ -10,6 +10,8 @@ struct SavedWord: Codable, Identifiable, Equatable, Sendable {
     /// The sentence (or paragraph, for text without sentence breaks) containing the word.
     var sentence: String
     var savedAt: Date
+    /// A short Chinese gloss, from an AI explanation the reader asked for. Nil until then.
+    var meaning: String?
 
     var id: String { Self.key(for: term) }
 
@@ -36,7 +38,7 @@ extension Article {
 
     /// Saves the word if it isn't saved yet, otherwise removes it. Returns whether it is saved afterwards.
     @discardableResult
-    func toggleSavedWord(_ request: WordLookupRequest, at date: Date = .now) -> Bool {
+    func toggleSavedWord(_ request: WordLookupRequest, meaning: String? = nil, at date: Date = .now) -> Bool {
         var words = savedWords
         let key = SavedWord.key(for: request.term)
         if let index = words.firstIndex(where: { $0.id == key }) {
@@ -44,9 +46,18 @@ extension Article {
             savedWords = words
             return false
         }
-        words.insert(SavedWord(word: request.word, term: request.term, sentence: request.sentence, savedAt: date), at: 0)
+        words.insert(SavedWord(word: request.word, term: request.term, sentence: request.sentence, savedAt: date, meaning: meaning), at: 0)
         savedWords = words
         return true
+    }
+
+    /// Attaches a meaning to a saved word. Does nothing if the word isn't saved (any more).
+    func setMeaning(_ meaning: String, forTerm term: String) {
+        var words = savedWords
+        let key = SavedWord.key(for: term)
+        guard let index = words.firstIndex(where: { $0.id == key }) else { return }
+        words[index].meaning = meaning
+        savedWords = words
     }
 
     func removeSavedWord(id: SavedWord.ID) {

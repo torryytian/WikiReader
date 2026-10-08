@@ -13,6 +13,8 @@ final class WordExplanationModel {
     let word: String
     let sentence: String
     private(set) var state = State.loading
+    /// Called when an explanation arrives, e.g. so a saved word can keep its meaning.
+    var onLoaded: ((WordExplanation) -> Void)?
 
     private let client: OpenAIExplainClient
     private let apiKey: () -> String?
@@ -41,6 +43,7 @@ final class WordExplanationModel {
             let result = await fetch(key: key)
             guard !Task.isCancelled else { return }
             state = result
+            if case .loaded(let explanation) = result { onLoaded?(explanation) }
         }
     }
 
