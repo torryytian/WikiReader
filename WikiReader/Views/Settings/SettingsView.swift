@@ -4,6 +4,7 @@ import SwiftUI
 /// Settings pages that can be pushed onto the settings navigation stack.
 private enum SettingsPage: Hashable {
     case voice
+    case backup
 }
 
 struct SettingsView: View {
@@ -28,6 +29,7 @@ struct SettingsView: View {
                 voiceSection
                 speedSection
                 dictionarySection
+                backupSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -40,6 +42,8 @@ struct SettingsView: View {
                 switch page {
                 case .voice:
                     VoiceSettingsView()
+                case .backup:
+                    LibraryBackupView()
                 }
             }
             // Runs again when coming back from the voice page, which may have changed the voice or key.
@@ -84,6 +88,18 @@ struct SettingsView: View {
             Text("Default Speed")
         } footer: {
             Text("Changing the speed in the player also changes this.")
+        }
+    }
+
+    // MARK: - Backup
+
+    private var backupSection: some View {
+        Section {
+            NavigationLink(value: SettingsPage.backup) {
+                Label("Backup & Transfer", systemImage: "arrow.left.arrow.right.circle")
+            }
+        } footer: {
+            Text("Move your articles, saved words and generated audio to another iPhone, or keep a copy before reinstalling.")
         }
     }
 
