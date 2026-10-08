@@ -204,18 +204,34 @@ struct ReaderTopMenu: View {
 /// Hiding the navigation bar also turns off the swipe-from-the-left-edge gesture that goes back. This turns
 /// it on again, so the reader can always be left without finding the top menu.
 struct SwipeBackEnabler: UIViewControllerRepresentable {
+    /// Off while a full-screen panel is open, so a swipe from the edge closes the panel instead of leaving the article.
+    var isEnabled = true
+
     func makeUIViewController(context: Context) -> Controller {
         Controller()
     }
 
-    func updateUIViewController(_ controller: Controller, context: Context) {}
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.isSwipeBackEnabled = isEnabled
+        controller.applyIfVisible()
+    }
 
     final class Controller: UIViewController {
+        var isSwipeBackEnabled = true
+
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
+            apply()
+        }
+
+        func applyIfVisible() {
+            if viewIfLoaded?.window != nil { apply() }
+        }
+
+        private func apply() {
             // Its default delegate refuses the gesture while the navigation bar is hidden.
             navigationController?.interactivePopGestureRecognizer?.delegate = nil
-            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+            navigationController?.interactivePopGestureRecognizer?.isEnabled = isSwipeBackEnabled
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The side panel that slides in from the right: the words saved from one article, newest first, each with a short Chinese meaning. Tap a word to open its
+/// The full-screen panel that slides in from the right: the words saved from one article, newest first, each with a short Chinese meaning. Tap a word to open its
 /// dictionary entry; swipe to remove it. A word without a meaning has a button that asks AI for one, and only
 /// when pressed (nothing is sent just because the list opened).
 struct SavedWordsView: View {
@@ -29,7 +29,7 @@ struct SavedWordsView: View {
                 }
                 .accessibilityLabel("Close")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
             Divider()
@@ -72,15 +72,7 @@ struct SavedWordsView: View {
                 }
             }
         }
-        .background {
-            // The shadow belongs to the panel's background only, not to the rows on it.
-            Color(.systemBackground)
-                .shadow(color: .black.opacity(0.2), radius: 16)
-                .ignoresSafeArea()
-        }
-        .overlay(alignment: .leading) {
-            Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 0.5).ignoresSafeArea()
-        }
+        .background(Color(.systemBackground).ignoresSafeArea())
     }
 
     /// Trailing control for a word without a meaning: a button to get one, a spinner, or the reason it failed.

@@ -116,7 +116,7 @@ struct ReaderView: View {
             }
         }
         .background(Color(style.backgroundColor).ignoresSafeArea())
-        .background(SwipeBackEnabler())
+        .background(SwipeBackEnabler(isEnabled: !isShowingSavedWords))
         .preferredColorScheme(style.theme.colorScheme)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden()
@@ -139,17 +139,11 @@ struct ReaderView: View {
 
     // MARK: - Saved words panel
 
-    /// The saved words slide in from the right (after a left swipe) over a dimmed page; tapping the page or
-    /// swiping the panel right puts it away.
+    /// The saved words slide in from the right (after a left swipe) and fill the screen; the close button or a
+    /// swipe to the right puts them away.
     private func savedWordsPanel(session: ReadingSession) -> some View {
         ZStack(alignment: .trailing) {
             if isShowingSavedWords {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture { closeSavedWords() }
-                    .transition(.opacity)
-
                 SavedWordsView(article: article, onLookUp: { saved in
                     let request = WordLookupRequest(
                         word: saved.word, term: saved.term,
@@ -158,7 +152,6 @@ struct ReaderView: View {
                     session.pause()
                     DictionaryPresenter.present(request, saving: saving(for: request))
                 }, onClose: closeSavedWords)
-                .containerRelativeFrame(.horizontal) { width, _ in width * 0.84 }
                 .gesture(
                     DragGesture(minimumDistance: 20).onEnded { drag in
                         if drag.translation.width > 80, abs(drag.translation.width) > abs(drag.translation.height) {
