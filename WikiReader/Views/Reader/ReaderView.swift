@@ -51,6 +51,7 @@ struct ReaderView: View {
                     },
                     onTranslate: { translate($0, pausing: session) },
                     onTapZone: handleTap(in:),
+                    savedWordKeys: Set(article.savedWords.flatMap { [$0.word.lowercased(), $0.term.lowercased()] }),
                     onSwipeLeft: {
                         hideMenus()
                         isShowingSavedWords = true

@@ -81,6 +81,25 @@ struct ArticleDocument {
         return NSRange(location: blockRange.location + range.location, length: range.length)
     }
 
+    /// Full-text ranges of the words in the blocks that are in `keys` (lowercased saved words and terms).
+    /// A trailing possessive ("aircraft's") doesn't stop a word from matching.
+    func ranges(ofWords keys: Set<String>) -> [NSRange] {
+        guard !keys.isEmpty else { return [] }
+        let text = attributedText.string as NSString
+        var found: [NSRange] = []
+        for blockRange in blockRanges {
+            text.enumerateSubstrings(in: blockRange, options: .byWords) { word, range, _, _ in
+                guard let word else { return }
+                var key = word.lowercased()
+                for suffix in ["'s", "\u{2019}s"] where key.hasSuffix(suffix) {
+                    key.removeLast(suffix.count)
+                }
+                if keys.contains(key) { found.append(range) }
+            }
+        }
+        return found
+    }
+
     /// The paragraph (or heading, or title) containing `range`, and `range` expressed inside it.
     /// Used to give the lemmatizer the surrounding sentence.
     func context(for range: NSRange) -> (text: String, wordRange: Range<String.Index>)? {

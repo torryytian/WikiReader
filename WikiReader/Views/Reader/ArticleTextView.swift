@@ -35,6 +35,8 @@ struct ArticleTextView: UIViewRepresentable {
     var onTranslate: (String) -> Void = { _ in }
     /// Called for a tap that isn't on a word: near the top or bottom edge (where the menus are), or elsewhere.
     var onTapZone: (TapZone) -> Void = { _ in }
+    /// Lowercased words and terms the reader saved; they get a light highlight wherever they appear.
+    var savedWordKeys: Set<String> = []
     /// Called when the reader swipes left across the text.
     var onSwipeLeft: () -> Void = {}
     /// Called when the user starts dragging the text, so overlays can get out of the way.
@@ -88,6 +90,7 @@ struct ArticleTextView: UIViewRepresentable {
         coordinator.onScrollSettled = onScrollSettled
         coordinator.apply(style)
         coordinator.show(document)
+        coordinator.showSavedWords(savedWordKeys)
         coordinator.showSpokenWord(spokenWord, inBlock: spokenBlock)
     }
 
@@ -122,6 +125,12 @@ struct ArticleTextView: UIViewRepresentable {
         /// How long after the user's scrolling stops before the view follows speech again.
         static var followResumeDelay: TimeInterval = 3
 
+        private var savedKeys: Set<String>?
+        private var savedRanges: [NSRange] = []
+
+        private static let savedColor = UIColor { traits in
+            UIColor.systemOrange.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.28 : 0.2)
+        }
         private static let tapColor = UIColor.tintColor.withAlphaComponent(0.25)
         private static let spokenColor = UIColor { traits in
             UIColor.systemYellow.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.35 : 0.45)
@@ -136,6 +145,8 @@ struct ArticleTextView: UIViewRepresentable {
             self.document = document
             shownText = document.attributedText
             spokenRange = nil
+            savedKeys = nil
+            savedRanges = []
             textView.attributedText = document.attributedText
             if let anchor { scroll(toBlock: anchor) }
         }
@@ -154,13 +165,42 @@ struct ArticleTextView: UIViewRepresentable {
             textView.textContainerInset.right = style.margins.inset
         }
 
+        // MARK: Saved words
+
+        /// Lightly highlights every occurrence of the saved words. Redone only when the set of words changes
+        /// (or the text is replaced), since it walks the whole article.
+        func showSavedWords(_ keys: Set<String>) {
+            guard let textView, let document, keys != savedKeys else { return }
+            let storage = textView.textStorage
+            for range in savedRanges where NSMaxRange(range) <= storage.length {
+                storage.removeAttribute(.backgroundColor, range: range)
+            }
+            savedKeys = keys
+            savedRanges = document.ranges(ofWords: keys)
+            for range in savedRanges where NSMaxRange(range) <= storage.length {
+                storage.addAttribute(.backgroundColor, value: Self.savedColor, range: range)
+            }
+            // The spoken word keeps its stronger highlight over a saved one.
+            if let spoken = spokenRange, NSMaxRange(spoken) <= storage.length {
+                storage.addAttribute(.backgroundColor, value: Self.spokenColor, range: spoken)
+            }
+        }
+
+        /// Removes a temporary highlight (spoken word, tap flash) and puts back the saved-word tint under it.
+        private func clearHighlight(in range: NSRange, of storage: NSTextStorage) {
+            storage.removeAttribute(.backgroundColor, range: range)
+            for saved in savedRanges where NSMaxRange(saved) <= storage.length && NSIntersectionRange(saved, range).length > 0 {
+                storage.addAttribute(.backgroundColor, value: Self.savedColor, range: saved)
+            }
+        }
+
         // MARK: Spoken word
 
         func showSpokenWord(_ range: NSRange?, inBlock block: Int?) {
             guard let textView, range != spokenRange else { return }
             let storage = textView.textStorage
             if let old = spokenRange, NSMaxRange(old) <= storage.length {
-                storage.removeAttribute(.backgroundColor, range: old)
+                clearHighlight(in: old, of: storage)
             }
             spokenRange = range
             spokenBlock = block
@@ -362,7 +402,7 @@ struct ArticleTextView: UIViewRepresentable {
             storage.addAttribute(.backgroundColor, value: Self.tapColor, range: range)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 guard range.upperBound <= storage.length else { return }
-                storage.removeAttribute(.backgroundColor, range: range)
+                self?.clearHighlight(in: range, of: storage)
                 // The flash may have covered the spoken word; put its highlight back.
                 if let spoken = self?.spokenRange, NSIntersectionRange(spoken, range).length > 0 {
                     storage.addAttribute(.backgroundColor, value: Self.spokenColor, range: spoken)
