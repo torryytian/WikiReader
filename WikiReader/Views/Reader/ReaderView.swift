@@ -116,7 +116,7 @@ struct ReaderView: View {
             }
         }
         .background(Color(style.backgroundColor).ignoresSafeArea())
-        .background(SwipeBackEnabler(isEnabled: !isShowingSavedWords))
+        .background(SwipeBackEnabler(onSwipeBack: swipeBackAction))
         .preferredColorScheme(style.theme.colorScheme)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden()
@@ -140,7 +140,7 @@ struct ReaderView: View {
     // MARK: - Saved words panel
 
     /// The saved words slide in from the right (after a left swipe) and fill the screen; the close button or a
-    /// swipe to the right puts them away.
+    /// swipe to the right (handled by `SwipeBackEnabler`) puts them away.
     private func savedWordsPanel(session: ReadingSession) -> some View {
         ZStack(alignment: .trailing) {
             if isShowingSavedWords {
@@ -152,17 +152,16 @@ struct ReaderView: View {
                     session.pause()
                     DictionaryPresenter.present(request, saving: saving(for: request))
                 }, onClose: closeSavedWords)
-                .gesture(
-                    DragGesture(minimumDistance: 20).onEnded { drag in
-                        if drag.translation.width > 80, abs(drag.translation.width) > abs(drag.translation.height) {
-                            closeSavedWords()
-                        }
-                    }
-                )
                 .transition(.move(edge: .trailing))
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isShowingSavedWords)
+    }
+
+    /// While the saved words are open, a swipe back closes them; otherwise the system's swipe back leaves the article.
+    private var swipeBackAction: (() -> Void)? {
+        guard isShowingSavedWords else { return nil }
+        return { closeSavedWords() }
     }
 
     private func closeSavedWords() {
