@@ -88,7 +88,7 @@ struct ReaderView: View {
                                 PlayerBar(session: session)
                             }
                         }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, showsBottomBar ? 0 : 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }

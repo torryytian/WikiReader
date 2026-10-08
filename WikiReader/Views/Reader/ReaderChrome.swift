@@ -5,80 +5,65 @@ extension EnvironmentValues {
     @Entry var floatingTint: Color = .clear
 }
 
-private struct FloatingGlass<S: InsettableShape>: ViewModifier {
+private struct ReaderBarBackground: ViewModifier {
     @Environment(\.floatingTint) private var tint
-    let shape: S
-    let interactive: Bool
+    let edge: VerticalEdge
 
     func body(content: Content) -> some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                let glass: Glass = interactive ? Glass.regular.interactive() : Glass.regular
-                // The glass bends whatever is behind it, which turns lines of text into noise. A page-colored
-                // fill behind the glass gives it something clean to bend.
-                content
-                    .glassEffect(glass, in: shape)
-                    .background(tint.opacity(0.92), in: shape)
-            } else {
-                content
-                    .background(.regularMaterial, in: shape)
-                    .background(tint.opacity(0.92), in: shape)
+        content
+            .background {
+                // Opaque page color running into the safe area, so no text shows through or behind the bar.
+                tint.ignoresSafeArea(edges: edge == .top ? .top : .bottom)
             }
-        }
-        // An edge and a shadow, so the control still reads as floating over a page of the same color.
-        .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
+            .overlay(alignment: edge == .top ? .bottom : .top) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.12))
+                    .frame(height: 0.5)
+            }
     }
 }
 
 extension View {
-    /// Background for controls that float over the text: Liquid Glass tinted with the page color where the
-    /// system has it, otherwise a blurred material with a hairline edge and a soft shadow.
-    func floatingGlass(in shape: some InsettableShape, interactive: Bool = false) -> some View {
-        modifier(FloatingGlass(shape: shape, interactive: interactive))
+    /// Background for the reader's top and bottom menus: the page color with a hairline on the edge facing the text.
+    func readerBar(edge: VerticalEdge) -> some View {
+        modifier(ReaderBarBackground(edge: edge))
     }
 }
 
 /// Menu at the top of the reader, shown when the reader taps near the top edge: back, the title, text settings.
-/// Three floating pieces rather than a full-width bar, so the text stays visible between them.
+/// A full-width bar in the page color, so it reads as part of the page rather than as pieces over the text.
 struct ReaderTopBar: View {
     let title: String
     let onBack: () -> Void
     let onStyle: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Button(action: onBack) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .frame(width: 44, height: 44)
-                    .floatingGlass(in: Circle(), interactive: true)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Back")
 
-            Spacer(minLength: 0)
-
             Text(title)
-                .font(.footnote.weight(.semibold))
+                .font(.headline)
                 .lineLimit(1)
-                .padding(.horizontal, 16)
-                .frame(height: 36)
-                .frame(maxWidth: 240)
-                .floatingGlass(in: Capsule())
-
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity)
 
             Button(action: onStyle) {
                 // Two sizes of "A", the usual sign for text settings.
                 (Text("A").font(.system(size: 14, weight: .semibold)) + Text("A").font(.system(size: 21, weight: .semibold)))
                     .frame(width: 44, height: 44)
-                    .floatingGlass(in: Circle(), interactive: true)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Text Settings")
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .readerBar(edge: .top)
         // Taps on the menu's own parts must not reach the text underneath and toggle the menu.
         .contentShape(Rectangle())
         .onTapGesture {}

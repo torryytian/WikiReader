@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// The player at the bottom of the reader, shown when the reader taps near the bottom edge:
-/// speed, previous / play-pause / next, in one floating capsule.
+/// speed on the left, previous / play-pause / next in the middle, on a full-width bar in the page color.
 struct PlayerBar: View {
     let session: ReadingSession
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 20) {
             Menu {
                 Picker("Speed", selection: Binding(get: { session.rate }, set: { session.setRate($0) })) {
                     ForEach(SpeechRate.allCases, id: \.self) { rate in
@@ -16,14 +16,12 @@ struct PlayerBar: View {
             } label: {
                 Text(session.rate.label)
                     .font(.subheadline.monospacedDigit().weight(.semibold))
-                    .frame(width: 54, height: 44)
+                    .frame(width: 56, height: 44)
+                    .background(Color.primary.opacity(0.08), in: Capsule())
             }
             .accessibilityLabel("Speed \(session.rate.label)")
 
-            Capsule()
-                .fill(Color.primary.opacity(0.15))
-                .frame(width: 1, height: 24)
-                .padding(.horizontal, 4)
+            Spacer(minLength: 0)
 
             transportButton("Previous Paragraph", symbol: "backward.fill", action: session.previous)
 
@@ -32,7 +30,7 @@ struct PlayerBar: View {
                     .font(.system(size: 22))
                     .foregroundStyle(.white)
                     .contentTransition(.symbolEffect(.replace))
-                    .frame(width: 56, height: 56)
+                    .frame(width: 54, height: 54)
                     .background(Color.accentColor, in: Circle())
                     .overlay {
                         // A cloud voice may take a moment to generate audio before sound starts.
@@ -48,22 +46,27 @@ struct PlayerBar: View {
             .accessibilityLabel(session.isPlaying ? "Pause" : "Play")
 
             transportButton("Next Paragraph", symbol: "forward.fill", action: session.next)
+
+            Spacer(minLength: 0)
+
+            // Balances the speed control so the transport buttons sit in the middle.
+            Color.clear.frame(width: 56, height: 1)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .floatingGlass(in: Capsule())
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+        .readerBar(edge: .bottom)
         // Taps on the player's own parts must not reach the text underneath and toggle the menu.
-        .contentShape(Capsule())
+        .contentShape(Rectangle())
         .onTapGesture {}
-        .padding(.horizontal, 16)
     }
 
     private func transportButton(_ label: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 19))
-                .frame(width: 52, height: 52)
+                .frame(width: 48, height: 48)
         }
         .accessibilityLabel(label)
     }
