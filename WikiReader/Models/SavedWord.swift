@@ -2,7 +2,7 @@ import Foundation
 
 /// A word the reader saved from the dictionary screen, with the sentence it was found in.
 /// Belongs to one article: each article keeps its own list.
-struct SavedWord: Codable, Identifiable, Equatable, Sendable {
+nonisolated struct SavedWord: Codable, Identifiable, Equatable, Sendable {
     /// The word as it appeared in the text, e.g. "studies".
     var word: String
     /// What the dictionary was asked for, e.g. "study". Two taps that resolve to the same term are one entry.
