@@ -59,7 +59,7 @@
   - `DictionaryPresenter`：弹系统词典；`PronouncingDictionaryViewController`（词典子类 + 喇叭 + AI 两个浮动按钮）。
   - `WordExplanationView`（单词 AI 讲解 sheet + `WordExplanationModel`）、`TranslationView`（翻译 sheet + `PassageTranslationModel`）。
   - `UITextView+WordHit`：点哪个词的命中判断。
-- `Settings/`：`SettingsView`（主页：Voice 一行、默认语速、词典说明）、`VoiceSettingsView`（所有声音一页，单一对勾）。
+- `Settings/`：`SettingsView`（主页：Appearance、Voice 一行、词典说明、Backup & Transfer 入口）、`VoiceSettingsView`（所有声音一页，单一对勾）。
 
 **tools/make_icon.swift**：生成 App 图标的三张 PNG。**docs/**：会话记录。
 
@@ -85,7 +85,7 @@
 - 切换语速时从**当前词开头**重读（用户确认保留这个行为）。
 - 自动跟随滚动：用户手动滚动后暂停跟随，**停手 3 秒或读到下一段**时恢复；恢复时不立即拉回，等下一个词再滚。
 - 系统声音选择：质量优先，同质量下现代声音（`com.apple.voice.*`）优先于老一代 MacinTalk/Eloquence（否则模拟器里会选中 "Fred"），再按口音、名字。
-- 语速 4 档（0.75/1/1.25/1.5×），播放条和设置页的默认语速是**同一个值**。
+- 语速 4 档（0.75/1/1.25/1.5×），只在播放条上调；上次用的语速会记住作为下次默认值（2026-10-08 去掉了设置页里的 Default Speed 选项，用户说没意义）。
 - 未朗读时手动滚动会更新阅读位置；朗读或暂停中不会。离开阅读页时主动保存 SwiftData。
 - 点词、打开翻译面板都会暂停朗读，关掉后保持暂停，按播放继续。
 
@@ -138,6 +138,7 @@
 
 ### App 外观（2026-10-08 晚）
 - 设置页最上面一个 Appearance 分段：System / Light / Dark（`AppAppearance`，键 `appAppearance`，随备份一起迁移）。实现：根视图 `preferredColorScheme` + 给所有 window 设 `overrideUserInterfaceStyle`（后者让 UIKit 弹出的系统词典、alert 也跟着变）。
+- **坑**：设置页是 sheet，弹出期间不会跟着窗口变；所以 `SettingsView` 自己也带 `.preferredColorScheme(appearance.colorScheme)`，根视图是个单独的 `RootView`（`@AppStorage` 放在 `App` 结构体里不会可靠地触发更新）。运行中切换 Light↔Dark 用截图验证过（用 App 内定时改 UserDefaults 模拟点选）。注意：`xcrun simctl spawn … defaults write` 写的不是 App 自己存设置的那份，测外观别用它。
 - 阅读页自己的主题（Auto/Light/Sepia/Dark）还在：它的 Auto 跟随 App 外观，选 Light/Sepia/Dark 则只改阅读页。
 - 截图验证过：深色（设置页）、浅色（文库页）。**未验证**：System 随 iPhone 切换时实时跟随、系统词典界面在深色下的样子、阅读页 Auto 在 App 深色下的样子。
 

@@ -12,7 +12,6 @@ struct SettingsView: View {
     @AppStorage(SettingsKeys.speechEngine) private var engineChoice = SpeechEngineChoice.system
     @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
-    @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
     @AppStorage(SettingsKeys.appAppearance) private var appearance = AppAppearance.system
 
     @State private var path: [SettingsPage]
@@ -29,7 +28,6 @@ struct SettingsView: View {
             Form {
                 appearanceSection
                 voiceSection
-                speedSection
                 dictionarySection
                 backupSection
             }
@@ -48,6 +46,9 @@ struct SettingsView: View {
                     LibraryBackupView()
                 }
             }
+            // The sheet carries its own appearance: a presented sheet keeps the style it was shown with, so it
+            // wouldn't follow a change made on this very page (or the window) while it is open.
+            .preferredColorScheme(appearance.colorScheme)
             // Runs again when coming back from the voice page, which may have changed the voice or key.
             .onAppear {
                 voices = VoiceSelection.rankedEnglishVoices(VoiceSelection.installedVoices())
@@ -68,6 +69,9 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            // Applied here as well as by the root view: the picker is the one place the choice is made,
+            // and this way the change shows immediately, sheet included.
+            .onChange(of: appearance) { _, new in new.apply() }
         } header: {
             Text("Appearance")
         } footer: {
@@ -90,23 +94,6 @@ struct SettingsView: View {
             Text("Reading")
         } footer: {
             Text("Free iPhone voices work offline. OpenAI voices sound more natural and cost about $0.015 per minute.")
-        }
-    }
-
-    // MARK: - Speed
-
-    private var speedSection: some View {
-        Section {
-            Picker("Default Speed", selection: $rateValue) {
-                ForEach(SpeechRate.allCases, id: \.self) { rate in
-                    Text(rate.label).tag(rate.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
-        } header: {
-            Text("Default Speed")
-        } footer: {
-            Text("Changing the speed in the player also changes this.")
         }
     }
 
