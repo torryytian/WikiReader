@@ -63,7 +63,7 @@ nonisolated struct ReaderStyle: Equatable, Sendable {
             case .system: .systemBackground
             case .light: .white
             case .sepia: UIColor(red: 0.96, green: 0.93, blue: 0.85, alpha: 1)
-            case .dark: UIColor(white: 0.09, alpha: 1)
+            case .dark: ReaderStyle.darkBackground(level: ReaderStyle.defaultDarkLevel)
             }
         }
 
@@ -72,7 +72,7 @@ nonisolated struct ReaderStyle: Equatable, Sendable {
             case .system: .label
             case .light: .black
             case .sepia: UIColor(red: 0.23, green: 0.19, blue: 0.14, alpha: 1)
-            case .dark: UIColor(white: 0.88, alpha: 1)
+            case .dark: UIColor(white: 0.82, alpha: 1)
             }
         }
 
@@ -117,14 +117,37 @@ nonisolated struct ReaderStyle: Equatable, Sendable {
 
     static let sizeRange: ClosedRange<Double> = 14...32
     static let defaultSize = 19.0
+    /// How deep the dark theme's background is: 0 is a soft charcoal, 1 is nearly black.
+    static let defaultDarkLevel = 0.25
 
     var fontFamily = FontFamily.system
     var fontSize = defaultSize
     var lineSpacing = LineSpacing.standard
     var margins = Margins.standard
     var theme = Theme.system
+    /// Only used by the dark theme.
+    var darkLevel = defaultDarkLevel
 
     static let `default` = ReaderStyle()
+
+    /// The dark theme's background for a level from 0 (soft charcoal) to 1 (nearly black).
+    static func darkBackground(level: Double) -> UIColor {
+        let level = min(max(level, 0), 1)
+        return UIColor(white: 0.21 - 0.18 * level, alpha: 1)
+    }
+
+    /// This style with the dark level reset, so two styles compare equal when the text would look the same:
+    /// the dark level only changes the page color, not the text, and shouldn't rebuild the article.
+    var textLayout: ReaderStyle {
+        var copy = self
+        copy.darkLevel = Self.defaultDarkLevel
+        return copy
+    }
+
+    /// Page color, which for the dark theme follows `darkLevel`.
+    var backgroundColor: UIColor {
+        theme == .dark ? Self.darkBackground(level: darkLevel) : theme.background
+    }
 
     /// The font size, kept inside the range the panel offers (a stale or hand-edited setting can't break layout).
     var clampedFontSize: CGFloat {

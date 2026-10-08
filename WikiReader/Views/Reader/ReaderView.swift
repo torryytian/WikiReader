@@ -21,6 +21,7 @@ struct ReaderView: View {
     @AppStorage(SettingsKeys.readerLineSpacing) private var lineSpacing = ReaderStyle.LineSpacing.standard
     @AppStorage(SettingsKeys.readerMargins) private var margins = ReaderStyle.Margins.standard
     @AppStorage(SettingsKeys.readerTheme) private var theme = ReaderStyle.Theme.system
+    @AppStorage(SettingsKeys.readerDarkLevel) private var darkLevel = ReaderStyle.defaultDarkLevel
     @State private var blocks: [ContentBlock] = []
     @State private var isShowingStyle = false
     @State private var translation: PassageTranslationModel?
@@ -30,7 +31,10 @@ struct ReaderView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var style: ReaderStyle {
-        ReaderStyle(fontFamily: fontFamily, fontSize: fontSize, lineSpacing: lineSpacing, margins: margins, theme: theme)
+        ReaderStyle(
+            fontFamily: fontFamily, fontSize: fontSize, lineSpacing: lineSpacing, margins: margins,
+            theme: theme, darkLevel: darkLevel
+        )
     }
 
     var body: some View {
@@ -63,7 +67,6 @@ struct ReaderView: View {
                 VStack(spacing: 0) {
                     if showsTopBar {
                         ReaderTopBar(title: article.title, onBack: { dismiss() }, onStyle: { isShowingStyle = true })
-                            .background(.bar, ignoresSafeAreaEdges: .top)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     Spacer(minLength: 0)
@@ -85,7 +88,7 @@ struct ReaderView: View {
                                 PlayerBar(session: session)
                             }
                         }
-                        .background(.bar, ignoresSafeAreaEdges: .bottom)
+                        .padding(.bottom, 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
@@ -99,7 +102,7 @@ struct ReaderView: View {
                 .sheet(isPresented: $isShowingStyle) {
                     ReaderStylePanel(
                         fontFamily: $fontFamily, fontSize: $fontSize, lineSpacing: $lineSpacing,
-                        margins: $margins, theme: $theme
+                        margins: $margins, theme: $theme, darkLevel: $darkLevel
                     )
                     // Tall enough to show every setting; the text behind stays visible and live.
                     .presentationDetents([.fraction(0.62), .large])
@@ -111,7 +114,7 @@ struct ReaderView: View {
                 }
             }
         }
-        .background(Color(style.theme.background).ignoresSafeArea())
+        .background(Color(style.backgroundColor).ignoresSafeArea())
         .background(SwipeBackEnabler())
         .preferredColorScheme(style.theme.colorScheme)
         .toolbar(.hidden, for: .navigationBar)
@@ -120,8 +123,9 @@ struct ReaderView: View {
             // The player's speed is also the default for next time.
             if let rate { rateValue = rate.rawValue }
         }
-        .onChange(of: style) { _, newStyle in
-            // New fonts and colors mean a new text; the text view keeps the reader's place.
+        .onChange(of: style) { oldStyle, newStyle in
+            // New fonts and text colors mean a new text; the text view keeps the reader's place.
+            guard oldStyle.textLayout != newStyle.textLayout else { return }
             document = ArticleDocument(title: article.title, blocks: blocks, style: newStyle)
         }
         .onAppear(perform: prepare)

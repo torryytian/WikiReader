@@ -17,6 +17,7 @@ nonisolated enum SettingsKeys {
     static let readerLineSpacing = "readerLineSpacing"
     static let readerMargins = "readerMargins"
     static let readerTheme = "readerTheme"
+    static let readerDarkLevel = "readerDarkLevel"
 }
 
 /// Which engine reads articles aloud. Chosen by picking a voice (see `VoiceChoice`).

@@ -136,7 +136,7 @@ struct ArticleTextView: UIViewRepresentable {
         func apply(_ style: ReaderStyle) {
             guard let textView, style != shownStyle else { return }
             shownStyle = style
-            textView.backgroundColor = style.theme.background
+            textView.backgroundColor = style.backgroundColor
             textView.overrideUserInterfaceStyle = switch style.theme.colorScheme {
             case .light?: .light
             case .dark?: .dark
