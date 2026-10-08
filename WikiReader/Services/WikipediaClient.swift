@@ -14,6 +14,8 @@ nonisolated enum WikipediaError: Error, Equatable {
     /// The page exists but has no text (e.g. a special page).
     case emptyArticle(title: String)
     case network(description: String)
+    /// No complete response arrived within the time limit.
+    case timedOut
     case httpStatus(Int)
     case badResponse
 }
@@ -22,7 +24,16 @@ nonisolated enum WikipediaError: Error, Equatable {
 nonisolated struct WikipediaClient: Sendable {
     static let userAgent = "WikiReader/0.1 (personal app; contact: torryytian@gmail.com)"
 
-    var session: URLSession = .shared
+    /// Not `.shared`: its defaults wait 60 s of silence per request and up to 7 days overall, so a bad
+    /// connection looks like an endless spinner. A TextExtracts response is small, so these are generous.
+    static let defaultSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15  // longest silence on the connection
+        configuration.timeoutIntervalForResource = 30  // whole fetch, even if data keeps trickling in
+        return URLSession(configuration: configuration)
+    }()
+
+    var session: URLSession = defaultSession
 
     /// Runs off the main actor (`@concurrent`) so a slow network never blocks the UI.
     @concurrent
@@ -34,6 +45,8 @@ nonisolated struct WikipediaClient: Sendable {
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            throw .timedOut
         } catch {
             throw .network(description: error.localizedDescription)
         }

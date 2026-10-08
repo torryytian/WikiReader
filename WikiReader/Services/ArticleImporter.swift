@@ -28,6 +28,8 @@ nonisolated enum ImportError: LocalizedError, Equatable {
             "“\(title)” has no readable text."
         case .wikipedia(.network(let description)):
             "Couldn't reach Wikipedia: \(description)"
+        case .wikipedia(.timedOut):
+            "Wikipedia didn't respond in time. Check your connection and try again."
         case .wikipedia(.httpStatus(let code)):
             "Wikipedia returned an error (HTTP \(code)). Try again later."
         case .wikipedia(.badResponse):

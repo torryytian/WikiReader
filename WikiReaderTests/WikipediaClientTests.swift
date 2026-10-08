@@ -2,7 +2,32 @@ import Foundation
 import Testing
 @testable import WikiReader
 
+/// Fails every request with a fixed URLError, without touching the network.
+private final class FailingURLProtocol: URLProtocol {
+    static let code = URLError.Code.timedOut
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(Self.code)) }
+    override func stopLoading() {}
+}
+
 struct WikipediaClientTests {
+    @Test func defaultSessionGivesUpInsteadOfSpinningForever() {
+        let configuration = WikipediaClient.defaultSession.configuration
+        #expect(configuration.timeoutIntervalForRequest <= 20)
+        #expect(configuration.timeoutIntervalForResource <= 60)
+    }
+
+    @Test func timeoutBecomesTimedOutError() async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [FailingURLProtocol.self]
+        let client = WikipediaClient(session: URLSession(configuration: configuration))
+        await #expect(throws: WikipediaError.timedOut) {
+            try await client.fetchArticle(title: "Albert Einstein")
+        }
+    }
+
     @Test func requestURLHasRequiredParameters() throws {
         let url = WikipediaClient.requestURL(forTitle: "Albert Einstein")
         let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
