@@ -10,9 +10,11 @@ import UIKit
 final class PronouncingDictionaryViewController: UIReferenceLibraryViewController {
     private let request: WordLookupRequest
     private let pronouncer: WordPronouncer
+    private let saving: WordSaving?
 
-    init(request: WordLookupRequest, voiceIdentifier: String?) {
+    init(request: WordLookupRequest, voiceIdentifier: String?, saving: WordSaving?) {
         self.request = request
+        self.saving = saving
         pronouncer = WordPronouncer(voiceIdentifier: voiceIdentifier)
         super.init(term: request.term)
     }
@@ -33,7 +35,11 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
             pronouncer.speak(request.term)
         }
 
-        let buttons = UIStackView(arrangedSubviews: [explainButton, speakButton])
+        var arranged = [explainButton, speakButton]
+        if let saving {
+            arranged.insert(saveButton(for: saving), at: 0)
+        }
+        let buttons = UIStackView(arrangedSubviews: arranged)
         buttons.spacing = 10
         buttons.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(buttons)
@@ -41,6 +47,21 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
             buttons.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
             buttons.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
         ])
+    }
+
+    /// Bookmark that adds the word to this article's word list, or removes it again.
+    private func saveButton(for saving: WordSaving) -> UIButton {
+        func configure(_ button: UIButton, isSaved: Bool) {
+            button.configuration?.image = UIImage(systemName: isSaved ? "bookmark.fill" : "bookmark")
+            button.accessibilityLabel = isSaved ? "Remove \(request.word) from saved words" : "Save \(request.word)"
+        }
+        let button = floatingButton(title: nil, symbol: "bookmark", label: "") { }
+        configure(button, isSaved: saving.isSaved)
+        button.addAction(UIAction { [weak button] _ in
+            guard let button else { return }
+            configure(button, isSaved: saving.toggle())
+        }, for: .primaryActionTriggered)
+        return button
     }
 
     private func floatingButton(title: String?, symbol: String, label: String, action: @escaping () -> Void) -> UIButton {
@@ -68,13 +89,20 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
     }
 }
 
+/// How the dictionary screen saves its word: the current state, and a toggle that returns the new state.
+struct WordSaving {
+    var isSaved: Bool
+    var toggle: () -> Bool
+}
+
 /// Shows the iOS system dictionary for a lookup request.
 ///
 /// Presented directly with UIKit rather than through a SwiftUI `.sheet`: the dictionary
 /// controller dismisses itself with its own Done button, and a SwiftUI sheet would keep a
 /// separate "is presented" state that can fall out of sync with that.
 enum DictionaryPresenter {
-    static func present(_ request: WordLookupRequest) {
+    /// - Parameter saving: When given, the dictionary gets a bookmark button for the article's word list.
+    static func present(_ request: WordLookupRequest, saving: WordSaving? = nil) {
         guard let presenter = topViewController() else {
             Log.lookup.error("No view controller to present the dictionary from")
             return
@@ -84,7 +112,7 @@ enum DictionaryPresenter {
 
         // Shown even without a definition: the system screen then offers to manage/download dictionaries.
         let voiceIdentifier = UserDefaults.standard.string(forKey: SettingsKeys.voiceIdentifier)
-        let dictionary = PronouncingDictionaryViewController(request: request, voiceIdentifier: voiceIdentifier)
+        let dictionary = PronouncingDictionaryViewController(request: request, voiceIdentifier: voiceIdentifier, saving: saving)
         presenter.present(dictionary, animated: true)
         Log.lookup.info("Presented dictionary for \(request.term, privacy: .public)")
     }

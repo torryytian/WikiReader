@@ -35,6 +35,8 @@ struct ArticleTextView: UIViewRepresentable {
     var onTranslate: (String) -> Void = { _ in }
     /// Called for a tap that isn't on a word: near the top or bottom edge (where the menus are), or elsewhere.
     var onTapZone: (TapZone) -> Void = { _ in }
+    /// Called when the reader swipes left across the text.
+    var onSwipeLeft: () -> Void = {}
     /// Called when the user starts dragging the text, so overlays can get out of the way.
     var onScrollBegan: () -> Void = {}
     /// Block to show at the top when the article first appears.
@@ -59,6 +61,10 @@ struct ArticleTextView: UIViewRepresentable {
         tap.delegate = context.coordinator
         textView.addGestureRecognizer(tap)
 
+        let swipe = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSwipe(_:)))
+        swipe.delegate = context.coordinator
+        textView.addGestureRecognizer(swipe)
+
         let coordinator = context.coordinator
         coordinator.textView = textView
         coordinator.apply(style)
@@ -77,6 +83,7 @@ struct ArticleTextView: UIViewRepresentable {
         coordinator.onReadFromHere = onReadFromHere
         coordinator.onTranslate = onTranslate
         coordinator.onTapZone = onTapZone
+        coordinator.onSwipeLeft = onSwipeLeft
         coordinator.onScrollBegan = onScrollBegan
         coordinator.onScrollSettled = onScrollSettled
         coordinator.apply(style)
@@ -92,6 +99,7 @@ struct ArticleTextView: UIViewRepresentable {
         var onReadFromHere: (Int) -> Void = { _ in }
         var onTranslate: (String) -> Void = { _ in }
         var onTapZone: (TapZone) -> Void = { _ in }
+        var onSwipeLeft: () -> Void = {}
         var onScrollBegan: () -> Void = {}
         var onScrollSettled: (Int) -> Void = { _ in }
         var pendingScrollBlock: Int?
@@ -284,6 +292,21 @@ struct ArticleTextView: UIViewRepresentable {
             shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
         ) -> Bool {
             true
+        }
+
+        /// The swipe recognizer only starts for a clearly sideways, leftward movement, so ordinary scrolling is untouched.
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+            let velocity = pan.velocity(in: pan.view)
+            return velocity.x < 0 && abs(velocity.x) > 2 * abs(velocity.y)
+        }
+
+        @objc func handleSwipe(_ gesture: UIPanGestureRecognizer) {
+            guard gesture.state == .ended else { return }
+            let translation = gesture.translation(in: gesture.view)
+            if translation.x < -80 && abs(translation.x) > 2 * abs(translation.y) {
+                onSwipeLeft()
+            }
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {

@@ -24,6 +24,7 @@ struct ReaderView: View {
     @AppStorage(SettingsKeys.readerDarkLevel) private var darkLevel = ReaderStyle.defaultDarkLevel
     @State private var blocks: [ContentBlock] = []
     @State private var translation: PassageTranslationModel?
+    @State private var isShowingSavedWords = false
     /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
     @State private var showsTopBar = false
     @State private var showsBottomBar = false
@@ -50,6 +51,10 @@ struct ReaderView: View {
                     },
                     onTranslate: { translate($0, pausing: session) },
                     onTapZone: handleTap(in:),
+                    onSwipeLeft: {
+                        hideMenus()
+                        isShowingSavedWords = true
+                    },
                     onScrollBegan: hideMenus,
                     initialBlock: article.lastReadBlockIndex,
                     onScrollSettled: { block in
@@ -100,6 +105,17 @@ struct ReaderView: View {
                 .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
                     // Only opened from the error banner, where the fix is a voice or an API key.
                     SettingsView(opensVoicePage: true)
+                }
+                .sheet(isPresented: $isShowingSavedWords) {
+                    SavedWordsView(article: article) { saved in
+                        let request = WordLookupRequest(
+                            word: saved.word, term: saved.term,
+                            hasDefinition: DictionaryLookup.system.hasDefinition(saved.term), sentence: saved.sentence
+                        )
+                        session.pause()
+                        DictionaryPresenter.present(request, saving: saving(for: request))
+                    }
+                    .presentationDetents([.medium, .large])
                 }
                 .sheet(item: $translation) { model in
                     TranslationView(model: model)
@@ -223,6 +239,13 @@ struct ReaderView: View {
             """)
         // Looking up pauses reading; it stays paused after the dictionary closes until Play is pressed.
         session.pause()
-        DictionaryPresenter.present(request)
+        DictionaryPresenter.present(request, saving: saving(for: request))
+    }
+
+    /// The dictionary's bookmark button saves into this article's own word list.
+    private func saving(for request: WordLookupRequest) -> WordSaving {
+        WordSaving(isSaved: article.isSaved(term: request.term)) { [article] in
+            article.toggleSavedWord(request)
+        }
     }
 }

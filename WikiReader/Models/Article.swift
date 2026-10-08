@@ -11,6 +11,8 @@ final class Article {
     var blocksData: Data
     /// Index into `blocks` of the last block read or spoken.
     var lastReadBlockIndex: Int
+    /// `[SavedWord]` encoded as JSON (see `SavedWord.swift`). The default lets existing databases upgrade in place.
+    var savedWordsData: Data = Data()
 
     init(title: String, sourceURL: URL, blocks: [ContentBlock], addedAt: Date = .now) {
         self.title = title
