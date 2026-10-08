@@ -6,8 +6,20 @@ import UIKit
 /// UIKit rather than SwiftUI `Text` because we need word hit-testing (tap to look up),
 /// per-word highlighting and scrolling to a text range.
 struct ArticleTextView: UIViewRepresentable {
-    enum TapZone {
+    enum TapZone: Equatable {
         case top, middle, bottom
+
+        /// Height of the strip, below the top safe area / above the bottom one, where a tap opens a menu.
+        static let topStrip: CGFloat = 40
+        static let bottomStrip: CGFloat = 70
+
+        /// Which zone a tap at `y` (measured from the top of the text view) is in. The top zone also
+        /// includes the safe area above the text view, which is handled outside it, so only `topStrip` counts here.
+        static func zone(forY y: CGFloat, viewHeight: CGFloat, topInset: CGFloat, bottomInset: CGFloat) -> TapZone {
+            if y < topInset + topStrip { return .top }
+            if y > viewHeight - bottomInset - bottomStrip { return .bottom }
+            return .middle
+        }
     }
 
     let document: ArticleDocument
@@ -301,9 +313,7 @@ struct ArticleTextView: UIViewRepresentable {
         /// The top and bottom strips are where the menus appear, so taps there never look up a word.
         private func tapZone(forY y: CGFloat, in textView: UITextView) -> TapZone {
             let insets = textView.adjustedContentInset
-            if y < insets.top + 40 { return .top }
-            if y > textView.bounds.height - insets.bottom - 70 { return .bottom }
-            return .middle
+            return TapZone.zone(forY: y, viewHeight: textView.bounds.height, topInset: insets.top, bottomInset: insets.bottom)
         }
 
         /// The block whose "Translate" label is under `point`.

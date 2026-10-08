@@ -123,3 +123,22 @@ struct ReaderStylePanel: View {
         .accessibilityAddTraits(theme == option ? .isSelected : [])
     }
 }
+
+/// Hiding the navigation bar also turns off the swipe-from-the-left-edge gesture that goes back. This turns
+/// it on again, so the reader can always be left without finding the top menu.
+struct SwipeBackEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller {
+        Controller()
+    }
+
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+
+    final class Controller: UIViewController {
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            // Its default delegate refuses the gesture while the navigation bar is hidden.
+            navigationController?.interactivePopGestureRecognizer?.delegate = nil
+            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        }
+    }
+}

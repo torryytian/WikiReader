@@ -58,6 +58,8 @@ struct ReaderView: View {
                 // Full screen except at the top, so the first line never hides behind the Dynamic Island.
                 .ignoresSafeArea(edges: .bottom)
 
+                topTapStrip
+
                 VStack(spacing: 0) {
                     if showsTopBar {
                         ReaderTopBar(title: article.title, onBack: { dismiss() }, onStyle: { isShowingStyle = true })
@@ -110,6 +112,7 @@ struct ReaderView: View {
             }
         }
         .background(Color(style.theme.background).ignoresSafeArea())
+        .background(SwipeBackEnabler())
         .preferredColorScheme(style.theme.colorScheme)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden()
@@ -130,6 +133,18 @@ struct ReaderView: View {
     }
 
     // MARK: - Menus
+
+    /// The safe area above the text (the Dynamic Island strip) isn't part of the text view, so taps there would do
+    /// nothing. This invisible strip covers it, so tapping the very top of the screen opens the top menu.
+    private var topTapStrip: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .frame(height: proxy.safeAreaInsets.top)
+                .contentShape(Rectangle())
+                .onTapGesture { handleTap(in: .top) }
+                .offset(y: -proxy.safeAreaInsets.top)
+        }
+    }
 
     private func handleTap(in zone: ArticleTextView.TapZone) {
         switch zone {

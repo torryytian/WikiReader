@@ -131,3 +131,29 @@ struct ArticleDocumentTests {
         }
     }
 }
+
+struct TapZoneTests {
+    private func zone(_ y: CGFloat, top: CGFloat = 0, bottom: CGFloat = 0) -> ArticleTextView.TapZone {
+        ArticleTextView.TapZone.zone(forY: y, viewHeight: 800, topInset: top, bottomInset: bottom)
+    }
+
+    @Test func topAndBottomStripsOpenMenus() {
+        #expect(zone(0) == .top)
+        #expect(zone(39) == .top)
+        #expect(zone(41) == .middle)
+        #expect(zone(799) == .bottom)
+        #expect(zone(731) == .bottom)
+        #expect(zone(729) == .middle)
+    }
+
+    @Test func insetsMoveTheStrips() {
+        #expect(zone(59, top: 20) == .top)
+        #expect(zone(61, top: 20) == .middle)
+        #expect(zone(700, bottom: 34) == .bottom)
+        #expect(zone(690, bottom: 34) == .middle)
+    }
+
+    @Test func middleOfTheScreenLooksUpWords() {
+        #expect(zone(400, top: 59, bottom: 34) == .middle)
+    }
+}
