@@ -157,3 +157,55 @@ struct TapZoneTests {
         #expect(zone(400, top: 59, bottom: 34) == .middle)
     }
 }
+
+struct ReaderThemeTests {
+    private func white(_ color: UIColor) -> CGFloat {
+        var white: CGFloat = 0
+        color.getWhite(&white, alpha: nil)
+        return white
+    }
+
+    @Test func darkThemeIsSofterThanNearBlack() {
+        // The first dark theme (white 0.09) was too harsh; the default is a charcoal, lighter than that.
+        #expect(white(ReaderStyle.darkBackground(level: ReaderStyle.defaultDarkLevel)) > 0.12)
+    }
+
+    @Test func darknessLevelMovesFromSoftToDeep() {
+        let soft = white(ReaderStyle.darkBackground(level: 0))
+        let middle = white(ReaderStyle.darkBackground(level: 0.5))
+        let deep = white(ReaderStyle.darkBackground(level: 1))
+        #expect(soft > middle)
+        #expect(middle > deep)
+        #expect(deep < 0.06)
+        // Out-of-range settings are clamped.
+        #expect(white(ReaderStyle.darkBackground(level: -3)) == soft)
+        #expect(white(ReaderStyle.darkBackground(level: 9)) == deep)
+    }
+
+    @Test func darkTextStaysSoftAndReadable() {
+        let background = white(ReaderStyle.darkBackground(level: 0))
+        let text = white(ReaderStyle.Theme.dark.text)
+        #expect(text < 0.9)  // not pure white
+        #expect(text - background > 0.5)  // still clearly lighter than the page
+    }
+
+    @Test func pageColorFollowsLevelOnlyInTheDarkTheme() {
+        let deep = ReaderStyle(theme: .dark, darkLevel: 1)
+        let soft = ReaderStyle(theme: .dark, darkLevel: 0)
+        #expect(white(deep.backgroundColor) < white(soft.backgroundColor))
+
+        let sepiaA = ReaderStyle(theme: .sepia, darkLevel: 0)
+        let sepiaB = ReaderStyle(theme: .sepia, darkLevel: 1)
+        #expect(sepiaA.backgroundColor == sepiaB.backgroundColor)
+    }
+
+    @Test func darkLevelDoesNotCountAsATextChange() {
+        // Moving the slider must not rebuild the article, only repaint the page.
+        let a = ReaderStyle(theme: .dark, darkLevel: 0.1)
+        let b = ReaderStyle(theme: .dark, darkLevel: 0.9)
+        #expect(a != b)
+        #expect(a.textLayout == b.textLayout)
+        #expect(ReaderStyle(fontSize: 20).textLayout != ReaderStyle(fontSize: 21).textLayout)
+        #expect(ReaderStyle(theme: .dark).textLayout != ReaderStyle(theme: .light).textLayout)
+    }
+}

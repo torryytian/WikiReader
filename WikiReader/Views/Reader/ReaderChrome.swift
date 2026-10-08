@@ -1,18 +1,41 @@
 import SwiftUI
 
-extension View {
-    /// Background for controls that float over the text: Liquid Glass where the system has it,
-    /// otherwise a blurred material with a hairline edge and a soft shadow.
-    @ViewBuilder
-    func floatingGlass(in shape: some InsettableShape, interactive: Bool = false) -> some View {
-        if #available(iOS 26.0, *) {
-            let glass: Glass = interactive ? Glass.regular.interactive() : Glass.regular
-            glassEffect(glass, in: shape)
-        } else {
-            background(.regularMaterial, in: shape)
-                .overlay(shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
+extension EnvironmentValues {
+    /// The page color, which floating controls take on so the text behind them fades instead of showing through.
+    @Entry var floatingTint: Color = .clear
+}
+
+private struct FloatingGlass<S: InsettableShape>: ViewModifier {
+    @Environment(\.floatingTint) private var tint
+    let shape: S
+    let interactive: Bool
+
+    func body(content: Content) -> some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                let glass: Glass = interactive ? Glass.regular.interactive() : Glass.regular
+                // The glass bends whatever is behind it, which turns lines of text into noise. A page-colored
+                // fill behind the glass gives it something clean to bend.
+                content
+                    .glassEffect(glass, in: shape)
+                    .background(tint.opacity(0.92), in: shape)
+            } else {
+                content
+                    .background(.regularMaterial, in: shape)
+                    .background(tint.opacity(0.92), in: shape)
+            }
         }
+        // An edge and a shadow, so the control still reads as floating over a page of the same color.
+        .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
+    }
+}
+
+extension View {
+    /// Background for controls that float over the text: Liquid Glass tinted with the page color where the
+    /// system has it, otherwise a blurred material with a hairline edge and a soft shadow.
+    func floatingGlass(in shape: some InsettableShape, interactive: Bool = false) -> some View {
+        modifier(FloatingGlass(shape: shape, interactive: interactive))
     }
 }
 

@@ -92,6 +92,7 @@ struct ReaderView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
+                .environment(\.floatingTint, Color(style.backgroundColor))
                 .animation(.easeInOut(duration: 0.22), value: showsTopBar)
                 .animation(.easeInOut(duration: 0.22), value: showsBottomBar)
                 .animation(.default, value: session.failure)
