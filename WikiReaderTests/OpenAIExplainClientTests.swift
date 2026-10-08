@@ -28,7 +28,7 @@ struct OpenAIExplainClientTests {
         }
     }
 
-    private func explain(with client: OpenAIExplainClient, key: String = "k") async throws(OpenAIExplainError) -> WordExplanation {
+    private func explain(with client: OpenAIExplainClient, key: String = "k") async throws(OpenAIChatError) -> WordExplanation {
         try await client.explain(word: word, sentence: sentence, apiKey: key)
     }
 
@@ -91,7 +91,7 @@ struct OpenAIExplainClientTests {
         #"{"choices":[{"message":{"content":"{\"meaning\":\"only one field\"}"}}]}"#,
     ])
     func unusableReplyIsBadResponse(body: String) async {
-        await #expect(throws: OpenAIExplainError.badResponse) { try await explain(with: client(status: 200, body: body)) }
+        await #expect(throws: OpenAIChatError.badResponse) { try await explain(with: client(status: 200, body: body)) }
     }
 
     // MARK: - Failures
@@ -101,31 +101,31 @@ struct OpenAIExplainClientTests {
             Issue.record("No request should be sent without a key")
             throw URLError(.cancelled)
         }
-        await #expect(throws: OpenAIExplainError.missingKey) { try await explain(with: client, key: "") }
+        await #expect(throws: OpenAIChatError.missingKey) { try await explain(with: client, key: "") }
     }
 
     @Test(arguments: [
-        (401, #"{"error":{"message":"Incorrect API key","code":"invalid_api_key"}}"#, OpenAIExplainError.invalidKey),
+        (401, #"{"error":{"message":"Incorrect API key","code":"invalid_api_key"}}"#, OpenAIChatError.invalidKey),
         (429, #"{"error":{"message":"You exceeded your quota","code":"insufficient_quota"}}"#, .quotaExceeded),
         (429, #"{"error":{"message":"Rate limit reached","code":"rate_limit_exceeded"}}"#, .rateLimited),
         (404, #"{"error":{"message":"The model does not exist"}}"#, .badRequest("The model does not exist")),
         (503, "", .server(status: 503)),
     ])
-    func errorResponses(status: Int, body: String, expected: OpenAIExplainError) async {
+    func errorResponses(status: Int, body: String, expected: OpenAIChatError) async {
         await #expect(throws: expected) { try await explain(with: client(status: status, body: body)) }
     }
 
     @Test func timeoutAndNetworkFailures() async {
-        await #expect(throws: OpenAIExplainError.timedOut) {
+        await #expect(throws: OpenAIChatError.timedOut) {
             try await explain(with: client(status: 0, error: URLError(.timedOut)))
         }
-        await #expect(throws: OpenAIExplainError.network(URLError(.notConnectedToInternet).localizedDescription)) {
+        await #expect(throws: OpenAIChatError.network(URLError(.notConnectedToInternet).localizedDescription)) {
             try await explain(with: client(status: 0, error: URLError(.notConnectedToInternet)))
         }
     }
 
     @Test func messagesNeverContainTheKeyAndRetryMatchesTheCause() {
-        let errors: [OpenAIExplainError] = [
+        let errors: [OpenAIChatError] = [
             .missingKey, .invalidKey, .quotaExceeded, .rateLimited, .badRequest("x"),
             .server(status: 500), .network("x"), .timedOut, .badResponse,
         ]
@@ -134,9 +134,9 @@ struct OpenAIExplainClientTests {
             #expect(!error.message.contains("sk-"))
         }
         // Retrying can't fix a key or credit problem, only transient ones.
-        #expect(!OpenAIExplainError.missingKey.isRetryable)
-        #expect(!OpenAIExplainError.invalidKey.isRetryable)
-        #expect(OpenAIExplainError.timedOut.isRetryable)
+        #expect(!OpenAIChatError.missingKey.isRetryable)
+        #expect(!OpenAIChatError.invalidKey.isRetryable)
+        #expect(OpenAIChatError.timedOut.isRetryable)
     }
 }
 

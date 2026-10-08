@@ -6,14 +6,25 @@ import UIKit
 /// UIKit rather than SwiftUI `Text` because we need word hit-testing (tap to look up),
 /// per-word highlighting and scrolling to a text range.
 struct ArticleTextView: UIViewRepresentable {
+    enum TapZone {
+        case top, middle, bottom
+    }
+
     let document: ArticleDocument
+    var style = ReaderStyle.default
     /// The word being read aloud, in full-text coordinates, and the block it belongs to.
     var spokenWord: NSRange?
     var spokenBlock: Int?
     /// Called with the full-text range of a tapped word. Taps on punctuation, numbers and blank space are ignored.
     var onWordTapped: (NSRange) -> Void = { _ in }
-    /// Called with the index of a long-pressed block (the title counts as block 0).
-    var onBlockLongPressed: (Int) -> Void = { _ in }
+    /// Called with the index of the block where a selection starts, from the selection menu's "Read From Here".
+    var onReadFromHere: (Int) -> Void = { _ in }
+    /// Called with article text to translate: a selection, or a paragraph whose "Translate" label was tapped.
+    var onTranslate: (String) -> Void = { _ in }
+    /// Called for a tap that isn't on a word: near the top or bottom edge (where the menus are), or elsewhere.
+    var onTapZone: (TapZone) -> Void = { _ in }
+    /// Called when the user starts dragging the text, so overlays can get out of the way.
+    var onScrollBegan: () -> Void = {}
     /// Block to show at the top when the article first appears.
     var initialBlock = 0
     /// Called with the block at the top of the screen after the user scrolls and lets go.
@@ -26,9 +37,8 @@ struct ArticleTextView: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextView {
         let textView = LayoutReportingTextView()
         textView.isEditable = false
-        // Selection would compete with tap-to-look-up.
-        textView.isSelectable = false
-        textView.backgroundColor = .systemBackground
+        // Long press selects text (to translate several words or paragraphs); a single tap still looks up a word.
+        textView.isSelectable = true
         textView.textContainerInset = UIEdgeInsets(top: 12, left: 16, bottom: 32, right: 16)
         textView.alwaysBounceVertical = true
         textView.delegate = context.coordinator
@@ -37,11 +47,9 @@ struct ArticleTextView: UIViewRepresentable {
         tap.delegate = context.coordinator
         textView.addGestureRecognizer(tap)
 
-        let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
-        textView.addGestureRecognizer(longPress)
-
         let coordinator = context.coordinator
         coordinator.textView = textView
+        coordinator.apply(style)
         coordinator.show(document)
         if initialBlock > 0 {
             // The view has no size yet; scroll once it has been laid out.
@@ -54,8 +62,12 @@ struct ArticleTextView: UIViewRepresentable {
     func updateUIView(_ textView: UITextView, context: Context) {
         let coordinator = context.coordinator
         coordinator.onWordTapped = onWordTapped
-        coordinator.onBlockLongPressed = onBlockLongPressed
+        coordinator.onReadFromHere = onReadFromHere
+        coordinator.onTranslate = onTranslate
+        coordinator.onTapZone = onTapZone
+        coordinator.onScrollBegan = onScrollBegan
         coordinator.onScrollSettled = onScrollSettled
+        coordinator.apply(style)
         coordinator.show(document)
         coordinator.showSpokenWord(spokenWord, inBlock: spokenBlock)
     }
@@ -65,7 +77,10 @@ struct ArticleTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         weak var textView: UITextView?
         var onWordTapped: (NSRange) -> Void = { _ in }
-        var onBlockLongPressed: (Int) -> Void = { _ in }
+        var onReadFromHere: (Int) -> Void = { _ in }
+        var onTranslate: (String) -> Void = { _ in }
+        var onTapZone: (TapZone) -> Void = { _ in }
+        var onScrollBegan: () -> Void = {}
         var onScrollSettled: (Int) -> Void = { _ in }
         var pendingScrollBlock: Int?
 
@@ -73,6 +88,10 @@ struct ArticleTextView: UIViewRepresentable {
         private var shownText: NSAttributedString?
         /// A tap that stops a fling-scroll shouldn't also look up a word, matching system apps.
         private var tapStartedWhileScrolling = false
+        /// A tap that dismisses a selection (and its menu) shouldn't also look up a word. Recorded when the
+        /// touch begins, because the text view's own tap clears the selection before ours is handled.
+        private var tapStartedWithSelection = false
+        private var shownStyle: ReaderStyle?
 
         private var spokenRange: NSRange?
         private var spokenBlock: Int?
@@ -92,10 +111,27 @@ struct ArticleTextView: UIViewRepresentable {
             // Compare identity, not contents: highlights edit the text view's copy,
             // and resetting the text would also reset the scroll position.
             guard let textView, shownText !== document.attributedText else { return }
+            // A new text (e.g. after changing the font size) starts at the top; scroll back to where the reader was.
+            let anchor = shownText == nil ? nil : topVisibleBlock()
             self.document = document
             shownText = document.attributedText
             spokenRange = nil
             textView.attributedText = document.attributedText
+            if let anchor { scroll(toBlock: anchor) }
+        }
+
+        /// Colors and margins; the fonts and text colors are in the document itself.
+        func apply(_ style: ReaderStyle) {
+            guard let textView, style != shownStyle else { return }
+            shownStyle = style
+            textView.backgroundColor = style.theme.background
+            textView.overrideUserInterfaceStyle = switch style.theme.colorScheme {
+            case .light?: .light
+            case .dark?: .dark
+            default: .unspecified
+            }
+            textView.textContainerInset.left = style.margins.inset
+            textView.textContainerInset.right = style.margins.inset
         }
 
         // MARK: Spoken word
@@ -183,6 +219,7 @@ struct ArticleTextView: UIViewRepresentable {
         // scrolling has stopped for a moment or speech moves on to another block, whichever comes first.
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            onScrollBegan()
             resumeFollowing?.cancel()
             guard spokenRange != nil, followPausedInBlock == nil else { return }
             followPausedInBlock = spokenBlock
@@ -221,18 +258,69 @@ struct ArticleTextView: UIViewRepresentable {
             // nothing is spoken, so browsing the article doesn't get pulled back.
         }
 
-        // MARK: Tap to look up
+        // MARK: Taps
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             tapStartedWhileScrolling = textView?.isDecelerating ?? false
+            tapStartedWithSelection = (textView?.selectedRange.length ?? 0) > 0
             return true
         }
 
+        /// Our tap runs next to the text view's own selection gestures instead of waiting for them.
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
+
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            guard gesture.state == .ended, !tapStartedWhileScrolling, let textView else { return }
-            guard let range = textView.lookupWordRange(at: gesture.location(in: textView)) else { return }
+            guard gesture.state == .ended, !tapStartedWhileScrolling, let textView, let document else { return }
+            if tapStartedWithSelection {
+                textView.selectedTextRange = nil
+                return
+            }
+
+            let point = gesture.location(in: textView)
+            let zone = tapZone(forY: point.y - textView.contentOffset.y, in: textView)
+            guard zone == .middle else {
+                onTapZone(zone)
+                return
+            }
+
+            onTapZone(.middle)
+            if let label = translateLabel(at: point, in: textView, document: document) {
+                if let text = document.blockText(label) { onTranslate(text) }
+                return
+            }
+            guard let range = textView.lookupWordRange(at: point) else { return }
             flashHighlight(range, in: textView)
             onWordTapped(range)
+        }
+
+        /// The top and bottom strips are where the menus appear, so taps there never look up a word.
+        private func tapZone(forY y: CGFloat, in textView: UITextView) -> TapZone {
+            let insets = textView.adjustedContentInset
+            if y < insets.top + 40 { return .top }
+            if y > textView.bounds.height - insets.bottom - 70 { return .bottom }
+            return .middle
+        }
+
+        /// The block whose "Translate" label is under `point`.
+        private func translateLabel(at point: CGPoint, in textView: UITextView, document: ArticleDocument) -> Int? {
+            guard let position = textView.closestPosition(to: point) else { return nil }
+            let location = textView.offset(from: textView.beginningOfDocument, to: position)
+            // closestPosition may land just after the label, so look at the character before it as well.
+            for candidate in [location, location - 1] {
+                guard let block = document.translateBlock(at: candidate),
+                      let start = textView.position(from: textView.beginningOfDocument, offset: candidate),
+                      let end = textView.position(from: start, offset: 1),
+                      let range = textView.textRange(from: start, to: end)
+                else { continue }
+                let hit = textView.selectionRects(for: range).contains { $0.rect.insetBy(dx: -6, dy: -8).contains(point) }
+                if hit { return block }
+            }
+            return nil
         }
 
         /// Briefly tints the tapped word as touch feedback.
@@ -249,20 +337,31 @@ struct ArticleTextView: UIViewRepresentable {
             }
         }
 
-        // MARK: Long press to read from here
+        // MARK: Selection menu
 
-        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-            guard gesture.state == .began, let textView, let document else { return }
-            let point = gesture.location(in: textView)
-            guard let position = textView.closestPosition(to: point) else { return }
-            // Ignore presses well away from any line of text (e.g. below the end of the article).
-            let caret = textView.caretRect(for: position)
-            guard abs(point.y - caret.midY) <= caret.height else { return }
+        /// The menu over a selection: translate it, read from it, or copy it. Our own menu instead of the system's,
+        /// whose "Look Up" and "Share" lead to web search.
+        func textView(_ textView: UITextView, editMenuForTextIn range: NSRange, suggestedActions: [UIMenuElement]) -> UIMenu? {
+            guard let document, range.length > 0 else { return nil }
+            let text = document.selectedText(in: range)
+            guard !text.isEmpty else { return nil }
 
-            let location = textView.offset(from: textView.beginningOfDocument, to: position)
-            guard let block = document.blockIndex(nearest: location) else { return }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            onBlockLongPressed(block)
+            let translate = UIAction(title: "AI Translate", image: UIImage(systemName: "character.bubble")) { [weak self, weak textView] _ in
+                textView?.selectedTextRange = nil
+                self?.onTranslate(text)
+            }
+            var actions = [translate]
+            if let block = document.blockIndex(nearest: range.location) {
+                actions.append(UIAction(title: "Read From Here", image: UIImage(systemName: "play")) { [weak self, weak textView] _ in
+                    textView?.selectedTextRange = nil
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    self?.onReadFromHere(block)
+                })
+            }
+            actions.append(UIAction(title: "Copy", image: UIImage(systemName: "doc.on.doc")) { _ in
+                UIPasteboard.general.string = text
+            })
+            return UIMenu(children: actions)
         }
     }
 }

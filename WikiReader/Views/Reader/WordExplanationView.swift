@@ -7,7 +7,7 @@ final class WordExplanationModel {
     enum State: Equatable {
         case loading
         case loaded(WordExplanation)
-        case failed(OpenAIExplainError)
+        case failed(OpenAIChatError)
     }
 
     let word: String
@@ -88,7 +88,7 @@ struct WordExplanationView: View {
         .onDisappear(perform: model.cancel)
     }
 
-    private func failureView(_ error: OpenAIExplainError) -> some View {
+    private func failureView(_ error: OpenAIChatError) -> some View {
         VStack(spacing: 16) {
             Label(error.message, systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.secondary)

@@ -16,54 +16,108 @@ struct ReaderView: View {
     @State private var isShowingSettings = false
     @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
 
+    @AppStorage(SettingsKeys.readerFont) private var fontFamily = ReaderStyle.FontFamily.system
+    @AppStorage(SettingsKeys.readerFontSize) private var fontSize = ReaderStyle.defaultSize
+    @AppStorage(SettingsKeys.readerLineSpacing) private var lineSpacing = ReaderStyle.LineSpacing.standard
+    @AppStorage(SettingsKeys.readerMargins) private var margins = ReaderStyle.Margins.standard
+    @AppStorage(SettingsKeys.readerTheme) private var theme = ReaderStyle.Theme.system
+    @State private var blocks: [ContentBlock] = []
+    @State private var isShowingStyle = false
+    @State private var translation: PassageTranslationModel?
+    /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
+    @State private var showsTopBar = false
+    @State private var showsBottomBar = false
+    @Environment(\.dismiss) private var dismiss
+
+    private var style: ReaderStyle {
+        ReaderStyle(fontFamily: fontFamily, fontSize: fontSize, lineSpacing: lineSpacing, margins: margins, theme: theme)
+    }
+
     var body: some View {
-        Group {
+        ZStack {
             if let document, let session {
                 ArticleTextView(
                     document: document,
+                    style: style,
                     spokenWord: session.spokenWord.flatMap { document.textRange(of: $0.range, inBlock: $0.block) },
                     spokenBlock: session.spokenWord?.block,
                     onWordTapped: { lookUpWord(at: $0, in: document, pausing: session) },
-                    onBlockLongPressed: { block in
-                        Log.speech.info("Long press: start at block \(block)")
+                    onReadFromHere: { block in
+                        Log.speech.info("Read from here: start at block \(block)")
                         session.start(at: block)
                     },
+                    onTranslate: { translate($0, pausing: session) },
+                    onTapZone: handleTap(in:),
+                    onScrollBegan: hideMenus,
                     initialBlock: article.lastReadBlockIndex,
                     onScrollSettled: { block in
                         // Scrolling only moves the reading position when nothing is being read.
                         session.moveWhileStopped(to: block)
                     }
                 )
-                .ignoresSafeArea(edges: .bottom)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    // One opaque bottom area, so article text scrolling underneath never shows through.
-                    VStack(spacing: 0) {
-                        if let failure = session.failure {
-                            SpeechErrorBanner(
-                                title: usesCloudEngine ? "OpenAI voice unavailable" : "Reading stopped",
-                                failure: failure,
-                                onOpenSettings: { isShowingSettings = true },
-                                onRetry: session.play,
-                                onUseSystemVoice: usesCloudEngine ? { useSystemVoice(in: session) } : nil,
-                                onDismiss: session.dismissFailure
-                            )
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-                        PlayerBar(session: session)
+                .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    if showsTopBar {
+                        ReaderTopBar(title: article.title, onBack: { dismiss() }, onStyle: { isShowingStyle = true })
+                            .background(.bar, ignoresSafeAreaEdges: .top)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    .background(.bar)
-                    .animation(.default, value: session.failure)
+                    Spacer(minLength: 0)
+                    // A speech error must be seen even if the player is hidden.
+                    if showsBottomBar || session.failure != nil {
+                        VStack(spacing: 0) {
+                            if let failure = session.failure {
+                                SpeechErrorBanner(
+                                    title: usesCloudEngine ? "OpenAI voice unavailable" : "Reading stopped",
+                                    failure: failure,
+                                    onOpenSettings: { isShowingSettings = true },
+                                    onRetry: session.play,
+                                    onUseSystemVoice: usesCloudEngine ? { useSystemVoice(in: session) } : nil,
+                                    onDismiss: session.dismissFailure
+                                )
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+                            if showsBottomBar {
+                                PlayerBar(session: session)
+                            }
+                        }
+                        .background(.bar, ignoresSafeAreaEdges: .bottom)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
+                .animation(.easeInOut(duration: 0.22), value: showsTopBar)
+                .animation(.easeInOut(duration: 0.22), value: showsBottomBar)
+                .animation(.default, value: session.failure)
                 .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
                     // Only opened from the error banner, where the fix is a voice or an API key.
                     SettingsView(opensVoicePage: true)
                 }
+                .sheet(isPresented: $isShowingStyle) {
+                    ReaderStylePanel(
+                        fontFamily: $fontFamily, fontSize: $fontSize, lineSpacing: $lineSpacing,
+                        margins: $margins, theme: $theme
+                    )
+                    .presentationDetents([.medium])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                }
+                .sheet(item: $translation) { model in
+                    TranslationView(model: model)
+                        .presentationDetents([.medium, .large])
+                }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color(style.theme.background).ignoresSafeArea())
+        .preferredColorScheme(style.theme.colorScheme)
+        .toolbar(.hidden, for: .navigationBar)
+        .statusBarHidden()
         .onChange(of: session?.rate) { _, rate in
             // The player's speed is also the default for next time.
             if let rate { rateValue = rate.rawValue }
+        }
+        .onChange(of: style) { _, newStyle in
+            // New fonts and colors mean a new text; the text view keeps the reader's place.
+            document = ArticleDocument(title: article.title, blocks: blocks, style: newStyle)
         }
         .onAppear(perform: prepare)
         .onDisappear {
@@ -73,10 +127,30 @@ struct ReaderView: View {
         }
     }
 
+    // MARK: - Menus
+
+    private func handleTap(in zone: ArticleTextView.TapZone) {
+        switch zone {
+        case .top:
+            showsTopBar.toggle()
+        case .bottom:
+            showsBottomBar.toggle()
+        case .middle:
+            hideMenus()
+        }
+    }
+
+    private func hideMenus() {
+        guard showsTopBar || showsBottomBar else { return }
+        showsTopBar = false
+        showsBottomBar = false
+    }
+
     private func prepare() {
         guard document == nil else { return }
         let blocks = article.blocks
-        document = ArticleDocument(title: article.title, blocks: blocks)
+        self.blocks = blocks
+        document = ArticleDocument(title: article.title, blocks: blocks, style: style)
 
         let session = ReadingSession(
             blocks: blocks,
@@ -117,6 +191,13 @@ struct ReaderView: View {
         usesCloudEngine = false
         session.replaceEngine(SystemSpeechEngine(voiceIdentifier: voiceIdentifier))
         session.play()
+    }
+
+    private func translate(_ text: String, pausing session: ReadingSession) {
+        Log.lookup.info("Translate requested: \(text.count) characters")
+        // Like looking up a word: reading pauses, and stays paused until Play is pressed.
+        session.pause()
+        translation = PassageTranslationModel(text: text)
     }
 
     private func lookUpWord(at range: NSRange, in document: ArticleDocument, pausing session: ReadingSession) {

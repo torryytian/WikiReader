@@ -11,6 +11,12 @@ nonisolated enum SettingsKeys {
     static let speechEngine = "speechEngine"
     /// Name of the chosen OpenAI voice, e.g. "marin".
     static let openAIVoice = "openAIVoice"
+    /// Reader typography, each the raw value of the matching `ReaderStyle` type (the size is a Double).
+    static let readerFont = "readerFont"
+    static let readerFontSize = "readerFontSize"
+    static let readerLineSpacing = "readerLineSpacing"
+    static let readerMargins = "readerMargins"
+    static let readerTheme = "readerTheme"
 }
 
 /// Which engine reads articles aloud. Chosen by picking a voice (see `VoiceChoice`).
