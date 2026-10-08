@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
     @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
+    @AppStorage(SettingsKeys.appAppearance) private var appearance = AppAppearance.system
 
     @State private var path: [SettingsPage]
     @State private var voices: [VoiceInfo] = []
@@ -26,6 +27,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Form {
+                appearanceSection
                 voiceSection
                 speedSection
                 dictionarySection
@@ -53,6 +55,23 @@ struct SettingsView: View {
                 // OpenAI can't read without a key, so make the stored engine match what is really in use.
                 if engineChoice == .openAI && !hasOpenAIKey { engineChoice = .system }
             }
+        }
+    }
+
+    // MARK: - Appearance
+
+    private var appearanceSection: some View {
+        Section {
+            Picker("Appearance", selection: $appearance) {
+                ForEach(AppAppearance.allCases, id: \.self) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Appearance")
+        } footer: {
+            Text("System follows your iPhone's Light or Dark setting. The reader has its own theme in its top menu; its Auto follows this choice.")
         }
     }
 

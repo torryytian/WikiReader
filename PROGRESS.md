@@ -136,6 +136,11 @@
 - **未验证**：设置页里导出后弹出的分享面板（AirDrop/存到文件）、导入时的文件选择器、真机上用 AirDrop 传文件。界面只截图看过备份页。
 - 没做：点文件直接用 WikiReader 打开（要在 Xcode 里声明文档类型）；导出文件放进 Finder 文件共享。
 
+### App 外观（2026-10-08 晚）
+- 设置页最上面一个 Appearance 分段：System / Light / Dark（`AppAppearance`，键 `appAppearance`，随备份一起迁移）。实现：根视图 `preferredColorScheme` + 给所有 window 设 `overrideUserInterfaceStyle`（后者让 UIKit 弹出的系统词典、alert 也跟着变）。
+- 阅读页自己的主题（Auto/Light/Sepia/Dark）还在：它的 Auto 跟随 App 外观，选 Light/Sepia/Dark 则只改阅读页。
+- 截图验证过：深色（设置页）、浅色（文库页）。**未验证**：System 随 iPhone 切换时实时跟随、系统词典界面在深色下的样子、阅读页 Auto 在 App 深色下的样子。
+
 ### 其他
 - 模拟器默认用 iPhone 15 Pro Max（和另一个项目共用）。App 图标：蓝色渐变底 + 白色书本 + 声波，浅色、深色、着色三个版本，由 `tools/make_icon.swift` 生成。
 

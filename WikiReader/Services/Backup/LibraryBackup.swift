@@ -82,7 +82,7 @@ nonisolated enum LibraryBackup {
     /// Settings that mean the same on another device. The system voice is left out (voices differ per device),
     /// and the OpenAI key is never exported.
     static let portableSettingKeys = [
-        SettingsKeys.speechRate, SettingsKeys.speechEngine, SettingsKeys.openAIVoice,
+        SettingsKeys.speechRate, SettingsKeys.speechEngine, SettingsKeys.openAIVoice, SettingsKeys.appAppearance,
         SettingsKeys.readerFont, SettingsKeys.readerFontSize, SettingsKeys.readerLineSpacing,
         SettingsKeys.readerMargins, SettingsKeys.readerTheme, SettingsKeys.readerDarkLevel,
     ]
