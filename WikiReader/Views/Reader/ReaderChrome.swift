@@ -91,6 +91,7 @@ struct ReaderStylePanel: View {
                     }
                 }
             }
+            .listSectionSpacing(.compact)
             .navigationTitle("Text Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

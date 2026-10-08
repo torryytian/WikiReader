@@ -55,7 +55,8 @@ struct ReaderView: View {
                         session.moveWhileStopped(to: block)
                     }
                 )
-                .ignoresSafeArea()
+                // Full screen except at the top, so the first line never hides behind the Dynamic Island.
+                .ignoresSafeArea(edges: .bottom)
 
                 VStack(spacing: 0) {
                     if showsTopBar {
@@ -98,8 +99,9 @@ struct ReaderView: View {
                         fontFamily: $fontFamily, fontSize: $fontSize, lineSpacing: $lineSpacing,
                         margins: $margins, theme: $theme
                     )
-                    .presentationDetents([.medium])
-                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    // Tall enough to show every setting; the text behind stays visible and live.
+                    .presentationDetents([.fraction(0.62), .large])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.62)))
                 }
                 .sheet(item: $translation) { model in
                     TranslationView(model: model)
