@@ -1,18 +1,39 @@
 import SwiftUI
 
-/// The words saved from one article, newest first, each with a short Chinese meaning. Tap a word to open its
+/// The side panel that slides in from the right: the words saved from one article, newest first, each with a short Chinese meaning. Tap a word to open its
 /// dictionary entry; swipe to remove it. A word without a meaning has a button that asks AI for one, and only
 /// when pressed (nothing is sent just because the list opened).
 struct SavedWordsView: View {
     let article: Article
     let onLookUp: (SavedWord) -> Void
-    @Environment(\.dismiss) private var dismiss
+    let onClose: () -> Void
     @State private var loading: Set<SavedWord.ID> = []
     @State private var failures: [SavedWord.ID: String] = [:]
 
     var body: some View {
-        NavigationStack {
-            let words = article.savedWords
+        let words = article.savedWords
+        VStack(spacing: 0) {
+            HStack {
+                Text("Saved Words")
+                    .font(.headline)
+                Text("\(words.count)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.primary.opacity(0.08), in: Circle())
+                }
+                .accessibilityLabel("Close")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            Divider()
+
             List {
                 ForEach(words) { saved in
                     Button {
@@ -39,6 +60,8 @@ struct SavedWordsView: View {
                     }
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .overlay {
                 if words.isEmpty {
                     ContentUnavailableView(
@@ -48,13 +71,15 @@ struct SavedWordsView: View {
                     )
                 }
             }
-            .navigationTitle("Saved Words")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+        }
+        .background {
+            // The shadow belongs to the panel's background only, not to the rows on it.
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.2), radius: 16)
+                .ignoresSafeArea()
+        }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 0.5).ignoresSafeArea()
         }
     }
 

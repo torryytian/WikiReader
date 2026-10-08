@@ -107,21 +107,12 @@ struct ReaderView: View {
                     // Only opened from the error banner, where the fix is a voice or an API key.
                     SettingsView(opensVoicePage: true)
                 }
-                .sheet(isPresented: $isShowingSavedWords) {
-                    SavedWordsView(article: article) { saved in
-                        let request = WordLookupRequest(
-                            word: saved.word, term: saved.term,
-                            hasDefinition: DictionaryLookup.system.hasDefinition(saved.term), sentence: saved.sentence
-                        )
-                        session.pause()
-                        DictionaryPresenter.present(request, saving: saving(for: request))
-                    }
-                    .presentationDetents([.medium, .large])
-                }
                 .sheet(item: $translation) { model in
                     TranslationView(model: model)
                         .presentationDetents([.medium, .large])
                 }
+
+                savedWordsPanel(session: session)
             }
         }
         .background(Color(style.backgroundColor).ignoresSafeArea())
@@ -144,6 +135,45 @@ struct ReaderView: View {
             // Save now rather than waiting for autosave, so the position survives the app being killed.
             try? article.modelContext?.save()
         }
+    }
+
+    // MARK: - Saved words panel
+
+    /// The saved words slide in from the right (after a left swipe) over a dimmed page; tapping the page or
+    /// swiping the panel right puts it away.
+    private func savedWordsPanel(session: ReadingSession) -> some View {
+        ZStack(alignment: .trailing) {
+            if isShowingSavedWords {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { closeSavedWords() }
+                    .transition(.opacity)
+
+                SavedWordsView(article: article, onLookUp: { saved in
+                    let request = WordLookupRequest(
+                        word: saved.word, term: saved.term,
+                        hasDefinition: DictionaryLookup.system.hasDefinition(saved.term), sentence: saved.sentence
+                    )
+                    session.pause()
+                    DictionaryPresenter.present(request, saving: saving(for: request))
+                }, onClose: closeSavedWords)
+                .containerRelativeFrame(.horizontal) { width, _ in width * 0.84 }
+                .gesture(
+                    DragGesture(minimumDistance: 20).onEnded { drag in
+                        if drag.translation.width > 80, abs(drag.translation.width) > abs(drag.translation.height) {
+                            closeSavedWords()
+                        }
+                    }
+                )
+                .transition(.move(edge: .trailing))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: isShowingSavedWords)
+    }
+
+    private func closeSavedWords() {
+        isShowingSavedWords = false
     }
 
     // MARK: - Menus
