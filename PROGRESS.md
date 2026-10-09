@@ -123,7 +123,7 @@
 
 ### 查词/翻译后的播放与下滑关闭（2026-10-09）
 - **查词、翻译、单词本里点词**：开始前如果正在播放，关掉词典/面板后自动接着播；如果是用户手动暂停的，保持暂停等按播放。规则在 `LookupResume`（`ReadingSession.swift`），`ArticleReader` 的 `pauseForLookup` / `resumeIfPausedForLookup` 用它。词典用 `DictionaryPresenter.present(…, onDismiss:)`（`PronouncingDictionaryViewController.viewDidDisappear` 里判断 `isBeingDismissed`，AI 面板盖上去或移开不算关闭），翻译用 `.sheet(item:onDismiss:)`。这取代了之前"查词后一律保持暂停"的行为（SPEC F4 已改）。
-- **下滑关闭（第二版，2026-10-09）**：第一版（只设置 `isModalInPresentation = false`）用户反馈不生效，推测系统词典自己把"不可下滑关闭"设回去了。现在 `PronouncingDictionaryViewController` **重写** `isModalInPresentation`（固定 false）和 `modalPresentationStyle`（固定 `.pageSheet`），并加了兜底：视图上一个自己的下滑手势（**整个词典页面任何位置**向下拖超过 80pt 或速度够快就 `dismiss`，`cancelsTouchesInView = false`；用户反馈只有小横条能关太窄，所以放宽到全页。代价：词条长到能滚动时，往回向下拖也会关掉）。模拟器里确认：词典显示为半屏面板 + 顶部小横条。**手势本身未验证**。排查用：日志（Lookup 类别）会记 "Dictionary shown: modal …, style …, sheet …" 和 "Dictionary closed by a swipe down"。
+- **下滑关闭（第三版，2026-10-09，最终结论）**：系统词典的内容区是**另一个进程**画的、也由它处理触摸，**这块区域的触摸 App 收不到**，所以任何加在宿主视图上的手势（包括整页下滑）都拿不到从单词/释义上开始的拖动，用户实测也证实了（第二版整页手势无效）。能用的只有：① 系统面板自己的小横条；② 我们在**标题栏**上盖的一条透明拖动区（`dragStrip`，高 104pt、宽度到关闭按钮左边为止，向下拖超过 40pt 或速度够快就 `dismiss`），比只有小横条好点得多。另外 `isModalInPresentation` 和 `modalPresentationStyle` 仍重写固定，防止系统改回去。**要做到整页下滑关闭只有一个办法：让词典内容区不再响应触摸（`isUserInteractionEnabled = false`），代价是不能点词条展开、不能点 Search Web/Manage Dictionaries，长词条也没法滚动**，没做，等用户决定。
 - 下滑关闭（第一版思路）：词典显式设成 `.pageSheet`、`isModalInPresentation = false`、`[.medium, .large]` 两档、显示顶部小横条（grabber）；翻译和 AI 讲解面板也显示小横条。**未验证**：下滑是否真的能关掉系统词典（它是系统进程里的内容，没法在模拟器里点），请真机试；如果还是关不掉，说明系统词典自己拦了手势，要换办法。
 
 ### OpenAI 请求记录（2026-10-09）

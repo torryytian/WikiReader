@@ -41,23 +41,37 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         set {}
     }
 
-    /// A swipe down anywhere on the dictionary closes it, even though the system's own sheet gesture only takes the
-    /// grabber (the dictionary's content is drawn by another process, which swallows the touches). The cost: when
-    /// the entry is long enough to scroll, dragging it back down also closes it; most entries fit on the screen.
-    private lazy var dismissPan: UIPanGestureRecognizer = {
+    /// The dictionary's own content is drawn and handled by another process, so touches on it never reach this app:
+    /// no gesture added here can see a drag that starts on a word or a definition. The grabber (the system sheet's)
+    /// and this strip can: a transparent area over the title bar, as wide as the bar except for the close button,
+    /// that closes the dictionary when dragged down. Much easier to hit than the grabber alone.
+    private lazy var dragStrip: UIView = {
+        let strip = UIView()
+        strip.backgroundColor = .clear
+        strip.accessibilityElementsHidden = true
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handleDismissPan(_:)))
         pan.delegate = self
-        // The dictionary still gets the touches: a tap on its buttons or a scroll is unaffected.
-        pan.cancelsTouchesInView = false
         pan.allowedScrollTypesMask = .all
-        return pan
+        strip.addGestureRecognizer(pan)
+        return strip
     }()
 
+    /// Height of the strip from the top of the sheet: the grabber and the title row, including the "Dictionary" heading (not tappable), down to the first entry.
+    private static let dragStripHeight: CGFloat = 104
+    /// Width left free on the right for the system's close button.
+    private static let closeButtonWidth: CGFloat = 72
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        dragStrip.frame = CGRect(x: 0, y: 0, width: max(view.bounds.width - Self.closeButtonWidth, 0), height: Self.dragStripHeight)
+        view.bringSubviewToFront(dragStrip)
+    }
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard gestureRecognizer === dismissPan else { return true }
-        let velocity = dismissPan.velocity(in: view)
-        // Mostly downward, so a sideways swipe or a scroll through the entry's own lines isn't taken.
-        return velocity.y > 0 && abs(velocity.y) > 1.5 * abs(velocity.x)
+        guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+        // Mostly downward, so a sideways swipe isn't taken.
+        let velocity = pan.velocity(in: pan.view)
+        return velocity.y > 0 && abs(velocity.y) > 1.2 * abs(velocity.x)
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
@@ -66,7 +80,7 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
 
     @objc private func handleDismissPan(_ pan: UIPanGestureRecognizer) {
         guard pan.state == .ended else { return }
-        if pan.translation(in: view).y > 80 || pan.velocity(in: view).y > 700 {
+        if pan.translation(in: view).y > 40 || pan.velocity(in: view).y > 500 {
             Log.lookup.info("Dictionary closed by a swipe down")
             dismiss(animated: true)
         }
@@ -74,7 +88,7 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.addGestureRecognizer(dismissPan)
+        view.addSubview(dragStrip)
 
         let explainButton = floatingButton(title: "AI", symbol: "sparkles", label: "Explain \(request.word) with AI") { [weak self] in
             self?.showExplanation()
