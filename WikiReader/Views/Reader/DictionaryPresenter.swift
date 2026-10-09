@@ -7,7 +7,7 @@ import UIKit
 /// The dictionary's own screen can't be extended (nor can its "Search Web" row be removed), so the
 /// buttons are subviews laid over it. Each does something only when pressed: nothing is spoken or
 /// sent to OpenAI just because the dictionary opened.
-final class PronouncingDictionaryViewController: UIReferenceLibraryViewController {
+final class PronouncingDictionaryViewController: UIReferenceLibraryViewController, UIGestureRecognizerDelegate {
     private let request: WordLookupRequest
     private let pronouncer: WordPronouncer
     private let saving: WordSaving?
@@ -29,8 +29,53 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         fatalError("init(coder:) is not used")
     }
 
+    // The system dictionary sets itself up as "can't be swiped away" and can put that back after it was changed from
+    // outside, so a swipe down did nothing. Overridden here, nothing can set it back.
+    override var isModalInPresentation: Bool {
+        get { false }
+        set {}
+    }
+
+    override var modalPresentationStyle: UIModalPresentationStyle {
+        get { .pageSheet }
+        set {}
+    }
+
+    /// A swipe down that starts near the top closes the dictionary even if the system's own sheet gesture doesn't
+    /// get the touch (the dictionary's content is drawn by another process, which can swallow it).
+    private lazy var dismissPan: UIPanGestureRecognizer = {
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleDismissPan(_:)))
+        pan.delegate = self
+        // The dictionary still gets the touches: a tap on its buttons or a scroll is unaffected.
+        pan.cancelsTouchesInView = false
+        pan.allowedScrollTypesMask = .all
+        return pan
+    }()
+
+    /// How far from the top of the dictionary a downward swipe may start to count.
+    private static let dismissZoneHeight: CGFloat = 130
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === dismissPan else { return true }
+        let velocity = dismissPan.velocity(in: view)
+        return dismissPan.location(in: view).y < Self.dismissZoneHeight && velocity.y > 0 && abs(velocity.y) > 1.5 * abs(velocity.x)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+
+    @objc private func handleDismissPan(_ pan: UIPanGestureRecognizer) {
+        guard pan.state == .ended else { return }
+        if pan.translation(in: view).y > 60 || pan.velocity(in: view).y > 600 {
+            Log.lookup.info("Dictionary closed by a swipe down")
+            dismiss(animated: true)
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.addGestureRecognizer(dismissPan)
 
         let explainButton = floatingButton(title: "AI", symbol: "sparkles", label: "Explain \(request.word) with AI") { [weak self] in
             self?.showExplanation()
@@ -95,6 +140,11 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         present(sheet, animated: true)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        Log.lookup.info("Dictionary shown: modal \(self.isModalInPresentation, privacy: .public), style \(self.modalPresentationStyle.rawValue, privacy: .public), sheet \(self.sheetPresentationController != nil, privacy: .public)")
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         pronouncer.stop()
@@ -137,10 +187,7 @@ enum DictionaryPresenter {
         let dictionary = PronouncingDictionaryViewController(
             request: request, voiceIdentifier: voiceIdentifier, saving: saving, onDismiss: onDismiss
         )
-        // A sheet that a swipe down closes, with a grabber to drag. Set explicitly: the system dictionary picks
-        // its own style otherwise.
-        dictionary.modalPresentationStyle = .pageSheet
-        dictionary.isModalInPresentation = false
+        // A sheet with a grabber to drag; a swipe down closes it (see the view controller for how that is kept working).
         dictionary.sheetPresentationController?.detents = [.medium(), .large()]
         dictionary.sheetPresentationController?.prefersGrabberVisible = true
         presenter.present(dictionary, animated: true)
