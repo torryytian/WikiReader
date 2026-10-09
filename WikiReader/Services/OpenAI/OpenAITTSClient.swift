@@ -17,12 +17,39 @@ nonisolated enum OpenAITTSError: Error, Equatable {
     case invalidKey
     case quotaExceeded
     case rateLimited
+    /// No answer in time.
+    case timedOut
     case badRequest(String)
     case server(status: Int)
     case network(String)
     case badResponse
     /// The audio couldn't be saved or played back.
     case audio(String)
+
+    /// How this error counts in the call log.
+    var outcome: CallOutcome {
+        switch self {
+        case .missingKey: .missingKey
+        case .invalidKey: .invalidKey
+        case .quotaExceeded: .outOfCredit
+        case .rateLimited: .rateLimited
+        case .timedOut: .timedOut
+        case .badRequest: .rejected
+        case .server: .serverError
+        case .network: .network
+        case .badResponse: .badResponse
+        case .audio: .audioError
+        }
+    }
+
+    /// What to note next to the outcome, without anything from the request itself.
+    var detail: String? {
+        switch self {
+        case .server(let status): "HTTP \(status)"
+        case .network(let text), .badRequest(let text), .audio(let text): text
+        default: nil
+        }
+    }
 
     var failure: SpeechFailure {
         SpeechFailure(message: message, isFixableInSettings: self == .missingKey || self == .invalidKey)
@@ -35,6 +62,7 @@ nonisolated enum OpenAITTSError: Error, Equatable {
         case .invalidKey: "The OpenAI API key was rejected. Check it in Settings."
         case .quotaExceeded: "Your OpenAI account has no remaining credit."
         case .rateLimited: "OpenAI is rate limiting requests. Try again in a moment."
+        case .timedOut: "OpenAI didn't answer in time. Try again."
         case .badRequest(let detail): "OpenAI rejected the request: \(detail)"
         case .server(let status): "OpenAI had a problem (HTTP \(status)). Try again later."
         case .network(let detail): "Couldn't reach OpenAI: \(detail)"
@@ -55,14 +83,31 @@ nonisolated struct OpenAITTSClient: Sendable {
     /// Injected so tests can answer requests without the network.
     var transport: Transport = { request in try await URLSession.shared.data(for: request) }
 
+    /// Where each request's time and result are noted, for the diagnostics page.
+    var log: OpenAICallLog = .standard
+
     /// Returns MP3 audio for the request. Runs off the main actor.
     @concurrent
     func synthesize(_ speech: OpenAISpeechRequest, apiKey: String) async throws(OpenAITTSError) -> Data {
         guard !apiKey.isEmpty else { throw .missingKey }
+        let start = ContinuousClock.now
+        do {
+            let audio = try await perform(speech, apiKey: apiKey)
+            log.note(.speech, size: speech.input.count, since: start, outcome: .ok)
+            return audio
+        } catch {
+            log.note(.speech, size: speech.input.count, since: start, outcome: error.outcome, detail: error.detail)
+            throw error
+        }
+    }
+
+    private func perform(_ speech: OpenAISpeechRequest, apiKey: String) async throws(OpenAITTSError) -> Data {
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await transport(Self.urlRequest(for: speech, apiKey: apiKey))
+        } catch let error as URLError where error.code == .timedOut {
+            throw .timedOut
         } catch {
             throw .network(error.localizedDescription)
         }

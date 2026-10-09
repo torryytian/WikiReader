@@ -5,6 +5,7 @@ import SwiftUI
 private enum SettingsPage: Hashable {
     case voice
     case backup
+    case diagnostics
 }
 
 struct SettingsView: View {
@@ -30,6 +31,7 @@ struct SettingsView: View {
                 voiceSection
                 dictionarySection
                 backupSection
+                diagnosticsSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -44,6 +46,8 @@ struct SettingsView: View {
                     VoiceSettingsView()
                 case .backup:
                     LibraryBackupView()
+                case .diagnostics:
+                    OpenAIDiagnosticsView()
                 }
             }
             // The sheet carries its own appearance: a presented sheet keeps the style it was shown with, so it
@@ -106,6 +110,18 @@ struct SettingsView: View {
             }
         } footer: {
             Text("Move your articles, saved words and generated audio to another iPhone, or keep a copy before reinstalling.")
+        }
+    }
+
+    // MARK: - Diagnostics
+
+    private var diagnosticsSection: some View {
+        Section {
+            NavigationLink(value: SettingsPage.diagnostics) {
+                Label("OpenAI Diagnostics", systemImage: "waveform.path.ecg")
+            }
+        } footer: {
+            Text("How long OpenAI requests take and why some fail, for when reading stalls or times out.")
         }
     }
 

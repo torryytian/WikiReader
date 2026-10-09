@@ -26,6 +26,30 @@ nonisolated enum OpenAIChatError: Error, Equatable {
         }
     }
 
+    /// How this error counts in the call log.
+    var outcome: CallOutcome {
+        switch self {
+        case .missingKey: .missingKey
+        case .invalidKey: .invalidKey
+        case .quotaExceeded: .outOfCredit
+        case .rateLimited: .rateLimited
+        case .badRequest: .rejected
+        case .server: .serverError
+        case .network: .network
+        case .timedOut: .timedOut
+        case .badResponse: .badResponse
+        }
+    }
+
+    /// What to note next to the outcome, without anything from the request itself.
+    var detail: String? {
+        switch self {
+        case .server(let status): "HTTP \(status)"
+        case .network(let text), .badRequest(let text): text
+        default: nil
+        }
+    }
+
     /// Whether asking again could work without changing anything.
     var isRetryable: Bool {
         switch self {
@@ -57,6 +81,9 @@ nonisolated struct OpenAIChatClient: Sendable {
     /// Injected so tests can answer requests without the network.
     var transport: Transport = defaultTransport
 
+    /// Where each request's time and result are noted, for the diagnostics page.
+    var log: OpenAICallLog = .standard
+
     /// Structured Outputs: the reply is always JSON in the shape of `schema`.
     static func urlRequest(system: String, user: String, schemaName: String, schema: [String: Any], apiKey: String) -> URLRequest {
         var request = URLRequest(url: endpoint)
@@ -84,6 +111,19 @@ nonisolated struct OpenAIChatClient: Sendable {
     /// Runs off the main actor.
     @concurrent
     func send<Output: Decodable & Sendable>(_ request: URLRequest, as type: Output.Type) async throws(OpenAIChatError) -> Output {
+        let start = ContinuousClock.now
+        let size = request.httpBody?.count ?? 0
+        do {
+            let output = try await perform(request, as: type)
+            log.note(.text, size: size, since: start, outcome: .ok)
+            return output
+        } catch {
+            log.note(.text, size: size, since: start, outcome: error.outcome, detail: error.detail)
+            throw error
+        }
+    }
+
+    private func perform<Output: Decodable & Sendable>(_ request: URLRequest, as type: Output.Type) async throws(OpenAIChatError) -> Output {
         let data: Data
         let response: URLResponse
         do {

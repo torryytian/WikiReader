@@ -121,6 +121,13 @@
 - **段末翻译**：每个段落（不含标题）末尾追加小号蓝色 "Translate"，是段落富文本的一部分但**不在块范围内**（`translateBlock` 属性；不参与朗读、高亮、取词、选中文字）。点它和多选翻译共用同一个翻译面板；没做成段落下方内联展开（要改整篇布局，风险大）。
 - 翻译走 `OpenAIChatClient`，结果按（模型 + 原文）缓存到 Application Support/Translations，同一段再看不重复请求，离线也能看缓存。上限 6000 字符，超出只翻前面并提示。
 
+### OpenAI 请求记录（2026-10-09）
+- 起因：用户在真机上遇到过几次朗读"缓冲时卡住、提示超时"，但没留下记录，没法判断成功率。现在每次 OpenAI 请求都记一条（`OpenAICallLog`，actor，存 Application Support/Diagnostics/openai-calls.json，只保留最近 500 条）：时间、类型（Speech = 朗读音频；AI Text = 单词讲解和翻译）、大小（朗读是字数，AI 文字是请求体字节数）、耗时、结果（成功/超时/网络错误/限流/额度用完/Key 被拒/…）、失败时的简短说明。**不记任何文字内容**。
+- 记录点：`OpenAITTSClient.synthesize` 和 `OpenAIChatClient.send`（都带 `log` 属性，默认 `.standard`；测试里 `.standard` 自动关闭，不会污染真实记录）。TTS 的系统超时现在单独算 `OpenAITTSError.timedOut`（原来混在 network 里）。
+- 查看：设置 → OpenAI Diagnostics（`OpenAIDiagnosticsView`）：请求数、成功率、典型耗时、9/10 请求的耗时上限、最慢成功耗时、超过 10 秒的次数、失败原因分布、最近 30 条；"Copy Report"复制成纯文本，可以直接贴给 Claude；"Clear Log"清空。
+- **未验证**：诊断页的实际样子（只写了代码和测试，没截图）；真机上记录是否正常落盘。
+- **下一步（用户同意过方向，还没做）**：用这份记录判断后，缩短 TTS 超时（现在静默 60 秒才判超时）并对超时/5xx/429 自动重试 1–2 次；多提前准备一段、把长段落拆小让第一小块先开始播。
+
 ### 目录与手势（2026-10-09）
 - **右划 = 打开目录**（`ContentsView` 从左边滑入，占满全屏）；左划关闭目录；**左划（目录没开时）仍是打开单词本**，右划（单词本开着时）关单词本。选中了文字时横向滑动一律不处理（`hasSelection`），免得拖选择柄时误触发。
 - **系统的左边缘滑动返回已关闭**（会和右划冲突）。返回靠顶部栏最左边的返回按钮（`ReaderTopInfoBar.onBack`，`dismiss()`）。`SwipeBackEnabler(onSwipe:)` 现在负责关掉系统手势并上报左/右划；用 `liveCount` 计数，换文章时旧 reader 晚消失也不会把系统手势提前打开。
