@@ -6,12 +6,14 @@ import SwiftUI
 struct PlayerBar: View {
     let session: ReadingSession
     @Binding var playbackMode: PlaybackMode
+    /// Called after a tap switched the mode, so the reader can announce it.
+    var onModeChanged: (PlaybackMode) -> Void = { _ in }
     let accent: Color
     let onAccent: Color
 
     var body: some View {
         HStack(spacing: 0) {
-            modeMenu
+            modeButton
             Spacer(minLength: 0)
             transportButton("Previous Paragraph", symbol: "backward.end.fill", size: 18, action: session.previous)
             transportButton("Back 10 Seconds", symbol: "gobackward.10", size: 23) { session.skip(seconds: -10) }
@@ -48,14 +50,12 @@ struct PlayerBar: View {
         .accessibilityLabel(session.isPlaying ? "Pause" : "Play")
     }
 
-    /// What happens when an article ends: next article, this one again, or a random one.
-    private var modeMenu: some View {
-        Menu {
-            Picker("Play Mode", selection: $playbackMode) {
-                ForEach(PlaybackMode.allCases, id: \.self) { mode in
-                    Label(mode.menuTitle, systemImage: mode.symbol).tag(mode)
-                }
-            }
+    /// What happens when an article ends: next article, this one again, or a random one. A tap switches to the
+    /// next mode right away, and the reader announces which one it is.
+    private var modeButton: some View {
+        Button {
+            playbackMode = playbackMode.cycled
+            onModeChanged(playbackMode)
         } label: {
             Image(systemName: playbackMode.symbol)
                 .font(.system(size: 17, weight: .semibold))
@@ -63,6 +63,7 @@ struct PlayerBar: View {
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel("Play mode: \(playbackMode.menuTitle)")
+        .accessibilityHint("Switches to the next mode")
     }
 
     private var speedMenu: some View {

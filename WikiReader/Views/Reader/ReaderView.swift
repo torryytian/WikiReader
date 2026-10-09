@@ -70,6 +70,9 @@ private struct ArticleReader: View {
     @AppStorage(SettingsKeys.readerDarkLevel) private var darkLevel = ReaderStyle.defaultDarkLevel
     @AppStorage(SettingsKeys.playbackMode) private var playbackMode = PlaybackMode.sequential
     @State private var blocks: [ContentBlock] = []
+    /// A message shown in the middle of the screen for a few seconds (the play mode just chosen).
+    @State private var toast: PlaybackMode?
+    @State private var toastGeneration = 0
     @State private var translation: PassageTranslationModel?
     @State private var isShowingSavedWords = false
     /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
@@ -142,7 +145,8 @@ private struct ArticleReader: View {
                             if showsBottomBar {
                                 ReaderBottomMenu(
                                     session: session, style: style, fontFamily: $fontFamily, fontSize: $fontSize,
-                                    lineSpacing: $lineSpacing, margins: $margins, theme: $theme, playbackMode: $playbackMode
+                                    lineSpacing: $lineSpacing, margins: $margins, theme: $theme, playbackMode: $playbackMode,
+                                    onModeChanged: showToast
                                 )
                             }
                         }
@@ -162,8 +166,15 @@ private struct ArticleReader: View {
                 }
 
                 savedWordsPanel(session: session)
+
+                if let toast {
+                    ReaderToast(symbol: toast.symbol, text: toast.menuTitle, style: style)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        .allowsHitTesting(false)
+                }
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: toast)
         .background(Color(style.backgroundColor).ignoresSafeArea())
         .background(SwipeBackEnabler(onSwipeBack: swipeBackAction))
         .preferredColorScheme(style.theme.colorScheme)
@@ -218,6 +229,18 @@ private struct ArticleReader: View {
     }
 
     // MARK: - Menus
+
+    /// Announces the play mode in the middle of the screen for about three seconds. A newer message replaces it
+    /// and restarts the time.
+    private func showToast(_ mode: PlaybackMode) {
+        toast = mode
+        toastGeneration += 1
+        let generation = toastGeneration
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if generation == toastGeneration { toast = nil }
+        }
+    }
 
     /// The safe area above the text (the Dynamic Island strip) isn't part of the text view, so taps there would do
     /// nothing. This invisible strip covers it, so tapping the very top of the screen opens the top menu.

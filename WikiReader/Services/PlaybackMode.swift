@@ -25,7 +25,16 @@ nonisolated enum PlaybackMode: String, CaseIterable, Sendable {
         }
     }
 
-    /// Name and scope in one line, for a menu.
+    /// The mode a tap on the mode button switches to: sequential, loop, shuffle, and round again.
+    var cycled: PlaybackMode {
+        switch self {
+        case .sequential: .loop
+        case .loop: .shuffle
+        case .shuffle: .sequential
+        }
+    }
+
+    /// Name and scope in one line, for a menu or a message.
     var menuTitle: String {
         switch self {
         case .sequential: "Sequential · All articles"

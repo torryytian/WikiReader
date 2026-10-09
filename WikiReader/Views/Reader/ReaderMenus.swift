@@ -138,6 +138,7 @@ struct ReaderBottomMenu: View {
     @Binding var margins: ReaderStyle.Margins
     @Binding var theme: ReaderStyle.Theme
     @Binding var playbackMode: PlaybackMode
+    var onModeChanged: (PlaybackMode) -> Void = { _ in }
 
     /// The tab in view. Remembered, so the menu opens on the one used last.
     @AppStorage(SettingsKeys.readerMenuTab) private var tab = MenuTab.playback
@@ -207,7 +208,7 @@ struct ReaderBottomMenu: View {
     // MARK: - Playback
 
     private func playbackPanel(_ colors: MenuColors) -> some View {
-        PlayerBar(session: session, playbackMode: $playbackMode, accent: colors.accent, onAccent: colors.onAccent)
+        PlayerBar(session: session, playbackMode: $playbackMode, onModeChanged: onModeChanged, accent: colors.accent, onAccent: colors.onAccent)
             .padding(.bottom, 2)
     }
 
@@ -348,5 +349,30 @@ struct ReaderBottomMenu: View {
                 .labelsHidden()
                 .frame(maxWidth: 240)
         }
+    }
+}
+
+/// A short message in the middle of the screen, e.g. which play mode a tap switched to.
+struct ReaderToast: View {
+    let symbol: String
+    let text: String
+    let style: ReaderStyle
+
+    var body: some View {
+        let colors = MenuColors(style)
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(colors.accent)
+            Text(text)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.text)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(colors.bar, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 4)
+        .accessibilityElement(children: .combine)
     }
 }

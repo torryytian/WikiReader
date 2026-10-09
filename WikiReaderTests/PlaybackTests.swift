@@ -234,3 +234,18 @@ struct ReadingProgressTests {
         #expect(ReadingProgress(blocks: [], currentBlock: 0, rate: .normal).detailText.contains("under a minute"))
     }
 }
+
+struct PlaybackModeCycleTests {
+    @Test func tappingGoesThroughEveryModeAndBack() {
+        #expect(PlaybackMode.sequential.cycled == .loop)
+        #expect(PlaybackMode.loop.cycled == .shuffle)
+        #expect(PlaybackMode.shuffle.cycled == .sequential)
+    }
+
+    @Test func everyModeHasAMessage() {
+        for mode in PlaybackMode.allCases {
+            #expect(!mode.menuTitle.isEmpty)
+            #expect(!mode.symbol.isEmpty)
+        }
+    }
+}
