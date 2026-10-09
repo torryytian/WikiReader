@@ -320,3 +320,21 @@ final class ReadingSession {
         }
     }
 }
+
+/// Remembers whether reading was going when a lookup paused it, so it can carry on afterwards. A reader who paused
+/// by hand before looking something up stays paused.
+nonisolated struct LookupResume: Equatable {
+    private(set) var pending = false
+
+    /// A lookup starts. A second one while the first is still open (reading is paused by then) keeps the first answer.
+    mutating func begin(wasPlaying: Bool) {
+        if wasPlaying { pending = true }
+    }
+
+    /// The lookup closed. True when reading should start again: it was going before, and is paused now
+    /// (if the reader pressed Play meanwhile, or left, there is nothing to do).
+    mutating func end(isPaused: Bool) -> Bool {
+        defer { pending = false }
+        return pending && isPaused
+    }
+}

@@ -380,3 +380,74 @@ struct ArticleOutlineLengthTests {
         #expect(ContentsView.mainSectionNumbers(entries) == [nil, 1, nil, 2])
     }
 }
+
+// MARK: - Lookups and playback
+
+struct LookupResumeTests {
+    @Test func readingThatWasGoingCarriesOnAfterTheLookup() {
+        var resume = LookupResume()
+        resume.begin(wasPlaying: true)
+        let answer = resume.end(isPaused: true)
+        #expect(answer)
+    }
+
+    @Test func readingPausedByHandStaysPaused() {
+        var resume = LookupResume()
+        resume.begin(wasPlaying: false)
+        let answer = resume.end(isPaused: true)
+        #expect(!answer)
+    }
+
+    @Test func aSecondLookupWhileTheFirstIsOpenKeepsTheFirstAnswer() {
+        var resume = LookupResume()
+        resume.begin(wasPlaying: true)
+        resume.begin(wasPlaying: false)  // reading was already paused by the first lookup
+        let answer = resume.end(isPaused: true)
+        #expect(answer)
+    }
+
+    @Test func nothingToDoIfTheReaderPressedPlayMeanwhile() {
+        var resume = LookupResume()
+        resume.begin(wasPlaying: true)
+        let answer = resume.end(isPaused: false)
+        #expect(!answer)
+    }
+
+    @Test func theAnswerIsUsedUpAfterOneClose() {
+        var resume = LookupResume()
+        resume.begin(wasPlaying: true)
+        _ = resume.end(isPaused: true)
+        let second = resume.end(isPaused: true)
+        #expect(!second)
+    }
+}
+
+@MainActor
+struct LookupPlaybackFlowTests {
+    @Test func lookupWhilePlayingResumesWhereItPaused() {
+        let engine = FakeSpeechEngine()
+        let session = ReadingSession(blocks: [.paragraph("One two three four.")], engine: engine)
+        var resume = LookupResume()
+
+        session.play()
+        resume.begin(wasPlaying: session.isPlaying)
+        session.pause()
+        #expect(session.state == .paused)
+        if resume.end(isPaused: session.state == .paused) { session.play() }
+        #expect(session.state == .playing)
+        #expect(engine.calls.last == .resume)
+    }
+
+    @Test func lookupAfterAManualPauseLeavesItPaused() {
+        let engine = FakeSpeechEngine()
+        let session = ReadingSession(blocks: [.paragraph("One two three four.")], engine: engine)
+        var resume = LookupResume()
+
+        session.play()
+        session.pause()  // by hand
+        resume.begin(wasPlaying: session.isPlaying)
+        session.pause()
+        if resume.end(isPaused: session.state == .paused) { session.play() }
+        #expect(session.state == .paused)
+    }
+}

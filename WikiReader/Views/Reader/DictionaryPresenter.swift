@@ -11,12 +11,15 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
     private let request: WordLookupRequest
     private let pronouncer: WordPronouncer
     private let saving: WordSaving?
+    /// Called once, after the dictionary has been closed (by its Done button or by swiping down).
+    private var onDismiss: () -> Void
     /// The meaning from an AI explanation opened on this screen; saved along with the word.
     private var meaning: String?
 
-    init(request: WordLookupRequest, voiceIdentifier: String?, saving: WordSaving?) {
+    init(request: WordLookupRequest, voiceIdentifier: String?, saving: WordSaving?, onDismiss: @escaping () -> Void = {}) {
         self.request = request
         self.saving = saving
+        self.onDismiss = onDismiss
         pronouncer = WordPronouncer(voiceIdentifier: voiceIdentifier)
         super.init(term: request.term)
     }
@@ -87,12 +90,20 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         }
         let sheet = UIHostingController(rootView: WordExplanationView(model: model))
         sheet.sheetPresentationController?.detents = [.medium(), .large()]
+        // The grabber is a handle that always drags the sheet away, even over scrolling content.
+        sheet.sheetPresentationController?.prefersGrabberVisible = true
         present(sheet, animated: true)
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         pronouncer.stop()
+        // Not when only something on top of the dictionary (the AI sheet) came or went.
+        if isBeingDismissed || presentingViewController == nil {
+            let finished = onDismiss
+            onDismiss = {}
+            finished()
+        }
     }
 }
 
@@ -112,7 +123,8 @@ struct WordSaving {
 /// separate "is presented" state that can fall out of sync with that.
 enum DictionaryPresenter {
     /// - Parameter saving: When given, the dictionary gets a bookmark button for the article's word list.
-    static func present(_ request: WordLookupRequest, saving: WordSaving? = nil) {
+    /// - Parameter onDismiss: Called when the dictionary has been closed, however that happened.
+    static func present(_ request: WordLookupRequest, saving: WordSaving? = nil, onDismiss: @escaping () -> Void = {}) {
         guard let presenter = topViewController() else {
             Log.lookup.error("No view controller to present the dictionary from")
             return
@@ -122,7 +134,15 @@ enum DictionaryPresenter {
 
         // Shown even without a definition: the system screen then offers to manage/download dictionaries.
         let voiceIdentifier = UserDefaults.standard.string(forKey: SettingsKeys.voiceIdentifier)
-        let dictionary = PronouncingDictionaryViewController(request: request, voiceIdentifier: voiceIdentifier, saving: saving)
+        let dictionary = PronouncingDictionaryViewController(
+            request: request, voiceIdentifier: voiceIdentifier, saving: saving, onDismiss: onDismiss
+        )
+        // A sheet that a swipe down closes, with a grabber to drag. Set explicitly: the system dictionary picks
+        // its own style otherwise.
+        dictionary.modalPresentationStyle = .pageSheet
+        dictionary.isModalInPresentation = false
+        dictionary.sheetPresentationController?.detents = [.medium(), .large()]
+        dictionary.sheetPresentationController?.prefersGrabberVisible = true
         presenter.present(dictionary, animated: true)
         Log.lookup.info("Presented dictionary for \(request.term, privacy: .public)")
     }

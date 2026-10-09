@@ -82,6 +82,9 @@ private struct ArticleReader: View {
     @State private var scrollTarget: ArticleTextView.ScrollTarget?
     /// Whether text is selected: a sideways swipe then belongs to the selection, not to the panels.
     @State private var hasSelection = false
+    /// Whether reading was going when a lookup or translation paused it, so it can carry on afterwards. A reader
+    /// who paused by hand before looking something up stays paused.
+    @State private var lookupResume = LookupResume()
     @Environment(\.dismiss) private var dismiss
     /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
     @State private var showsTopBar = false
@@ -171,9 +174,10 @@ private struct ArticleReader: View {
                     // Only opened from the error banner, where the fix is a voice or an API key.
                     SettingsView(opensVoicePage: true)
                 }
-                .sheet(item: $translation) { model in
+                .sheet(item: $translation, onDismiss: { resumeIfPausedForLookup(session) }) { model in
                     TranslationView(model: model)
                         .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
                 }
 
                 savedWordsPanel(session: session)
@@ -223,8 +227,8 @@ private struct ArticleReader: View {
                         word: saved.word, term: saved.term,
                         hasDefinition: DictionaryLookup.system.hasDefinition(saved.term), sentence: saved.sentence
                     )
-                    session.pause()
-                    DictionaryPresenter.present(request, saving: saving(for: request))
+                    pauseForLookup(session)
+                    DictionaryPresenter.present(request, saving: saving(for: request), onDismiss: { resumeIfPausedForLookup(session) })
                 }, onClose: closeSavedWords)
                 .transition(.move(edge: .trailing))
             }
@@ -373,8 +377,8 @@ private struct ArticleReader: View {
 
     private func translate(_ text: String, pausing session: ReadingSession) {
         Log.lookup.info("Translate requested: \(text.count) characters")
-        // Like looking up a word: reading pauses, and stays paused until Play is pressed.
-        session.pause()
+        // Like looking up a word: reading pauses, and carries on when the sheet closes if it was going.
+        pauseForLookup(session)
         translation = PassageTranslationModel(text: text)
     }
 
@@ -385,9 +389,21 @@ private struct ArticleReader: View {
             Tapped \(request.word, privacy: .public) -> term \(request.term, privacy: .public), \
             hasDefinition: \(request.hasDefinition, privacy: .public)
             """)
-        // Looking up pauses reading; it stays paused after the dictionary closes until Play is pressed.
+        // Looking up pauses reading; it carries on when the dictionary closes if it was going.
+        pauseForLookup(session)
+        DictionaryPresenter.present(request, saving: saving(for: request), onDismiss: { resumeIfPausedForLookup(session) })
+    }
+
+    /// Pauses for a lookup, remembering whether reading was going. A second lookup while the first is still
+    /// open (the reader is already paused by then) keeps the first answer.
+    private func pauseForLookup(_ session: ReadingSession) {
+        lookupResume.begin(wasPlaying: session.isPlaying)
         session.pause()
-        DictionaryPresenter.present(request, saving: saving(for: request))
+    }
+
+    /// Carries on reading if it was going before the lookup; otherwise leaves it paused until Play is pressed.
+    private func resumeIfPausedForLookup(_ session: ReadingSession) {
+        if lookupResume.end(isPaused: session.state == .paused) { session.play() }
     }
 
     /// The dictionary's bookmark button saves into this article's own word list.
