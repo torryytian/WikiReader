@@ -341,3 +341,42 @@ struct SessionJumpTests {
         #expect(session.currentBlock == 0)
     }
 }
+
+struct ArticleOutlineLengthTests {
+    private let blocks: [ContentBlock] = [
+        .paragraph(String(repeating: "a", count: 840)),    // 1 minute at 14 characters a second
+        .heading("Life", level: 2),
+        .paragraph(String(repeating: "b", count: 2520)),   // 3 minutes
+        .heading("Early years", level: 3),
+        .paragraph(String(repeating: "c", count: 10)),
+    ]
+
+    @Test func eachSectionKnowsItsOwnLength() {
+        let entries = ArticleOutline(blocks: blocks).entries
+        // The heading text counts toward its own section.
+        #expect(entries.map(\.characters) == [840, 4 + 2520, 11 + 10])
+        #expect(entries.reduce(0) { $0 + $1.characters } == ArticleOutline(blocks: blocks).totalCharacters)
+    }
+
+    @Test func minutesRoundButNeverShowZero() {
+        let entries = ArticleOutline(blocks: blocks).entries
+        #expect(entries[0].minutes == 1)
+        #expect(entries[1].minutes == 3)
+        #expect(entries[2].minutes == 1)  // a tiny section still reads "1 min"
+    }
+
+    @Test func totalMinutesAddUp() {
+        #expect(ArticleOutline(blocks: blocks).totalMinutes == 4)
+    }
+
+    @Test func onlyTheLeadingTextIsTheIntroduction() {
+        let entries = ArticleOutline(blocks: blocks).entries
+        #expect(entries.map(\.isIntroduction) == [true, false, false])
+    }
+
+    @Test func mainSectionsAreNumberedFromOneAfterTheIntroduction() {
+        let entries = ArticleOutline(blocks: blocks + [.heading("Legacy", level: 2), .paragraph("Text.")]).entries
+        // Introduction, Life, Early years (a subsection), Legacy.
+        #expect(ContentsView.mainSectionNumbers(entries) == [nil, 1, nil, 2])
+    }
+}

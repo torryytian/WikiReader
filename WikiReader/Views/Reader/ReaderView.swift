@@ -254,7 +254,7 @@ private struct ArticleReader: View {
     private func contentsPanel(session: ReadingSession) -> some View {
         ZStack(alignment: .leading) {
             if isShowingContents {
-                ContentsView(outline: outline, currentBlock: session.currentBlock, style: style, onSelect: { entry in
+                ContentsView(articleTitle: article.title, outline: outline, currentBlock: session.currentBlock, style: style, onSelect: { entry in
                     isShowingContents = false
                     Log.app.info("Contents: jump to block \(entry.block)")
                     session.go(to: entry.block)
