@@ -54,6 +54,8 @@ private struct ArticleReader: View {
     // times, and laying out the article or starting a speech engine each time would be wasteful.
     @State private var document: ArticleDocument?
     @State private var session: ReadingSession?
+    /// Lock screen and Control Center: shows what is being read and takes their buttons.
+    @State private var nowPlaying: NowPlayingController?
     @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
     @AppStorage(SettingsKeys.speechEngine) private var engineChoice = SpeechEngineChoice.system
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
@@ -192,6 +194,8 @@ private struct ArticleReader: View {
         .onAppear(perform: prepare)
         .onDisappear {
             session?.stop()
+            nowPlaying?.teardown()
+            nowPlaying = nil
             // Save now rather than waiting for autosave, so the position survives the app being killed.
             try? article.modelContext?.save()
         }
@@ -296,6 +300,7 @@ private struct ArticleReader: View {
             }
         }
         self.session = session
+        nowPlaying = NowPlayingController(session: session, blocks: blocks, title: article.title)
         if startsPlaying { session.start(at: 0) }
     }
 
