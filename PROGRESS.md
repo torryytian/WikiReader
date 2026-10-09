@@ -123,7 +123,7 @@
 
 ### 查词/翻译后的播放与下滑关闭（2026-10-09）
 - **查词、翻译、单词本里点词**：开始前如果正在播放，关掉词典/面板后自动接着播；如果是用户手动暂停的，保持暂停等按播放。规则在 `LookupResume`（`ReadingSession.swift`），`ArticleReader` 的 `pauseForLookup` / `resumeIfPausedForLookup` 用它。词典用 `DictionaryPresenter.present(…, onDismiss:)`（`PronouncingDictionaryViewController.viewDidDisappear` 里判断 `isBeingDismissed`，AI 面板盖上去或移开不算关闭），翻译用 `.sheet(item:onDismiss:)`。这取代了之前"查词后一律保持暂停"的行为（SPEC F4 已改）。
-- **下滑关闭（第二版，2026-10-09）**：第一版（只设置 `isModalInPresentation = false`）用户反馈不生效，推测系统词典自己把"不可下滑关闭"设回去了。现在 `PronouncingDictionaryViewController` **重写** `isModalInPresentation`（固定 false）和 `modalPresentationStyle`（固定 `.pageSheet`），并加了兜底：视图上一个自己的下滑手势（从顶部 130pt 内向下拖超过 60pt 或速度够快就 `dismiss`，`cancelsTouchesInView = false`，不影响词典自己的点击和滚动）。模拟器里确认：词典显示为半屏面板 + 顶部小横条。**手势本身未验证**。排查用：日志（Lookup 类别）会记 "Dictionary shown: modal …, style …, sheet …" 和 "Dictionary closed by a swipe down"。
+- **下滑关闭（第二版，2026-10-09）**：第一版（只设置 `isModalInPresentation = false`）用户反馈不生效，推测系统词典自己把"不可下滑关闭"设回去了。现在 `PronouncingDictionaryViewController` **重写** `isModalInPresentation`（固定 false）和 `modalPresentationStyle`（固定 `.pageSheet`），并加了兜底：视图上一个自己的下滑手势（**整个词典页面任何位置**向下拖超过 80pt 或速度够快就 `dismiss`，`cancelsTouchesInView = false`；用户反馈只有小横条能关太窄，所以放宽到全页。代价：词条长到能滚动时，往回向下拖也会关掉）。模拟器里确认：词典显示为半屏面板 + 顶部小横条。**手势本身未验证**。排查用：日志（Lookup 类别）会记 "Dictionary shown: modal …, style …, sheet …" 和 "Dictionary closed by a swipe down"。
 - 下滑关闭（第一版思路）：词典显式设成 `.pageSheet`、`isModalInPresentation = false`、`[.medium, .large]` 两档、显示顶部小横条（grabber）；翻译和 AI 讲解面板也显示小横条。**未验证**：下滑是否真的能关掉系统词典（它是系统进程里的内容，没法在模拟器里点），请真机试；如果还是关不掉，说明系统词典自己拦了手势，要换办法。
 
 ### OpenAI 请求记录（2026-10-09）

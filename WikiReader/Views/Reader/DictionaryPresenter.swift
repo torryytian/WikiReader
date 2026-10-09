@@ -41,8 +41,9 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         set {}
     }
 
-    /// A swipe down that starts near the top closes the dictionary even if the system's own sheet gesture doesn't
-    /// get the touch (the dictionary's content is drawn by another process, which can swallow it).
+    /// A swipe down anywhere on the dictionary closes it, even though the system's own sheet gesture only takes the
+    /// grabber (the dictionary's content is drawn by another process, which swallows the touches). The cost: when
+    /// the entry is long enough to scroll, dragging it back down also closes it; most entries fit on the screen.
     private lazy var dismissPan: UIPanGestureRecognizer = {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handleDismissPan(_:)))
         pan.delegate = self
@@ -52,13 +53,11 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
         return pan
     }()
 
-    /// How far from the top of the dictionary a downward swipe may start to count.
-    private static let dismissZoneHeight: CGFloat = 130
-
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer === dismissPan else { return true }
         let velocity = dismissPan.velocity(in: view)
-        return dismissPan.location(in: view).y < Self.dismissZoneHeight && velocity.y > 0 && abs(velocity.y) > 1.5 * abs(velocity.x)
+        // Mostly downward, so a sideways swipe or a scroll through the entry's own lines isn't taken.
+        return velocity.y > 0 && abs(velocity.y) > 1.5 * abs(velocity.x)
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
@@ -67,7 +66,7 @@ final class PronouncingDictionaryViewController: UIReferenceLibraryViewControlle
 
     @objc private func handleDismissPan(_ pan: UIPanGestureRecognizer) {
         guard pan.state == .ended else { return }
-        if pan.translation(in: view).y > 60 || pan.velocity(in: view).y > 600 {
+        if pan.translation(in: view).y > 80 || pan.velocity(in: view).y > 700 {
             Log.lookup.info("Dictionary closed by a swipe down")
             dismiss(animated: true)
         }
