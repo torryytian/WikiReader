@@ -2,8 +2,54 @@ import OSLog
 import SwiftData
 import SwiftUI
 
+/// Opens an article and keeps reading across articles: when one has been read to the end, the playback mode
+/// (sequential, loop, shuffle) decides what comes next. Switching articles replaces the reader below, so each
+/// article gets a fresh reading session.
 struct ReaderView: View {
     let article: Article
+    @Query(sort: \Article.addedAt, order: .reverse) private var library: [Article]
+    /// The article being read after an automatic switch; nil while it is still the one that was opened.
+    @State private var switchedTo: Article?
+    @State private var startsPlaying = false
+    /// Bumped to rebuild the reader for the same article (the only article in the library, in shuffle mode).
+    @State private var generation = 0
+
+    private struct ReaderID: Hashable {
+        var article: PersistentIdentifier
+        var generation: Int
+    }
+
+    var body: some View {
+        let shown = switchedTo ?? article
+        ArticleReader(article: shown, startsPlaying: startsPlaying, onFinished: { advance(from: shown) })
+            .id(ReaderID(article: shown.persistentModelID, generation: generation))
+    }
+
+    /// Called when `finished` was read to the end (reading is already stopped).
+    private func advance(from finished: Article) {
+        let index = library.firstIndex { $0.persistentModelID == finished.persistentModelID } ?? 0
+        let next = PlaybackMode.saved.next(count: library.count, index: index)
+        Log.speech.info("Article finished (\(PlaybackMode.saved.rawValue, privacy: .public)): \(String(describing: next), privacy: .public)")
+        switch next {
+        case .article(let target) where library.indices.contains(target):
+            startsPlaying = true
+            switchedTo = library[target]
+        case .restart:
+            // The same article again: a new reader, started from the top.
+            startsPlaying = true
+            switchedTo = finished
+            generation += 1
+        default:
+            break
+        }
+    }
+}
+
+private struct ArticleReader: View {
+    let article: Article
+    /// Start reading from the top as soon as the article opens (when arriving from the previous article).
+    let startsPlaying: Bool
+    let onFinished: () -> Void
     // Created on first appearance rather than in init: SwiftUI may construct this view many
     // times, and laying out the article or starting a speech engine each time would be wasteful.
     @State private var document: ArticleDocument?
@@ -22,6 +68,7 @@ struct ReaderView: View {
     @AppStorage(SettingsKeys.readerMargins) private var margins = ReaderStyle.Margins.standard
     @AppStorage(SettingsKeys.readerTheme) private var theme = ReaderStyle.Theme.system
     @AppStorage(SettingsKeys.readerDarkLevel) private var darkLevel = ReaderStyle.defaultDarkLevel
+    @AppStorage(SettingsKeys.playbackMode) private var playbackMode = PlaybackMode.sequential
     @State private var blocks: [ContentBlock] = []
     @State private var translation: PassageTranslationModel?
     @State private var isShowingSavedWords = false
@@ -57,7 +104,7 @@ struct ReaderView: View {
                         isShowingSavedWords = true
                     },
                     onScrollBegan: hideMenus,
-                    initialBlock: article.lastReadBlockIndex,
+                    initialBlock: startsPlaying ? 0 : article.lastReadBlockIndex,
                     onScrollSettled: { block in
                         // Scrolling only moves the reading position when nothing is being read.
                         session.moveWhileStopped(to: block)
@@ -70,11 +117,12 @@ struct ReaderView: View {
 
                 VStack(spacing: 0) {
                     if showsTopBar {
-                        ReaderTopMenu(
-                            fontFamily: $fontFamily, fontSize: $fontSize, lineSpacing: $lineSpacing,
-                            margins: $margins, theme: $theme, darkLevel: $darkLevel
+                        ReaderTopInfoBar(
+                            title: article.title,
+                            progress: ReadingProgress(blocks: blocks, currentBlock: session.currentBlock, rate: session.rate),
+                            style: style
                         )
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     Spacer(minLength: 0)
                     // A speech error must be seen even if the player is hidden.
@@ -92,14 +140,15 @@ struct ReaderView: View {
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                             if showsBottomBar {
-                                PlayerBar(session: session)
+                                ReaderBottomMenu(
+                                    session: session, style: style, fontFamily: $fontFamily, fontSize: $fontSize,
+                                    lineSpacing: $lineSpacing, margins: $margins, theme: $theme, playbackMode: $playbackMode
+                                )
                             }
                         }
-                        .padding(.bottom, showsBottomBar ? 0 : 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .environment(\.floatingTint, Color(style.backgroundColor))
                 .animation(.easeInOut(duration: 0.22), value: showsTopBar)
                 .animation(.easeInOut(duration: 0.22), value: showsBottomBar)
                 .animation(.default, value: session.failure)
@@ -215,7 +264,16 @@ struct ReaderView: View {
             article.lastReadBlockIndex = block
             Log.app.info("Reading position saved: block \(block)")
         }
+        session.onFinished = { [onFinished] in
+            // Loop stays in this reader; the other modes hand over to the library-wide logic.
+            if PlaybackMode.saved == .loop {
+                session.start(at: 0)
+            } else {
+                onFinished()
+            }
+        }
         self.session = session
+        if startsPlaying { session.start(at: 0) }
     }
 
     private func makeEngine() -> SpeechEngine {

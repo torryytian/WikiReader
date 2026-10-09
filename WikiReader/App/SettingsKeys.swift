@@ -11,6 +11,8 @@ nonisolated enum SettingsKeys {
     static let speechEngine = "speechEngine"
     /// Name of the chosen OpenAI voice, e.g. "marin".
     static let openAIVoice = "openAIVoice"
+    /// `PlaybackMode.rawValue`: what happens when an article has been read to the end.
+    static let playbackMode = "playbackMode"
     /// `AppAppearance.rawValue`: light, dark, or follow the system.
     static let appAppearance = "appAppearance"
     /// Reader typography, each the raw value of the matching `ReaderStyle` type (the size is a Double).

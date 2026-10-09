@@ -43,7 +43,7 @@ nonisolated struct ReaderStyle: Equatable, Sendable {
         var label: String {
             switch self {
             case .system: "Auto"
-            case .light: "Light"
+            case .light: "White"
             case .sepia: "Sepia"
             case .dark: "Dark"
             }
@@ -73,6 +73,35 @@ nonisolated struct ReaderStyle: Equatable, Sendable {
             case .light: .black
             case .sepia: UIColor(red: 0.23, green: 0.19, blue: 0.14, alpha: 1)
             case .dark: UIColor(white: 0.82, alpha: 1)
+            }
+        }
+
+        /// The menus' background: a step away from the page, so the bars read as bars.
+        var barBackground: UIColor {
+            switch self {
+            case .system: .secondarySystemBackground
+            case .light: UIColor(red: 0.965, green: 0.965, blue: 0.953, alpha: 1)
+            case .sepia: UIColor(red: 0.933, green: 0.894, blue: 0.808, alpha: 1)
+            case .dark: UIColor(white: 0.20, alpha: 1)
+            }
+        }
+
+        /// The menus' highlight color. Each theme has its own, chosen to sit well on its page; nil is the app's tint.
+        var accent: UIColor? {
+            switch self {
+            case .system: nil
+            case .light: UIColor(red: 0.184, green: 0.420, blue: 0.859, alpha: 1)
+            case .sepia: UIColor(red: 0.706, green: 0.325, blue: 0.165, alpha: 1)
+            case .dark: UIColor(red: 0.878, green: 0.643, blue: 0.345, alpha: 1)
+            }
+        }
+
+        /// Icon color on a button filled with `accent`.
+        var onAccent: UIColor {
+            switch self {
+            case .system, .light: .white
+            case .sepia: UIColor(red: 1, green: 0.973, blue: 0.933, alpha: 1)
+            case .dark: UIColor(red: 0.165, green: 0.125, blue: 0.075, alpha: 1)
             }
         }
 

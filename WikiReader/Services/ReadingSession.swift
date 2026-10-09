@@ -20,6 +20,9 @@ final class ReadingSession {
 
     /// Pause after a heading is read, so it sounds like a heading.
     static let pauseAfterHeading: TimeInterval = 0.6
+    /// How fast speech goes at 1×, in characters per second. Neither the system synthesizer nor the cloud audio
+    /// reports time per character, so "skip 10 seconds" and "minutes left" are estimates from this.
+    nonisolated static let charactersPerSecond = 14.0
 
     private(set) var state: State = .stopped
     /// The block being read, or the one that will be read when playback starts.
@@ -35,6 +38,9 @@ final class ReadingSession {
 
     /// Called whenever reading moves to another block, so the position can be saved.
     @ObservationIgnored var onBlockChange: (Int) -> Void = { _ in }
+    /// Called when the last block has been read to the end. By then the session is stopped and back at the
+    /// start; the owner decides what happens next (loop, another article, nothing).
+    @ObservationIgnored var onFinished: () -> Void = {}
 
     @ObservationIgnored private let blocks: [ContentBlock]
     @ObservationIgnored private var engine: SpeechEngine
@@ -96,6 +102,71 @@ final class ReadingSession {
     /// Goes to the previous block; at the first block, back to its start.
     func previous() {
         jump(to: max(currentBlock - 1, 0))
+    }
+
+    /// Skips forward (positive) or back (negative) by about this many seconds of speech, across blocks if needed.
+    /// The distance is an estimate (`charactersPerSecond`), and the new position is the start of a word.
+    /// While playing, speech continues from there; while paused or stopped, play starts from there.
+    func skip(seconds: Double) {
+        guard !blocks.isEmpty else { return }
+        let characters = Int((seconds * Self.charactersPerSecond * rate.rawValue).rounded())
+        let lengths = blocks.map { ($0.text as NSString).length }
+        let from = spokenWord?.range.location ?? resumeOffset
+        let target = Self.skipTarget(blockLengths: lengths, block: currentBlock, offset: from, characters: characters)
+
+        let text = blocks[target.block].text as NSString
+        let offset = Self.wordStart(in: text, atOrBefore: min(target.offset, max(text.length - 1, 0)))
+        Log.speech.info("Skip \(Int(seconds)) s: block \(self.currentBlock) -> \(target.block), offset \(offset)")
+
+        switch state {
+        case .playing:
+            move(to: target.block)
+            speakCurrentBlock(from: offset)
+        case .paused, .stopped:
+            discardUtterance()
+            move(to: target.block)
+            resumeOffset = offset
+            spokenWord = nil
+        }
+    }
+
+    /// Where moving `characters` (negative: back) from `offset` in `block` ends up, walking over block boundaries.
+    /// Stops at the very start, or at the end of the last block.
+    static func skipTarget(blockLengths: [Int], block: Int, offset: Int, characters: Int) -> (block: Int, offset: Int) {
+        var block = block
+        var offset = offset
+        var remaining = characters
+        while remaining > 0 {
+            let available = blockLengths[block] - offset
+            if remaining < available {
+                offset += remaining
+                break
+            }
+            guard block + 1 < blockLengths.count else { return (block, blockLengths[block]) }
+            remaining -= available
+            block += 1
+            offset = 0
+        }
+        while remaining < 0 {
+            if -remaining <= offset {
+                offset += remaining
+                break
+            }
+            guard block > 0 else { return (0, 0) }
+            remaining += offset
+            block -= 1
+            offset = blockLengths[block]
+        }
+        return (block, offset)
+    }
+
+    /// The start of the word at or before `offset`, so speech never begins in the middle of a word.
+    static func wordStart(in text: NSString, atOrBefore offset: Int) -> Int {
+        var index = min(max(offset, 0), text.length)
+        while index > 0, let scalar = Unicode.Scalar(text.character(at: index - 1)), !CharacterSet.whitespacesAndNewlines.contains(scalar) {
+            index -= 1
+        }
+        return index
     }
 
     /// Changes speed. While speaking, restarts from the current word so the change is immediate.
@@ -237,6 +308,7 @@ final class ReadingSession {
                 state = .stopped
                 engine.stop()
                 move(to: 0)
+                onFinished()
             }
         }
     }
