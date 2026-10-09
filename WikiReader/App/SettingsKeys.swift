@@ -13,6 +13,8 @@ nonisolated enum SettingsKeys {
     static let openAIVoice = "openAIVoice"
     /// `PlaybackMode.rawValue`: what happens when an article has been read to the end.
     static let playbackMode = "playbackMode"
+    /// The tab the reader's bottom menu was left on (`playback`, `font`, `theme` or `layout`), so it opens there next time.
+    static let readerMenuTab = "readerMenuTab"
     /// `AppAppearance.rawValue`: light, dark, or follow the system.
     static let appAppearance = "appAppearance"
     /// Reader typography, each the raw value of the matching `ReaderStyle` type (the size is a Double).

@@ -104,11 +104,12 @@ struct ReaderTopInfoBar: View {
     }
 }
 
-private enum MenuTab: CaseIterable {
-    case font, theme, layout
+private enum MenuTab: String, CaseIterable {
+    case playback, font, theme, layout
 
     var title: String {
         switch self {
+        case .playback: "Playback"
         case .font: "Font & Size"
         case .theme: "Theme"
         case .layout: "Layout"
@@ -117,6 +118,7 @@ private enum MenuTab: CaseIterable {
 
     var symbol: String {
         switch self {
+        case .playback: "play.circle"
         case .font: "textformat.size"
         case .theme: "circle.lefthalf.filled"
         case .layout: "rectangle.split.3x1"
@@ -124,9 +126,9 @@ private enum MenuTab: CaseIterable {
     }
 }
 
-/// Shown at the bottom of the reader when the reader taps near the bottom edge: the transport row, and four
-/// tabs (font and size, theme, layout). A tab opens its settings above the transport row; the same tab
-/// again closes it. Changes apply to the article behind it right away.
+/// Shown at the bottom of the reader when the reader taps near the bottom edge:
+/// four equal tabs: playback, font and size, theme, layout. One is always open, the one used last; the playback
+/// controls show only on the playback tab. Changes apply to the article behind it right away.
 struct ReaderBottomMenu: View {
     let session: ReadingSession
     let style: ReaderStyle
@@ -137,21 +139,16 @@ struct ReaderBottomMenu: View {
     @Binding var theme: ReaderStyle.Theme
     @Binding var playbackMode: PlaybackMode
 
-    @State private var tab: MenuTab?
+    /// The tab in view. Remembered, so the menu opens on the one used last.
+    @AppStorage(SettingsKeys.readerMenuTab) private var tab = MenuTab.playback
 
     var body: some View {
         let colors = MenuColors(style)
         VStack(spacing: 0) {
-            if let tab {
-                panel(for: tab, colors: colors)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 4)
-                    .transition(.opacity)
-            }
-
-            PlayerBar(session: session, playbackMode: $playbackMode, accent: colors.accent, onAccent: colors.onAccent)
-                .padding(.top, 4)
+            panel(for: tab, colors: colors)
+                .padding(.horizontal, tab == .playback ? 6 : 16)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
 
             HStack {
                 ForEach(MenuTab.allCases, id: \.self) { item in
@@ -170,7 +167,6 @@ struct ReaderBottomMenu: View {
         .foregroundStyle(colors.text)
         .tint(colors.accent)
         .readerBar(edge: .bottom, color: colors.bar)
-        .animation(.easeInOut(duration: 0.18), value: tab)
         // Taps on the menu itself must not reach the text underneath and toggle the menu.
         .contentShape(Rectangle())
         .onTapGesture {}
@@ -179,7 +175,7 @@ struct ReaderBottomMenu: View {
     private func tabButton(_ item: MenuTab, colors: MenuColors) -> some View {
         let isSelected = tab == item
         return Button {
-            tab = isSelected ? nil : item
+            tab = item
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: item.symbol)
@@ -201,10 +197,18 @@ struct ReaderBottomMenu: View {
     @ViewBuilder
     private func panel(for tab: MenuTab, colors: MenuColors) -> some View {
         switch tab {
+        case .playback: playbackPanel(colors)
         case .font: fontPanel(colors)
         case .theme: themePanel(colors)
         case .layout: layoutPanel(colors)
         }
+    }
+
+    // MARK: - Playback
+
+    private func playbackPanel(_ colors: MenuColors) -> some View {
+        PlayerBar(session: session, playbackMode: $playbackMode, accent: colors.accent, onAccent: colors.onAccent)
+            .padding(.bottom, 2)
     }
 
     // MARK: - Font and size

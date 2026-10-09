@@ -112,7 +112,7 @@
 - **沉浸式**：默认隐藏状态栏、导航栏、播放条。点屏幕最上方（含灵动岛那条安全区，用一个看不见的 SwiftUI 点击条 `topTapStrip` 覆盖）出顶部菜单；点最下方出播放条；中间点词仍查词，同时收起菜单；开始滚动也收起。朗读出错时错误条始终显示。文本视图只在底部忽略安全区（顶部留出灵动岛，第一行不会被挡）。隐藏导航栏会关掉左边缘滑动返回，用 `SwipeBackEnabler` 重新打开（**未验证**）。
 - **菜单（2026-10-09，取代之前所有版本的描述）**：
   - 顶部 `ReaderTopInfoBar` 只放信息：标题、读到百分之几、当前章节 · 第几段/共几段 · 还剩几分钟，下面一条细进度条（`ReadingProgress`，按字数估算，`ReadingSession.charactersPerSecond` = 14 字/秒 × 语速）。没有按钮。
-  - 底部 `ReaderBottomMenu`：**播放是独立的一行**（`PlayerBar`）：左边播放模式菜单，中间上一段、快退 10 秒、播放、快进 10 秒、下一段，右边语速菜单。下面是三个设置标签：Font & Size、Theme、Layout，点哪个就在播放行上方展开，再点收起。**播放设置不放进设置标签里**（用户明确要求）。
+  - 底部 `ReaderBottomMenu`：四个并列的标签 **Playback、Font & Size、Theme、Layout**，永远有一个展开（默认 Playback）。**播放控制只在 Playback 标签下显示**（`PlayerBar`：左边播放模式菜单，中间上一段、快退 10 秒、播放、快进 10 秒、下一段，右边语速菜单）；播放不放进其他设置里，也不是常驻的一行（用户明确要求，说了两次）。**上次用的标签会记住**（`readerMenuTab`），下次打开菜单就在那个标签上。
   - 主题（Auto/White/Sepia/Dark）各自带一套菜单配色（栏底色、强调色、强调色上的图标色，见 `ReaderStyle.Theme`）：米黄配赭红，白色配蓝，暗黑配琥珀色，Auto 用系统色。段末 "Translate" 也用主题强调色。暗黑沿用柔和炭灰，界面里不再有 Soft–Deep 滑块（`darkLevel` 设置和备份字段还在，只是没有入口）。
   - 旧的悬浮玻璃菜单、`ReaderTopMenu`、排版 sheet 都已删除。
 - **播放模式**（`PlaybackMode`，键 `playbackMode`，随备份迁移）：Sequential = 当前文章读完后接着读文库里的下一篇（按文库列表顺序，最后一篇读完就停）；Loop = 当前文章从头再来；Shuffle = 读完随机换另一篇（只有一篇时重读）。切换文章靠 `ReaderView` 外层包装：`.id(文章 + generation)` 重建里面的 `ArticleReader`，新文章从头自动开始读；旧会话读完时已经停了，不会和新文章抢音频会话。
