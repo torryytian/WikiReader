@@ -94,6 +94,13 @@ final class ReadingSession {
         speakCurrentBlock()
     }
 
+    /// Jumps to a block (e.g. a section chosen in the table of contents). While playing, reading continues from
+    /// there; while paused or stopped, it stays so and play starts there.
+    func go(to block: Int) {
+        guard blocks.indices.contains(block) else { return }
+        jump(to: block)
+    }
+
     func next() {
         guard currentBlock + 1 < blocks.count else { return }
         jump(to: currentBlock + 1)

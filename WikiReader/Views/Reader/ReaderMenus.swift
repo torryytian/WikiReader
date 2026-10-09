@@ -58,43 +58,56 @@ private struct MenuColors {
     }
 }
 
-/// Shown at the top of the reader when the reader taps near the top edge. Information only: the title and
-/// how far along the article is.
+/// Shown at the top of the reader when the reader taps near the top edge: a button back to the library, the title,
+/// and how far along the article is.
 struct ReaderTopInfoBar: View {
     let title: String
     let progress: ReadingProgress
     let style: ReaderStyle
+    let onBack: () -> Void
 
     var body: some View {
         let colors = MenuColors(style)
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                Text(progress.percentText)
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(colors.secondary)
+        HStack(alignment: .top, spacing: 4) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(colors.accent)
+                    .frame(width: 44, height: 44)
             }
-            Text(progress.detailText)
-                .font(.caption)
-                .foregroundStyle(colors.secondary)
-                .lineLimit(1)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back to Library")
 
-            GeometryReader { proxy in
-                Capsule().fill(colors.chip)
-                    .overlay(alignment: .leading) {
-                        Capsule().fill(colors.accent)
-                            .frame(width: proxy.size.width * progress.fraction)
-                    }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(progress.percentText)
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(colors.secondary)
+                }
+                Text(progress.detailText)
+                    .font(.caption)
+                    .foregroundStyle(colors.secondary)
+                    .lineLimit(1)
+
+                GeometryReader { proxy in
+                    Capsule().fill(colors.chip)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(colors.accent)
+                                .frame(width: proxy.size.width * progress.fraction)
+                        }
+                }
+                .frame(height: 3)
+                .padding(.top, 6)
             }
-            .frame(height: 3)
             .padding(.top, 6)
+            .padding(.trailing, 16)
         }
         .foregroundStyle(colors.text)
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .padding(.leading, 8)
         .padding(.bottom, 8)
         .readerBar(edge: .top, color: colors.bar)
         // Taps on the bar itself must not reach the text underneath and toggle the menu.

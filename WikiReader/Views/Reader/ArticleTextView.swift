@@ -6,6 +6,11 @@ import UIKit
 /// UIKit rather than SwiftUI `Text` because we need word hit-testing (tap to look up),
 /// per-word highlighting and scrolling to a text range.
 struct ArticleTextView: UIViewRepresentable {
+    struct ScrollTarget: Equatable {
+        var token: Int
+        var block: Int
+    }
+
     enum TapZone: Equatable {
         case top, middle, bottom
 
@@ -39,6 +44,10 @@ struct ArticleTextView: UIViewRepresentable {
     var savedWordKeys: Set<String> = []
     /// Called when the reader swipes left across the text.
     var onSwipeLeft: () -> Void = {}
+    /// Scrolls to a block when `token` changes (e.g. after jumping to a section in the contents).
+    var scrollTarget: ScrollTarget?
+    /// Called when text is selected or the selection is cleared, so swipes can leave a selection alone.
+    var onSelectionChanged: (Bool) -> Void = { _ in }
     /// Called when the user starts dragging the text, so overlays can get out of the way.
     var onScrollBegan: () -> Void = {}
     /// Block to show at the top when the article first appears.
@@ -89,11 +98,13 @@ struct ArticleTextView: UIViewRepresentable {
         coordinator.onTranslate = onTranslate
         coordinator.onTapZone = onTapZone
         coordinator.onSwipeLeft = onSwipeLeft
+        coordinator.onSelectionChanged = onSelectionChanged
         coordinator.onScrollBegan = onScrollBegan
         coordinator.onScrollSettled = onScrollSettled
         coordinator.apply(style)
         coordinator.show(document)
         coordinator.showSavedWords(savedWordKeys)
+        coordinator.scroll(to: scrollTarget)
         coordinator.showSpokenWord(spokenWord, inBlock: spokenBlock)
     }
 
@@ -106,6 +117,8 @@ struct ArticleTextView: UIViewRepresentable {
         var onTranslate: (String) -> Void = { _ in }
         var onTapZone: (TapZone) -> Void = { _ in }
         var onSwipeLeft: () -> Void = {}
+        var onSelectionChanged: (Bool) -> Void = { _ in }
+        private var handledScrollToken: Int?
         var onScrollBegan: () -> Void = {}
         var onScrollSettled: (Int) -> Void = { _ in }
         var pendingScrollBlock: Int?
@@ -234,6 +247,18 @@ struct ArticleTextView: UIViewRepresentable {
         }
 
         // MARK: Reading position
+
+        /// Scrolls to the requested block once per token.
+        func scroll(to target: ScrollTarget?) {
+            guard let target, target.token != handledScrollToken else { return }
+            handledScrollToken = target.token
+            // Not from inside a SwiftUI update: scrolling there would re-enter layout.
+            DispatchQueue.main.async { [weak self] in self?.scroll(toBlock: target.block) }
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            onSelectionChanged(textView.selectedRange.length > 0)
+        }
 
         func performPendingScroll() {
             guard pendingScrollBlock != nil, let textView, textView.bounds.height > 0 else { return }

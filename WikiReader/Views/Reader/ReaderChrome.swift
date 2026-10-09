@@ -25,47 +25,36 @@ extension View {
     }
 }
 
-/// Hiding the navigation bar also turns off the swipe-from-the-left-edge gesture that goes back. This turns
-/// it on again, so the reader can always be left without finding the top menu.
-///
-/// While something sits on top of the article (the saved words panel), a rightward swipe should put that away
-/// first, and only the next one goes back to the library. Give `onSwipeBack` then: the system gesture is off
-/// and a swipe to the right anywhere calls it instead. It also answers a two-finger trackpad swipe, like the
-/// system gesture does.
+enum SwipeDirection {
+    case left, right
+}
+
+/// Takes over the horizontal swipe in the reader. The system's swipe-from-the-left-edge that goes back is turned
+/// off while the reader is on screen (it would collide with the swipe that opens the table of contents; going back
+/// is the button in the top bar). Instead, a clear sideways swipe anywhere, from a finger or a two-finger trackpad
+/// swipe, calls `onSwipe`.
 struct SwipeBackEnabler: UIViewControllerRepresentable {
-    var onSwipeBack: (() -> Void)?
+    var onSwipe: (SwipeDirection) -> Void
 
     func makeUIViewController(context: Context) -> Controller {
         Controller()
     }
 
     func updateUIViewController(_ controller: Controller, context: Context) {
-        controller.onSwipeBack = onSwipeBack
-        controller.applyIfVisible()
+        controller.onSwipe = onSwipe
     }
 
     final class Controller: UIViewController, UIGestureRecognizerDelegate {
-        var onSwipeBack: (() -> Void)?
+        var onSwipe: (SwipeDirection) -> Void = { _ in }
         private let swipe = UIPanGestureRecognizer()
         private var isInstalled = false
+        /// Readers currently on screen. When one article gives way to the next, the old reader can disappear after
+        /// the new one has appeared; the system gesture may only come back when none is left.
+        private static var liveCount = 0
+        private var isCounted = false
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            apply()
-        }
-
-        override func viewWillDisappear(_ animated: Bool) {
-            super.viewWillDisappear(animated)
-            // Leaving: the library below must get the system gesture back.
-            swipe.isEnabled = false
-            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
-        }
-
-        func applyIfVisible() {
-            if viewIfLoaded?.window != nil { apply() }
-        }
-
-        private func apply() {
             guard let navigationController else { return }
             if !isInstalled {
                 swipe.addTarget(self, action: #selector(handleSwipe(_:)))
@@ -74,16 +63,30 @@ struct SwipeBackEnabler: UIViewControllerRepresentable {
                 navigationController.view.addGestureRecognizer(swipe)
                 isInstalled = true
             }
-            // The system gesture's default delegate refuses it while the navigation bar is hidden.
-            navigationController.interactivePopGestureRecognizer?.delegate = nil
-            let intercepting = onSwipeBack != nil
-            navigationController.interactivePopGestureRecognizer?.isEnabled = !intercepting
-            swipe.isEnabled = intercepting
+            swipe.isEnabled = true
+            if !isCounted {
+                isCounted = true
+                Self.liveCount += 1
+            }
+            navigationController.interactivePopGestureRecognizer?.isEnabled = false
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            swipe.isEnabled = false
+            if isCounted {
+                isCounted = false
+                Self.liveCount -= 1
+            }
+            // Leaving: the library below gets the system gesture back.
+            if Self.liveCount <= 0 {
+                navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+            }
         }
 
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             let velocity = swipe.velocity(in: swipe.view)
-            return velocity.x > 0 && abs(velocity.x) > 2 * abs(velocity.y)
+            return abs(velocity.x) > 2 * abs(velocity.y)
         }
 
         func gestureRecognizer(
@@ -96,9 +99,8 @@ struct SwipeBackEnabler: UIViewControllerRepresentable {
         @objc private func handleSwipe(_ gesture: UIPanGestureRecognizer) {
             guard gesture.state == .ended else { return }
             let translation = gesture.translation(in: gesture.view)
-            if translation.x > 80 && abs(translation.x) > 2 * abs(translation.y) {
-                onSwipeBack?()
-            }
+            guard abs(translation.x) > 80, abs(translation.x) > 2 * abs(translation.y) else { return }
+            onSwipe(translation.x > 0 ? .right : .left)
         }
     }
 }

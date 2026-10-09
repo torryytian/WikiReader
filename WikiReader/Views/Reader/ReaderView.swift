@@ -77,6 +77,12 @@ private struct ArticleReader: View {
     @State private var toastGeneration = 0
     @State private var translation: PassageTranslationModel?
     @State private var isShowingSavedWords = false
+    @State private var isShowingContents = false
+    @State private var outline = ArticleOutline(blocks: [])
+    @State private var scrollTarget: ArticleTextView.ScrollTarget?
+    /// Whether text is selected: a sideways swipe then belongs to the selection, not to the panels.
+    @State private var hasSelection = false
+    @Environment(\.dismiss) private var dismiss
     /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
     @State private var showsTopBar = false
     @State private var showsBottomBar = false
@@ -108,6 +114,8 @@ private struct ArticleReader: View {
                         hideMenus()
                         isShowingSavedWords = true
                     },
+                    scrollTarget: scrollTarget,
+                    onSelectionChanged: { hasSelection = $0 },
                     onScrollBegan: hideMenus,
                     initialBlock: startsPlaying ? 0 : article.lastReadBlockIndex,
                     onScrollSettled: { block in
@@ -125,7 +133,8 @@ private struct ArticleReader: View {
                         ReaderTopInfoBar(
                             title: article.title,
                             progress: ReadingProgress(blocks: blocks, currentBlock: session.currentBlock, rate: session.rate),
-                            style: style
+                            style: style,
+                            onBack: { dismiss() }
                         )
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
@@ -168,6 +177,7 @@ private struct ArticleReader: View {
                 }
 
                 savedWordsPanel(session: session)
+                contentsPanel(session: session)
 
                 if let toast {
                     ReaderToast(symbol: toast.symbol, text: toast.menuTitle, style: style)
@@ -178,7 +188,7 @@ private struct ArticleReader: View {
         }
         .animation(.easeInOut(duration: 0.2), value: toast)
         .background(Color(style.backgroundColor).ignoresSafeArea())
-        .background(SwipeBackEnabler(onSwipeBack: swipeBackAction))
+        .background(SwipeBackEnabler(onSwipe: handleSwipe))
         .preferredColorScheme(style.theme.colorScheme)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden()
@@ -222,10 +232,38 @@ private struct ArticleReader: View {
         .animation(.easeInOut(duration: 0.25), value: isShowingSavedWords)
     }
 
-    /// While the saved words are open, a swipe back closes them; otherwise the system's swipe back leaves the article.
-    private var swipeBackAction: (() -> Void)? {
-        guard isShowingSavedWords else { return nil }
-        return { closeSavedWords() }
+    /// Sideways swipes: right opens the contents (or closes the saved words if they are open), left closes the
+    /// contents (the text itself opens the saved words on a left swipe). A swipe while text is selected is left alone.
+    private func handleSwipe(_ direction: SwipeDirection) {
+        switch direction {
+        case .right:
+            if isShowingSavedWords {
+                closeSavedWords()
+            } else if !isShowingContents, !hasSelection {
+                hideMenus()
+                isShowingContents = true
+            }
+        case .left:
+            if isShowingContents { isShowingContents = false }
+        }
+    }
+
+    // MARK: - Contents panel
+
+    /// The table of contents slides in from the left and fills the screen.
+    private func contentsPanel(session: ReadingSession) -> some View {
+        ZStack(alignment: .leading) {
+            if isShowingContents {
+                ContentsView(outline: outline, currentBlock: session.currentBlock, style: style, onSelect: { entry in
+                    isShowingContents = false
+                    Log.app.info("Contents: jump to block \(entry.block)")
+                    session.go(to: entry.block)
+                    scrollTarget = ArticleTextView.ScrollTarget(token: (scrollTarget?.token ?? 0) + 1, block: entry.block)
+                }, onClose: { isShowingContents = false })
+                .transition(.move(edge: .leading))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: isShowingContents)
     }
 
     private func closeSavedWords() {
@@ -279,6 +317,7 @@ private struct ArticleReader: View {
         guard document == nil else { return }
         let blocks = article.blocks
         self.blocks = blocks
+        outline = ArticleOutline(blocks: blocks)
         document = ArticleDocument(title: article.title, blocks: blocks, style: style)
 
         let session = ReadingSession(

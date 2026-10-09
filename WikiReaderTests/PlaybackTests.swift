@@ -249,3 +249,95 @@ struct PlaybackModeCycleTests {
         }
     }
 }
+
+// MARK: - Contents
+
+struct ArticleOutlineTests {
+    private let blocks: [ContentBlock] = [
+        .paragraph(String(repeating: "a", count: 100)),   // 0 introduction
+        .heading("Life", level: 2),                       // 1
+        .paragraph(String(repeating: "b", count: 193)),   // 2
+        .heading("Early years", level: 3),                // 3
+        .paragraph(String(repeating: "c", count: 200)),   // 4
+        .heading("Legacy", level: 2),                     // 5
+        .paragraph(String(repeating: "d", count: 100)),   // 6
+    ]
+
+    @Test func listsTheIntroductionAndEveryHeading() {
+        let outline = ArticleOutline(blocks: blocks)
+        #expect(outline.entries.map(\.title) == ["Introduction", "Life", "Early years", "Legacy"])
+        #expect(outline.entries.map(\.block) == [0, 1, 3, 5])
+    }
+
+    @Test func entriesKnowTheirDepthAndPosition() {
+        let outline = ArticleOutline(blocks: blocks)
+        #expect(outline.entries.map(\.depth) == [0, 0, 1, 0])
+        // 100 + 4 + 193 + 11 + 200 = 508 characters come before "Legacy", out of 614.
+        #expect(outline.entries[3].percentText == "83%")
+        #expect(outline.entries[0].percentText == "0%")
+    }
+
+    @Test func currentEntryIsTheLastOneAtOrBeforeTheBlock() {
+        let outline = ArticleOutline(blocks: blocks)
+        #expect(outline.currentEntry(atBlock: 0)?.title == "Introduction")
+        #expect(outline.currentEntry(atBlock: 2)?.title == "Life")
+        #expect(outline.currentEntry(atBlock: 3)?.title == "Early years")
+        #expect(outline.currentEntry(atBlock: 6)?.title == "Legacy")
+    }
+
+    @Test func noIntroductionEntryWhenTheArticleStartsWithAHeading() {
+        let outline = ArticleOutline(blocks: [.heading("History", level: 2), .paragraph("Text.")])
+        #expect(outline.entries.map(\.title) == ["History"])
+    }
+
+    @Test func anArticleWithoutHeadingsIsOneEntry() {
+        #expect(ArticleOutline(blocks: [.paragraph("Only text.")]).entries.map(\.title) == ["Introduction"])
+        #expect(ArticleOutline(blocks: []).entries.isEmpty)
+    }
+
+    @Test func deepHeadingsStopIndentingAtTwoLevels() {
+        let outline = ArticleOutline(blocks: [.heading("A", level: 2), .heading("B", level: 5), .heading("C", level: 9)])
+        #expect(outline.entries.map(\.depth) == [0, 2, 2])
+    }
+}
+
+@MainActor
+struct SessionJumpTests {
+    let blocks: [ContentBlock] = [.paragraph("One."), .heading("Two", level: 2), .paragraph("Three."), .paragraph("Four.")]
+    let engine = FakeSpeechEngine()
+
+    @Test func jumpingWhilePlayingContinuesFromThere() {
+        let session = ReadingSession(blocks: blocks, engine: engine)
+        session.play()
+        session.go(to: 2)
+        #expect(session.currentBlock == 2)
+        #expect(session.state == .playing)
+        #expect(engine.lastSpoken?.text == "Three.")
+    }
+
+    @Test func jumpingWhileStoppedMovesThePlaceWithoutPlaying() {
+        let session = ReadingSession(blocks: blocks, engine: engine)
+        session.go(to: 3)
+        #expect(session.currentBlock == 3)
+        #expect(session.state == .stopped)
+        #expect(engine.spoken.isEmpty)
+        session.play()
+        #expect(engine.lastSpoken?.text == "Four.")
+    }
+
+    @Test func jumpingWhilePausedStaysPaused() {
+        let session = ReadingSession(blocks: blocks, engine: engine)
+        session.play()
+        session.pause()
+        session.go(to: 1)
+        #expect(session.state == .paused)
+        session.play()
+        #expect(engine.lastSpoken?.text == "Two")
+    }
+
+    @Test func jumpingToAnInvalidBlockDoesNothing() {
+        let session = ReadingSession(blocks: blocks, engine: engine)
+        session.go(to: 99)
+        #expect(session.currentBlock == 0)
+    }
+}
