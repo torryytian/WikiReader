@@ -18,6 +18,7 @@ struct ContentsView: View {
         let accent: Color
         let onAccent: Color
         let rail: Color
+        let page: Color
     }
 
     var body: some View {
@@ -26,7 +27,8 @@ struct ContentsView: View {
             secondary: Color(style.theme.secondaryText),
             accent: style.theme.accent.map(Color.init) ?? .accentColor,
             onAccent: Color(style.theme.onAccent),
-            rail: Color.primary.opacity(0.16)
+            rail: Color.primary.opacity(0.16),
+            page: Color(style.backgroundColor)
         )
         let entries = outline.entries
         let currentIndex = entries.firstIndex { $0.id == outline.currentEntry(atBlock: currentBlock)?.id } ?? 0
@@ -183,6 +185,8 @@ struct ContentsView: View {
     ) -> some View {
         let filled = isCurrent || isRead
         ZStack {
+            // Solid page color underneath, so the rail doesn't show through the tinted node.
+            Circle().fill(palette.page)
             Circle()
                 .fill(isCurrent ? palette.accent : (isRead ? palette.accent.opacity(0.22) : Color.primary.opacity(0.07)))
             if !isMain {
