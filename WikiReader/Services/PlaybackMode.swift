@@ -25,6 +25,15 @@ nonisolated enum PlaybackMode: String, CaseIterable, Sendable {
         }
     }
 
+    /// Name and scope in one line, for a menu.
+    var menuTitle: String {
+        switch self {
+        case .sequential: "Sequential · All articles"
+        case .loop: "Loop · This article"
+        case .shuffle: "Shuffle · All articles"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .sequential: "arrow.right"

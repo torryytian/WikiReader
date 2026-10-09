@@ -153,7 +153,7 @@ struct ArticleDocument {
     static func translateLabel(forBlock block: Int, style: ReaderStyle) -> NSAttributedString {
         var attributes = attributes(for: .paragraph, style: style)
         attributes[.font] = style.fontFamily.font(size: style.clampedFontSize * 0.78, weight: .medium)
-        attributes[.foregroundColor] = UIColor.tintColor
+        attributes[.foregroundColor] = style.theme.accent ?? UIColor.tintColor
         attributes[.translateBlock] = block
         return NSAttributedString(string: " Translate", attributes: attributes)
     }

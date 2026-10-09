@@ -105,13 +105,12 @@ struct ReaderTopInfoBar: View {
 }
 
 private enum MenuTab: CaseIterable {
-    case font, theme, playback, layout
+    case font, theme, layout
 
     var title: String {
         switch self {
         case .font: "Font & Size"
         case .theme: "Theme"
-        case .playback: "Playback"
         case .layout: "Layout"
         }
     }
@@ -120,14 +119,13 @@ private enum MenuTab: CaseIterable {
         switch self {
         case .font: "textformat.size"
         case .theme: "circle.lefthalf.filled"
-        case .playback: "play.circle"
         case .layout: "rectangle.split.3x1"
         }
     }
 }
 
 /// Shown at the bottom of the reader when the reader taps near the bottom edge: the transport row, and four
-/// tabs (font and size, theme, playback, layout). A tab opens its settings above the transport row; the same tab
+/// tabs (font and size, theme, layout). A tab opens its settings above the transport row; the same tab
 /// again closes it. Changes apply to the article behind it right away.
 struct ReaderBottomMenu: View {
     let session: ReadingSession
@@ -152,7 +150,7 @@ struct ReaderBottomMenu: View {
                     .transition(.opacity)
             }
 
-            PlayerBar(session: session, accent: colors.accent, onAccent: colors.onAccent)
+            PlayerBar(session: session, playbackMode: $playbackMode, accent: colors.accent, onAccent: colors.onAccent)
                 .padding(.top, 4)
 
             HStack {
@@ -205,7 +203,6 @@ struct ReaderBottomMenu: View {
         switch tab {
         case .font: fontPanel(colors)
         case .theme: themePanel(colors)
-        case .playback: playbackPanel(colors)
         case .layout: layoutPanel(colors)
         }
     }
@@ -278,9 +275,8 @@ struct ReaderBottomMenu: View {
             theme = option
         } label: {
             VStack(spacing: 5) {
-                Text("Aa")
+                swatchLabel(for: option)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(option.text))
                     .frame(width: 44, height: 44)
                     .background {
                         if option == .system {
@@ -306,55 +302,17 @@ struct ReaderBottomMenu: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    // MARK: - Playback
-
-    private func playbackPanel(_ colors: MenuColors) -> some View {
-        VStack(spacing: 8) {
-            ForEach(PlaybackMode.allCases, id: \.self) { mode in
-                modeButton(mode, colors: colors)
+    /// "Aa" in the theme's text color; for Auto, a dark "A" on the light half and a light "a" on the dark half.
+    @ViewBuilder
+    private func swatchLabel(for option: ReaderStyle.Theme) -> some View {
+        if option == .system {
+            HStack(spacing: 0) {
+                Text("A").foregroundStyle(.black)
+                Text("a").foregroundStyle(.white)
             }
-            HStack {
-                Text("Speed")
-                    .font(.subheadline)
-                    .foregroundStyle(colors.secondary)
-                Spacer(minLength: 12)
-                Picker("Speed", selection: Binding(get: { session.rate }, set: { session.setRate($0) })) {
-                    ForEach(SpeechRate.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 240)
-            }
-            .padding(.top, 2)
+        } else {
+            Text("Aa").foregroundStyle(Color(option.text))
         }
-    }
-
-    private func modeButton(_ mode: PlaybackMode, colors: MenuColors) -> some View {
-        let isSelected = playbackMode == mode
-        return Button {
-            playbackMode = mode
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: mode.symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 22)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(mode.label).font(.subheadline.weight(.semibold))
-                    Text(mode.detail).font(.caption).foregroundStyle(colors.secondary)
-                }
-                Spacer(minLength: 0)
-                if isSelected {
-                    Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
-                }
-            }
-            .foregroundStyle(isSelected ? colors.accent : colors.text)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 11).fill(colors.chip))
-            .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(isSelected ? colors.accent : .clear, lineWidth: 1.5))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(mode.label): \(mode.detail)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Layout
