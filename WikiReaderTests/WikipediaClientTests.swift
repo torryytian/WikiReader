@@ -33,18 +33,18 @@ struct WikipediaClientTests {
         let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
         let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
         #expect(url.host() == "en.wikipedia.org")
-        #expect(query["prop"] == "extracts")
-        #expect(query["explaintext"] == "1")
-        #expect(query["exsectionformat"] == "wiki")
+        #expect(query["action"] == "parse")
+        #expect(query["prop"] == "text")
         #expect(query["redirects"] == "1")
+        #expect(query["disableeditsection"] == "1")
         #expect(query["formatversion"] == "2")
-        #expect(query["titles"] == "Albert Einstein")
+        #expect(query["page"] == "Albert Einstein")
     }
 
     @Test func plusSignIsEscaped() {
         // An unescaped "+" would be read by the API as a space.
         let url = WikipediaClient.requestURL(forTitle: "C++")
-        #expect(url.absoluteString.hasSuffix("titles=C%2B%2B"))
+        #expect(url.absoluteString.hasSuffix("page=C%2B%2B"))
     }
 
     @Test func userAgentHasContact() {
@@ -55,37 +55,44 @@ struct WikipediaClientTests {
     @Test func parsesArticle() throws {
         let article = try Fixture.article("albert_einstein")
         #expect(article.title == "Albert Einstein")
-        #expect(article.extract.hasPrefix("Albert Einstein ("))
-        #expect(article.extract.contains("== Life and career =="))
+        #expect(article.html.contains("<h2 id=\"Life_and_career\">Life and career</h2>"))
+        #expect(article.html.contains("Albert Einstein"))
     }
 
     @Test func followsRedirect() throws {
         // Requested "Einstein"; the API resolved the redirect.
-        #expect(try Fixture.article("redirect_einstein").title == "Albert Einstein")
+        #expect(try Fixture.article("redirect_einstein", requestedTitle: "Einstein").title == "Albert Einstein")
     }
 
     @Test func missingPage() {
         #expect(throws: WikipediaError.pageNotFound(title: "Asdfqwerzxcv123")) {
-            try Fixture.article("missing_page")
+            try Fixture.article("missing_page", requestedTitle: "Asdfqwerzxcv123")
         }
     }
 
     @Test func invalidTitle() {
-        let json = #"{"batchcomplete":true,"query":{"pages":[{"title":"[]","invalidreason":"bad","invalid":true}]}}"#
+        let json = #"{"error":{"code":"invalidtitle","info":"Bad title \"[]\"."}}"#
         #expect(throws: WikipediaError.invalidTitle(title: "[]")) {
-            try WikipediaClient.parseResponse(Data(json.utf8))
+            try WikipediaClient.parseResponse(Data(json.utf8), requestedTitle: "[]")
         }
     }
 
-    @Test func emptyExtract() {
-        let json = #"{"query":{"pages":[{"pageid":1,"ns":0,"title":"Empty","extract":"  "}]}}"#
+    @Test func emptyText() {
+        let json = #"{"parse":{"title":"Empty","pageid":1,"text":"  "}}"#
         #expect(throws: WikipediaError.emptyArticle(title: "Empty")) {
-            try WikipediaClient.parseResponse(Data(json.utf8))
+            try WikipediaClient.parseResponse(Data(json.utf8), requestedTitle: "Empty")
+        }
+    }
+
+    @Test func unknownAPIErrorIsABadResponse() {
+        let json = #"{"error":{"code":"ratelimited","info":"slow down"}}"#
+        #expect(throws: WikipediaError.badResponse) {
+            try WikipediaClient.parseResponse(Data(json.utf8), requestedTitle: "X")
         }
     }
 
     @Test func garbageResponse() {
-        #expect(throws: WikipediaError.badResponse) { try WikipediaClient.parseResponse(Data("<html>".utf8)) }
-        #expect(throws: WikipediaError.badResponse) { try WikipediaClient.parseResponse(Data(#"{"batchcomplete":true}"#.utf8)) }
+        #expect(throws: WikipediaError.badResponse) { try WikipediaClient.parseResponse(Data("<html>".utf8), requestedTitle: "X") }
+        #expect(throws: WikipediaError.badResponse) { try WikipediaClient.parseResponse(Data(#"{"batchcomplete":true}"#.utf8), requestedTitle: "X") }
     }
 }

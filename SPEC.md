@@ -130,14 +130,14 @@
 
 ### 5.1 Wikipedia 抓取
 
-- 用 MediaWiki Action API 的 TextExtracts 接口取纯文本：
+- 用 MediaWiki Action API 的 `action=parse` 取页面正文 HTML，自己解析（2026-10-13 起；原来用的 TextExtracts 纯文本接口会丢掉"摘录"段落，见 PROGRESS.md）：
 
   ```
-  https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exsectionformat=wiki&redirects=1&format=json&formatversion=2&titles=<URL 编码后的标题>
+  https://en.wikipedia.org/w/api.php?action=parse&prop=text&redirects=1&disableeditsection=1&disablelimitreport=1&disabletoc=1&format=json&formatversion=2&page=<URL 编码后的标题>
   ```
 
-- 返回的纯文本里，章节标题形如 `== History ==`、`=== Early life ===`，等号个数就是层级。
-- 页面不存在时，返回结果里会标记 missing，据此给出"页面不存在"的提示。
+- 只取标题（`<h2>`–`<h6>`）、段落和列表项；表格、信息框、导航框、图片说明、引语框、"Main article:" 之类的提示行、脚注上标、公式一律跳过。别的页面嵌进来的"摘录"段落属于正文，要保留。
+- 页面不存在时，返回 `error.code == "missingtitle"`，据此给出"页面不存在"的提示。
 - 每个请求都要带 User-Agent（格式和内容见 CLAUDE.md）。Wikimedia 从 2026 年起对 API 统一限流，不带联系方式的请求会被归为"未识别"，配额很低。
 - 只在用户添加文章时请求，不预取、不批量抓。
 - Wikipedia 正文采用 CC BY-SA 4.0 授权。自己用没问题；以后如果要分发，阅读页需要注明来源和许可。

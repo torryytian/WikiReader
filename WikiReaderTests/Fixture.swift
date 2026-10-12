@@ -15,12 +15,12 @@ enum Fixture {
         return try Data(contentsOf: url)
     }
 
-    static func article(_ name: String) throws -> FetchedArticle {
-        try WikipediaClient.parseResponse(data(name))
+    static func article(_ name: String, requestedTitle: String = "") throws -> FetchedArticle {
+        try WikipediaClient.parseResponse(data(name), requestedTitle: requestedTitle)
     }
 
     /// Cleaned blocks of a fixture article.
     static func blocks(_ name: String) throws -> [ContentBlock] {
-        ArticleCleaner.blocks(from: try article(name).extract)
+        ArticleCleaner.blocks(fromHTML: try article(name).html)
     }
 }

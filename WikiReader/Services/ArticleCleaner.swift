@@ -1,12 +1,7 @@
 import Foundation
 
-/// Turns a TextExtracts plain-text extract into blocks that are pleasant to read and to listen to.
-///
-/// The API output looks like this:
-/// - Section headings are lines like `== History ==`; the number of `=` is the level.
-/// - Paragraphs are single lines; blank lines separate sections.
-/// - Math formulas appear as a run of indented lines (one MathML token per line)
-///   ending in a LaTeX annotation such as `{\displaystyle a^{2}+b^{2}=c^{2}}`.
+/// Turns the readable text of an article (see `ArticleHTMLParser`) into blocks that are pleasant to
+/// read and to listen to: drops excluded sections, pronunciation, citation markers and formula leftovers.
 nonisolated enum ArticleCleaner {
     /// Sections removed together with all their subsections. Compared case-insensitively.
     static let excludedSections: Set<String> = [
@@ -14,40 +9,34 @@ nonisolated enum ArticleCleaner {
         "bibliography", "works cited", "further reading", "external links",
     ]
 
-    static func blocks(from extract: String) -> [ContentBlock] {
-        let lines = removingFormulas(from: extract.components(separatedBy: .newlines))
+    /// `html` is the `text` of an `action=parse` response.
+    static func blocks(fromHTML html: String) -> [ContentBlock] {
+        blocks(from: ArticleHTMLParser.rawBlocks(from: html))
+    }
 
+    static func blocks(from rawBlocks: [ArticleHTMLParser.RawBlock]) -> [ContentBlock] {
         var blocks: [ContentBlock] = []
         // While set, we are inside an excluded section of this level: skip until a heading at or above it.
         var skippingLevel: Int?
 
-        for line in lines {
-            if let heading = parseHeading(line) {
-                if let level = skippingLevel, heading.level > level { continue }
+        for raw in rawBlocks {
+            let text = cleanInline(raw.text)
+            if raw.level > 0 {
+                if let level = skippingLevel, raw.level > level { continue }
                 skippingLevel = nil
-                if excludedSections.contains(heading.title.lowercased()) {
-                    skippingLevel = heading.level
+                if excludedSections.contains(text.lowercased()) {
+                    skippingLevel = raw.level
                     continue
                 }
-                let title = cleanInline(heading.title)
-                if !title.isEmpty { blocks.append(.heading(title, level: heading.level)) }
-            } else if skippingLevel == nil {
-                let text = cleanInline(line)
-                if !text.isEmpty { blocks.append(.paragraph(text)) }
+                if !text.isEmpty { blocks.append(.heading(text, level: raw.level)) }
+            } else if skippingLevel == nil, !text.isEmpty {
+                blocks.append(.paragraph(text))
             }
         }
         return removingEmptySections(blocks)
     }
 
-    // MARK: - Headings and sections
-
-    static func parseHeading(_ line: String) -> (level: Int, title: String)? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard let match = trimmed.wholeMatch(of: #/(={2,6})\s*(.+?)\s*(={2,6})/#),
-              match.output.1.count == match.output.3.count
-        else { return nil }
-        return (match.output.1.count, String(match.output.2))
-    }
+    // MARK: - Sections
 
     /// Drops headings with no paragraph anywhere below them (before the next heading at the same or a higher level),
     /// e.g. "Notes and references" once its "Notes" and "References" subsections are gone.
@@ -61,46 +50,6 @@ nonisolated enum ArticleCleaner {
             }
             return nil
         }
-    }
-
-    // MARK: - Formulas
-
-    /// Removes formula runs: consecutive lines that are blank or indented by 2+ spaces and contain
-    /// a LaTeX annotation line. A formula inside a sentence joins the text around it; a display
-    /// formula (surrounded by blank lines) becomes a paragraph break.
-    static func removingFormulas(from lines: [String]) -> [String] {
-        var result: [String] = []
-        var index = 0
-        while index < lines.count {
-            guard isFormulaRunLine(lines[index]) else {
-                result.append(lines[index])
-                index += 1
-                continue
-            }
-            var end = index
-            while end < lines.count, isFormulaRunLine(lines[end]) { end += 1 }
-            let run = lines[index..<end]
-
-            if !run.contains(where: isLaTeXAnnotation) {
-                result.append(contentsOf: run)
-            } else if run.contains(where: \.isEmpty) || result.isEmpty || end == lines.count {
-                result.append("")
-            } else {
-                // Inline formula: the sentence continues on the line after the run.
-                result[result.count - 1] = result[result.count - 1] + " " + lines[end]
-                end += 1
-            }
-            index = end
-        }
-        return result
-    }
-
-    private static func isFormulaRunLine(_ line: String) -> Bool {
-        line.allSatisfy(\.isWhitespace) || line.hasPrefix("  ") || line.hasPrefix("\t")
-    }
-
-    private static func isLaTeXAnnotation(_ line: String) -> Bool {
-        line.trimmingCharacters(in: .whitespaces).prefixMatch(of: #/\{\\[a-z]*style\b/#) != nil
     }
 
     // MARK: - Inline cleanup

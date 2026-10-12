@@ -59,7 +59,7 @@ nonisolated struct ArticleImporter: Sendable {
             throw .wikipedia(error)
         }
 
-        let blocks = ArticleCleaner.blocks(from: fetched.extract)
+        let blocks = ArticleCleaner.blocks(fromHTML: fetched.html)
         guard blocks.contains(where: { $0.kind == .paragraph }) else {
             throw .nothingToRead(title: fetched.title)
         }

@@ -6,7 +6,7 @@
 
 ## 0. 接手须知（新会话先读这里）
 
-**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。303 个单元测试全过。**但阅读页的触摸操作和词典上的浮动按钮从来没有人点过，真机上也还没装最近几版。**
+**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。311 个单元测试全过。**但阅读页的触摸操作和词典上的浮动按钮从来没有人点过，真机上也还没装最近几版。**
 
 **先做这几件事**
 1. `git pull`，按 CLAUDE.md 编译并跑测试（见第 6 节的环境注意事项）。
@@ -32,7 +32,7 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：303 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：311 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
@@ -41,7 +41,7 @@
 **Models/**：`Article`（SwiftData：标题、来源 URL、添加时间、内容块 JSON、上次读到的块序号）、`ContentBlock`（标题或段落）。
 
 **Services/**
-- 抓取与清洗：`ArticleInput`（链接/标题解析）、`WikipediaClient`（TextExtracts API，专用 URLSession，15/30 秒超时）、`ArticleCleaner`、`ArticleImporter`（输入 → 标题 → 抓取 → 清洗）。
+- 抓取与清洗：`ArticleInput`（链接/标题解析）、`WikipediaClient`（`action=parse` 取 HTML，专用 URLSession，15/30 秒超时）、`ArticleHTMLParser`（HTML → 标题/段落，白名单）、`ArticleCleaner`（章节排除、去音标、引用标记兜底、标点整理）、`ArticleImporter`（输入 → 标题 → 抓取 → 清洗）。
 - 朗读：`SpeechEngine`（协议）、`SystemSpeechEngine`、`ReadingSession`（朗读流程，`@Observable`）、`SpokenAudioSession`（音频会话）、`VoiceSelection`（声音排序/选择，含 `americanVoice`）、`VoiceChoice`（"当前用哪个声音 + 引擎"，设置页和主页那一行的文字）。
 - 查词：`DictionaryLookup`（候选词顺序、词形还原、所在句子）、`WordPronouncer`（词典上喇叭按钮用的单词发音，固定美式）。
 - 钥匙串：`KeychainStore`（OpenAI Key）。
@@ -73,10 +73,15 @@
 - 查词弹窗用 UIKit `present` 直接弹出 `UIReferenceLibraryViewController`，不用 SwiftUI sheet（避免两份"是否弹出"状态不同步）。
 - 查词候选顺序：原词 → 去所有格 → 小写 → 词形还原（NLTagger，整段作上下文）。系统词典本身就认识多数变形词，所以词形还原只在原词查不到时起作用。
 
-### 正文清洗（和 SPEC 预期不同的地方）
-- Paris 首句如今本来就没有音标（维基百科挪到了脚注）；去音标规则应用到全文，靠"括号里有没有 IPA 字符"判断，保留 `"[the]"` 这类编辑方括号。
-- 公式残留是一整串缩进行 + `{\displaystyle …}` 或 `{\textstyle …}`；整段删除。**行内公式删掉后句子会缺一块**（如 "a measure of and which contain"），暂未处理，可改成用 "a formula" 占位。
-- 父章节在子章节都被删除后变空（如 "Notes and references"），一并删除。
+### 正文清洗（2026-10-13 改成解析 HTML）
+- **起因**：用户发现 Cultural Revolution 里一段没显示。原因是 TextExtracts 默认**删掉页面里所有 `div` 里的内容**，而 Wikipedia 用模板把别的词条的段落/小节"摘录"（`div.excerpt-block`）嵌进来，整段就丢了。COVID-19 丢了 24 段、约 12,800 字符（18%）；抽样的 16 篇长文里 3 篇有这类问题。
+- **现在**：`WikipediaClient` 用 `action=parse` 取 HTML（压缩后 200–300 KB，抓一篇约 2–3 秒），`ArticleHTMLParser` 自己写的容错分词器（`XMLParser` 读不了，这不是合法 XML）按**白名单**取 `p/li/dd/dt/h2–h6`，其余整块跳过：表格、信息框、导航框、`figure`/图片说明、引语框（`blockquote`、`quotebox`、`templatequote`、署名 `templatequotecite`）、`hatnote`（含 "This paragraph is an excerpt from"）、脚注上标、`noprint/nomobile/noexcerpt`、`display:none`（含坐标的十进制隐藏部分）、公式、书目条目（`cite.citation`）、分栏长列表（`div-col`、`columns`）。块级公式（`mwe-math-element-block`）在段内断开成两段，和以前一致。**用户明确要求：图片说明、引语框、"Main article" 提示行都不读也不显示。**
+- 保留的老规则：章节排除（整个子树）、空章节删除、去 IPA/listen、`[1]`/`[citation needed]` 兜底、标点整理；公式整段/整句删除（行内公式删掉后句子会缺一块，仍是已知问题）。
+- 新旧对比（16 篇真实文章，旧版输出 vs 新版输出）：大多数段落逐字相同（例如 Einstein 218 段里 207 段相同）；不同的主要是旧版在页面里的 div 处把一个段落**拆成了两段**，新版保持完整；新增的主要是摘录段。残留扫描（引用标记、`[edit]`、公式、网址、署名行、过短块）0 条。
+- **不影响已有数据**：已保存的文章存的是清洗好的块，备份导出/导入用的也是库里已存的块；OpenAI 音频缓存文件名 = SHA256(模型+声音+风格+段落文字)，所以**旧文章、旧备份、已下载的语音都不受影响**。只有以后新添加的文章走新解析。**注意**：以后若做"刷新旧文章"，没变的段落必须逐字一致才能继续命中旧语音缓存；被旧版拆开又被新版合并的段落会失效（要重新生成）。
+- **已保存的旧文章不会自动补上摘录**：重复添加同一标题会直接打开旧文章，所以要补全得先删掉再添加（或以后加"刷新"入口，要处理阅读位置、单词本）。
+- 测试 fixture 现在是 `action=parse` 的真实返回（Einstein/Paris/Pythagorean 各约 0.5–1 MB）+ 一份从 Cultural Revolution 截出来的摘录小节（`excerpt_section.json`）。
+- 其他旧说明：Paris 首句如今本来就没有音标（挪到了脚注）；去音标规则靠"括号里有没有 IPA 字符"判断，保留 `"[the]"` 这类编辑方括号；父章节在子章节都被删除后变空（如 "Notes and references"），一并删除。
 
 ### 朗读
 - 朗读引擎抽象为 `SpeechEngine` 协议；`ReadingSession` 管流程，用假引擎做单元测试，另有真引擎冒烟测试。

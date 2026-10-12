@@ -1,1 +1,1 @@
-{"batchcomplete":true,"query":{"pages":[{"ns":0,"title":"Asdfqwerzxcv123","missing":true}]}}
+{"error": {"code": "missingtitle", "info": "The page you specified doesn't exist.", "docref": "See https://en.wikipedia.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/postorius/lists/mediawiki-api-announce.lists.wikimedia.org/&gt; for notice of API deprecations and breaking changes."}, "servedby": "mw-api-ext.eqiad.main-549b7f8f46-s52m4"}
