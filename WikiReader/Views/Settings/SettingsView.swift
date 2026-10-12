@@ -129,7 +129,7 @@ struct SettingsView: View {
 
     private var dictionarySection: some View {
         Section("Dictionary") {
-            Text("To see Chinese definitions when you tap a word, enable an English–Chinese dictionary in iPhone **Settings → General → Dictionary**, for example **Simplified Chinese–English**.")
+            Text("Tapping a word opens the built-in English–Chinese dictionary (ECDICT), which works offline. English definitions come from Wiktionary, and recordings of the pronunciation from Wikimedia Commons, when you open a word and have a connection. The **iPhone Dictionary** button on a word opens the system dictionary too; its English–Chinese entries need to be enabled in iPhone **Settings → General → Dictionary**.")
                 .font(.callout)
         }
     }

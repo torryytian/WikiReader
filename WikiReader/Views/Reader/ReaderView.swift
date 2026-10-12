@@ -225,7 +225,7 @@ private struct ArticleReader: View {
                 SavedWordsView(article: article, onLookUp: { saved in
                     let request = WordLookupRequest(
                         word: saved.word, term: saved.term,
-                        hasDefinition: DictionaryLookup.system.hasDefinition(saved.term), sentence: saved.sentence
+                        hasDefinition: DictionaryLookup.bundled.hasDefinition(saved.term), sentence: saved.sentence
                     )
                     pauseForLookup(session)
                     DictionaryPresenter.present(request, saving: saving(for: request), onDismiss: { resumeIfPausedForLookup(session) })
@@ -384,7 +384,7 @@ private struct ArticleReader: View {
 
     private func lookUpWord(at range: NSRange, in document: ArticleDocument, pausing session: ReadingSession) {
         guard let context = document.context(for: range) else { return }
-        let request = DictionaryLookup.system.request(forWordAt: context.wordRange, in: context.text)
+        let request = DictionaryLookup.bundled.request(forWordAt: context.wordRange, in: context.text)
         Log.lookup.info("""
             Tapped \(request.word, privacy: .public) -> term \(request.term, privacy: .public), \
             hasDefinition: \(request.hasDefinition, privacy: .public)

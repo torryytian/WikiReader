@@ -43,7 +43,7 @@
 **Services/**
 - 抓取与清洗：`ArticleInput`（链接/标题解析）、`WikipediaClient`（`action=parse` 取 HTML，专用 URLSession，15/30 秒超时）、`ArticleHTMLParser`（HTML → 标题/段落，白名单）、`ArticleCleaner`（章节排除、去音标、引用标记兜底、标点整理）、`ArticleImporter`（输入 → 标题 → 抓取 → 清洗）。
 - 朗读：`SpeechEngine`（协议）、`SystemSpeechEngine`、`ReadingSession`（朗读流程，`@Observable`）、`SpokenAudioSession`（音频会话）、`VoiceSelection`（声音排序/选择，含 `americanVoice`）、`VoiceChoice`（"当前用哪个声音 + 引擎"，设置页和主页那一行的文字）。
-- 查词：`DictionaryLookup`（候选词顺序、词形还原、所在句子）、`WordPronouncer`（词典上喇叭按钮用的单词发音，固定美式）。
+- 查词：`DictionaryLookup`（候选词顺序、词形还原、所在句子）、`WordPronouncer`（喇叭：先真人录音，没有就系统美式声音）。`Dictionary/`：`DictionaryDatabase`、`DictionaryEntry`（离线词库）、`WiktionaryClient` + `DefinitionCache`、`WordAudioClient`。
 - 钥匙串：`KeychainStore`（OpenAI Key）。
 - `OpenAI/`：
   - 朗读：`OpenAITTSClient`、`OpenAISpeechEngine`、`SpeechChunking`、`SpeechAudioCache`、`AudioClip`。
@@ -56,7 +56,7 @@
   - `ArticleTextView`：只负责 UIKit `UITextView` 的那一层——点词、选择菜单、点击区域（`TapZone`）、高亮、自动跟随滚动、位置恢复。
   - `ArticleDocument`：整篇文章的富文本 + "块 → 文本区间"映射；样式（`ReaderStyle`）、段末 "Translate" 标签、选中文字提取。
   - `ReaderStyle`：主题/字体/字号/行距/页边距/深色程度；`ReaderChrome`：`floatingGlass`、顶部菜单 `ReaderTopBar`、排版面板 `ReaderStylePanel`、`SwipeBackEnabler`；`PlayerBar`：底部播放胶囊；`SpeechErrorBanner`：朗读出错条。
-  - `DictionaryPresenter`：弹系统词典；`PronouncingDictionaryViewController`（词典子类 + 喇叭 + AI 两个浮动按钮）。
+  - `DictionaryPresenter`：弹词典页；`WordCardView`/`WordCardModel`：自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）。
   - `WordExplanationView`（单词 AI 讲解 sheet + `WordExplanationModel`）、`TranslationView`（翻译 sheet + `PassageTranslationModel`）。
   - `UITextView+WordHit`：点哪个词的命中判断。
 - `Settings/`：`SettingsView`（主页：Appearance、Voice 一行、词典说明、Backup & Transfer 入口）、`VoiceSettingsView`（所有声音一页，单一对勾）。
@@ -106,7 +106,16 @@
 - 去掉 "Read With" 切换。设置主页只有一行 "Voice"（显示如 "Marin · OpenAI"），点进 Voice 页：OpenAI 分组（Key、13 个声音、缓存、删除 Key）在上，iPhone 声音在下，整页只有一个对勾，选哪个声音就用哪个引擎（`VoiceChoice`）。
 - 没有 Key 时 OpenAI 声音带锁、不可选；删除 Key 时若正在用 OpenAI 声音，自动改回 iPhone 声音。存储的设置项（`speechEngine`、`voiceIdentifier`、`openAIVoice`）不变，不用迁移。
 
-### 词典界面：发音与 AI 讲解（2026-10-08）
+### 自己的词典页，取代系统词典（2026-10-13）
+- **起因**：① 系统词典的内容区是另一个进程画的，触摸 App 收不到，下滑关不掉（试了三版都只能靠小横条/标题栏拖动区）；② 苹果词库释义不好用、没装英汉词典就没有中文。AI 讲解页和翻译页因为是我们自己的 SwiftUI，所以任意位置下滑都能关。**结论：点词直接弹自己的词典页，下滑关闭和 AI 页一样。**
+- **离线词库**：完整 ECDICT（MIT，77 万词条，用户明确要完整版不要裁剪版）。`tools/make_dictionary.py` 把官方 `ecdict.csv`（66 MB，不进仓库，下载命令在脚本注释里）转成 `WikiReader/Resources/ecdict.sqlite`（77.5 MB，压缩后约 30 MB，**已提交进 git**；重建会再往仓库里加一份约 30 MB，别随便重建）。表 `entries` 以 (lower, word) 为主键、WITHOUT ROWID；字段：音标、英文释义、中文释义、柯林斯星级、Oxford 3000、考试标签、词频、`exchange`（词形和原形）。丢掉 pos/detail/audio。放在同步文件夹里，自动进 App 资源。
+- **查询**：`DictionaryDatabase`（`SQLite3` 系统库，每次查询打开只读文件、查完关，没有共享连接所以不用加锁）；`DictionaryEntry` 解析中文/英文行（库里的换行是两个字符 `\n`）、词形（`0:` 是原形，`p/d/i/3/r/t/s` 是变形）、考试标签、显示用音标（ECDICT 的 schwa 是西里尔字母 `ә`，显示时换成 `ə`，并去掉 `^`）。`DictionaryLookup.bundled` 取代 `.system`，候选顺序不变；变形词（`studies`）同时显示原形（`study`）的释义。已知：ECDICT 没有首字母大写的专有词条（March/Turkey 显示的是普通名词义）；`CCP` 这类缩写词义不对；中文释义偏短，语境里的准确意思仍靠 ✨AI。
+- **联网（用户同意，CLAUDE.md 已改）**：打开词典页时请求 Wiktionary（`WiktionaryClient`，6/12 秒超时，只发单词，结果存 Application Support/Definitions，失败静默并给"Retry"）；点喇叭时 `WordPronouncer.pronounce` 先取 Commons 的真人录音 mp3（`WordAudioClient`，缓存 Application Support/WordAudio，没有或失败就用系统美式声音）。**dictionaryapi.dev 试过并放弃**：2026-10-13 实测，只有缓存过的词能秒回，其余都卡约 20 秒后 522。Commons 的 mp3 有时返回 429（转码限流），所以失败回退很重要。Wikimedia 的 User-Agent 带邮箱，**绝不能发给 Wikimedia 以外的服务**。
+- **界面**（`WordCardView` + `WordCardModel`，`WordCardHostingController` 负责"真正关闭"的回调）：单词 + 音标 + 喇叭、Collins 星/Oxford 3000/考试标签、中文、原形、词形、英文（在线的到了就替换离线的）；底部固定 ✨AI、收藏、"iPhone Dictionary"（在卡片上再弹系统词典）。收藏时如果没有 AI 释义，存词典里第一行中文（≤40 字）。查词后恢复朗读的逻辑（`onDismiss`）不变。
+- **验证**：模拟器截图看过三种情况（`shirk`、变形词 `studies`、库里没有的词）；真实网络下在线释义加载并缓存成功；单元测试（数据库/词条/Wiktionary/录音/缓存/卡片模型）。**未验证**：点喇叭的真人录音（模拟器没点击）、AI 按钮和收藏按钮的点击、下滑关闭本身、真机上的字号与排版、深色以外的主题、`WordExplanationView` 作为嵌套 sheet 弹在卡片上的表现。
+- 取代了下面两节里关于"叠在系统词典上的浮动按钮"和"拖动区 dragStrip"的做法（代码已删，`PronouncingDictionaryViewController` 不存在了）；"Search Web 去不掉"也不再相关。**不要重复做**：用户否决过"点词先弹词卡 + 自动发音"，现在点词不会自动发音，只有按喇叭才发。
+
+### 词典界面：发音与 AI 讲解（2026-10-08，已被上面取代，保留作历史）
 - 系统词典的内容改不了：不能加按钮，也不能去掉 "Search Web" / "Manage Dictionaries"。所以做成它的子类，在右下角叠两个浮动按钮：`✨ AI` 和喇叭。
 - 点词直接弹词典，**不自动发音**；按喇叭才读被查的词，固定美式（en-US）本机声音（设置里选的声音是美式就用它，否则用最好的美式声音）。读单词不 `deactivate` 音频会话，避免影响暂停中的文章朗读。
 - AI 讲解：点 AI 才请求 OpenAI，只发单词和所在句子，用设置页保存的同一个 Key。返回词性、中文释义、用法说明、整句翻译、3 个中英例句。无 Key、超时、限流、额度用完都有明确提示。**未做缓存**：重复点同一个词会重复请求（单次约千分之几美分）。

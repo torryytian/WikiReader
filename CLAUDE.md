@@ -28,6 +28,7 @@ WikiReader/
   App/          入口、全局配置（SettingsKeys 是所有设置项的键）
   Models/       SwiftData 模型
   Services/     WikipediaClient、ArticleCleaner、SpeechEngine、DictionaryLookup、VoiceChoice
+    Dictionary/ 离线词库（ECDICT）查询、Wiktionary 英文释义、真人发音
     OpenAI/     朗读（TTS）、聊天请求层、单词讲解、翻译、缓存
   Views/        Library、Reader（阅读页、词典、翻译面板）、Settings
 WikiReaderTests/
@@ -74,4 +75,5 @@ docs/           会话记录
 - 只在我添加文章时请求 Wikipedia，不预取、不批量抓。
 - 选用 OpenAI 朗读时，只为当前段和下一段请求 `api.openai.com` 生成音频；生成结果缓存在本地，不重复请求，不批量生成全文。
 - AI 讲解（词典界面的 AI 按钮）：只在我点按钮时请求 `api.openai.com/v1/chat/completions`，一次只发被查的单词和它所在的句子，不发全文，不预取，不自动触发；用的是设置页保存的同一个 OpenAI Key。
+- 词典页（点词弹出）：离线词库 ECDICT 在 App 里，不联网。打开词典页时请求 `en.wiktionary.org/api/rest_v1/page/definition/<词>` 取英文释义，只发被查的单词（不发句子），结果缓存在本地，失败静默；点喇叭时请求 `upload.wikimedia.org` 上的真人录音 mp3（`En-us-<词>.ogg` 的转码版），只发单词，结果缓存，没有录音就用系统声音。这两个都是 Wikimedia 的服务，带同样的 User-Agent。**不要把 User-Agent 里的邮箱发给 Wikimedia 以外的任何服务**（dictionaryapi.dev 试过，服务端常 522，已放弃）。
 - 任何 API Key 都不写进代码、不提交到 git。以后接云端服务时，Key 在 App 的设置页输入，存 Keychain。

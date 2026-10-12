@@ -45,12 +45,13 @@
 
 ### F4 点词查词典
 
-- 单击正文里的任意单词，弹出 iOS 系统词典。
-- 先判断原词有没有释义；没有就换成词形还原后的原形再查（`running` → `run`，`studies` → `study`）。
-- 都查不到也照样弹出词典界面：它会显示"无释义"，并提供管理、下载词典的入口。
+- 单击正文里的任意单词，弹出自己做的词典页（2026-10-13 起，取代 iOS 系统词典，原因见 PROGRESS.md）：音标、喇叭、中文释义、词形、英文释义，以及 AI、收藏和"iPhone Dictionary"按钮。
+- 离线词库是完整的 ECDICT（约 77 万词条）。先判断原词有没有词条；没有就换成词形还原后的原形再查（`running` → `run`，`studies` → `study`）；变形词同时显示原形的释义。
+- 都查不到也照样弹出词典页：提示"不在离线词典里"，引导用 AI 或系统词典。
+- 打开词典页时联网取 Wiktionary 的英文释义（失败静默，只剩离线内容）；点喇叭时优先播 Wikimedia Commons 的真人录音，没有就用系统美式声音。
 - 被点的单词短暂高亮，作为点击反馈。
 - 点击标点、数字、空白处没有反应。
-- 朗读中点词：自动暂停朗读；关掉词典后，如果查词前正在播放就自动从暂停处继续，如果是我手动暂停的则保持暂停，按播放才继续。翻译面板同理。词典和翻译面板都可以下滑关闭。
+- 朗读中点词：自动暂停朗读；关掉词典后，如果查词前正在播放就自动从暂停处继续，如果是我手动暂停的则保持暂停，按播放才继续。翻译面板同理。词典页和翻译面板在任意位置下滑都能关闭。
 
 ### F5 朗读
 
@@ -166,10 +167,11 @@
 
 ### 5.4 查词
 
-- 用 `UIReferenceLibraryViewController(term:)`，以 sheet 方式弹出（SwiftUI 里用 `UIViewControllerRepresentable` 包一层）。
-- 查之前用 `UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm:)` 判断有没有释义。
-- 词形还原：`NLTagger`，tag scheme 用 `.lemma`。
-- 英汉释义来自系统词典里的英汉词典，需要我在 iPhone「设置 → 通用 → 词典」里勾选（比如"简体中文-英文"）。
+- 离线词库：ECDICT（MIT 授权，https://github.com/skywind3000/ECDICT），由 `tools/make_dictionary.py` 转成 `WikiReader/Resources/ecdict.sqlite`（完整版，约 77 MB），用系统自带的 `SQLite3` 只读查询。
+- 词典页是 SwiftUI（`WordCardView`），由 UIKit `present` 弹出，方便阅读页在任何地方弹出并知道何时关闭。
+- 词形还原：`NLTagger`，tag scheme 用 `.lemma`；ECDICT 自己的 `exchange` 字段也带原形（`0:study`）。
+- 英文释义：`en.wiktionary.org/api/rest_v1/page/definition/<词>`；发音：Commons 上的 `En-us-<词>.ogg` 的 mp3 转码版。都只发被查的单词。
+- 系统词典（`UIReferenceLibraryViewController`）保留为词典页上的"iPhone Dictionary"按钮。
 
 ### 5.5 阅读页实现建议（有更好的方案可以先提出来）
 

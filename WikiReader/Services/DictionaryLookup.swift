@@ -18,12 +18,12 @@ nonisolated struct WordLookupRequest: Equatable, Sendable {
 /// Picks the term to look up for a tapped word: the word itself, then simpler forms of it
 /// (without possessive, lowercased, lemma), using the first one the dictionary knows.
 struct DictionaryLookup {
-    /// Whether the dictionary has an entry for a term. Injected so tests don't depend on installed dictionaries.
+    /// Whether the dictionary has an entry for a term. Injected so tests can use a fixed word list.
     var hasDefinition: (String) -> Bool
 
-    /// Uses the iOS system dictionaries (the ones enabled in Settings → General → Dictionary).
-    static let system = DictionaryLookup { term in
-        UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm: term)
+    /// Uses the bundled English–Chinese dictionary (ECDICT).
+    static let bundled = DictionaryLookup { term in
+        DictionaryDatabase.bundled.contains(term)
     }
 
     /// - Parameters:

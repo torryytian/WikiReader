@@ -24,6 +24,13 @@ nonisolated enum ArticleHTMLParser {
         return walker.blocks
     }
 
+    /// Text of a small HTML snippet (a dictionary definition, say): tags dropped, entities decoded, spaces collapsed.
+    static func plainText(fromHTML snippet: String) -> String {
+        var walker = Walker(bytes: Array(("<p>" + snippet + "</p>").utf8))
+        walker.run()
+        return walker.blocks.map(\.text).joined(separator: " ")
+    }
+
     // MARK: - What is skipped
 
     private static let skippedTags: Set<String> = [
@@ -336,7 +343,7 @@ nonisolated enum ArticleHTMLParser {
 
     /// Decodes `&amp;`, `&#8211;`, `&#x2013;` and a short list of named entities (MediaWiki writes
     /// almost everything else as literal UTF-8). Unknown entities are left as they are.
-    fileprivate static func decodeEntities(_ bytes: ArraySlice<UInt8>) -> [UInt8] {
+    static func decodeEntities(_ bytes: ArraySlice<UInt8>) -> [UInt8] {
         guard bytes.contains(UInt8(ascii: "&")) else { return Array(bytes) }
         var result: [UInt8] = []
         result.reserveCapacity(bytes.count)
