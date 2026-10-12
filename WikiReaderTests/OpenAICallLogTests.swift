@@ -118,7 +118,8 @@ struct TTSOutcomeMappingTests {
     }
 
     @Test func timeoutFromTheSystemBecomesTimedOut() async {
-        let client = OpenAITTSClient { _ in throw URLError(.timedOut) }
+        var client = OpenAITTSClient { _ in throw URLError(.timedOut) }
+        client.retry = .never
         let speech = OpenAISpeechRequest(model: "m", voice: "v", input: "Hi.", instructions: nil)
         await #expect(throws: OpenAITTSError.timedOut) { try await client.synthesize(speech, apiKey: "k") }
     }

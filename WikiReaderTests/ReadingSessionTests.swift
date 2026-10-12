@@ -218,12 +218,49 @@ struct ReadingSessionTests {
 
     // MARK: - Preparing ahead
 
-    @Test func eachBlockPreparesOnlyTheNextOne() {
+    @Test func eachBlockPreparesTheBlocksAfterIt() {
         let session = makeSession()
         session.play()
-        #expect(engine.prepared == ["Early life"])
+        #expect(engine.prepared == ["Early life", "He was born in Ulm.", "He moved to Munich."])
         engine.emitFinished()
-        #expect(engine.prepared == ["Early life", "He was born in Ulm."])
+        #expect(engine.prepared == ["He was born in Ulm.", "He moved to Munich."])
+    }
+
+    @Test func lookaheadStopsAfterAboutSeventyFiveSecondsOfSpeech() {
+        // 600 characters is about 43 s at 1×: the second block takes the total past 75 s.
+        let long = (0..<8).map { ContentBlock.paragraph(String(repeating: "word ", count: 120) + "\($0)") }
+        func prepared(rate: SpeechRate) -> Int {
+            let engine = FakeSpeechEngine()
+            let session = ReadingSession(blocks: long, rate: rate, engine: engine)
+            session.play()
+            return engine.prepared.count
+        }
+        #expect(prepared(rate: .normal) == 2)
+        #expect(prepared(rate: .slow) == 2)
+        // Faster speech uses up the lookahead sooner, so more blocks are prepared.
+        #expect(prepared(rate: .fast) == 3)
+    }
+
+    @Test func lookaheadNeverPassesFourBlocks() {
+        let tiny = (0..<12).map { ContentBlock.paragraph("Short \($0).") }
+        let session = ReadingSession(blocks: tiny, engine: engine)
+        session.play()
+        #expect(engine.prepared.count == ReadingSession.maxLookaheadBlocks)
+        #expect(engine.prepared.first == "Short 1.")
+    }
+
+    @Test func aLongNextBlockIsStillPrepared() {
+        let blocks = [ContentBlock.paragraph("Start."), .paragraph(String(repeating: "long ", count: 1000)), .paragraph("After.")]
+        let session = ReadingSession(blocks: blocks, engine: engine)
+        session.play()
+        #expect(engine.prepared.count == 1)
+    }
+
+    @Test func skippingPreparesAheadOfTheNewPlace() {
+        let session = makeSession()
+        session.play()
+        session.next()
+        #expect(engine.prepared == ["He was born in Ulm.", "He moved to Munich."])
     }
 
     @Test func lastBlockPreparesNothing() {

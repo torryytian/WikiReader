@@ -23,10 +23,12 @@ final class FakeSpeechEngine: SpeechEngine {
     func pause() { calls.append(.pause) }
     func resume() { calls.append(.resume) }
     func stop() { calls.append(.stop) }
-    func prepare(_ text: String) { prepared.append(text) }
+    func prepare(upcoming texts: [String]) { preparedCalls.append(texts) }
 
-    /// Texts passed to `prepare`, kept apart from `calls` so flow tests can ignore them.
-    private(set) var prepared: [String] = []
+    /// Every `prepare(upcoming:)` call, kept apart from `calls` so flow tests can ignore them.
+    private(set) var preparedCalls: [[String]] = []
+    /// The texts of the latest call.
+    var prepared: [String] { preparedCalls.last ?? [] }
 
     /// Pretends sound started for the given (default: last) utterance.
     func emitStarted(id: Int? = nil) {

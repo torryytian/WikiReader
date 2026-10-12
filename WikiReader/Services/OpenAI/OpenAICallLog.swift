@@ -57,8 +57,14 @@ nonisolated struct CallRecord: Codable, Equatable, Identifiable, Sendable {
     /// From sending the request to getting the whole answer (or the failure).
     var seconds: Double
     var outcome: CallOutcome
-    /// For failures, what the system or OpenAI said (e.g. "HTTP 503").
+    /// For failures, what the system or OpenAI said (e.g. "HTTP 503"); for a request that had to be repeated,
+    /// how each attempt went.
     var detail: String?
+    /// How many requests it took, retries included. Nil in records written before retries existed (one).
+    var attempts: Int?
+
+    /// Asked again at least once.
+    var wasRetried: Bool { (attempts ?? 1) > 1 }
 }
 
 /// Numbers worked out from records, for the diagnostics page and the copied report.
@@ -71,6 +77,9 @@ nonisolated struct CallStats: Equatable, Sendable {
     var failures: [(outcome: CallOutcome, count: Int)]
     /// Calls that took longer than `slowThreshold` seconds, successful or not.
     var slowCount: Int
+    /// Calls that were repeated after a failed attempt, and how many of those worked in the end.
+    var retriedCount: Int
+    var retriedOKCount: Int
 
     static let slowThreshold = 10.0
 
@@ -81,11 +90,13 @@ nonisolated struct CallStats: Equatable, Sendable {
         let failed = Dictionary(grouping: records.filter { $0.outcome != .ok }, by: \.outcome)
         failures = failed.map { ($0.key, $0.value.count) }.sorted { $0.count > $1.count }
         slowCount = records.filter { $0.seconds > Self.slowThreshold }.count
+        retriedCount = records.filter(\.wasRetried).count
+        retriedOKCount = records.filter { $0.wasRetried && $0.outcome == .ok }.count
     }
 
     static func == (lhs: CallStats, rhs: CallStats) -> Bool {
         lhs.count == rhs.count && lhs.okCount == rhs.okCount && lhs.okSeconds == rhs.okSeconds
-            && lhs.slowCount == rhs.slowCount
+            && lhs.slowCount == rhs.slowCount && lhs.retriedCount == rhs.retriedCount && lhs.retriedOKCount == rhs.retriedOKCount
             && lhs.failures.map(\.outcome) == rhs.failures.map(\.outcome) && lhs.failures.map(\.count) == rhs.failures.map(\.count)
     }
 
@@ -168,10 +179,14 @@ actor OpenAICallLog {
 
     /// Writes the record without making the caller wait for the disk.
     nonisolated func note(
-        _ kind: CallKind, size: Int, since start: ContinuousClock.Instant, outcome: CallOutcome, detail: String? = nil
+        _ kind: CallKind, size: Int, since start: ContinuousClock.Instant, outcome: CallOutcome, detail: String? = nil,
+        attempts: Int = 1
     ) {
         let seconds = start.duration(to: .now).seconds
-        let entry = CallRecord(date: .now, kind: kind, size: size, seconds: seconds, outcome: outcome, detail: detail)
+        let entry = CallRecord(
+            date: .now, kind: kind, size: size, seconds: seconds, outcome: outcome, detail: detail,
+            attempts: attempts > 1 ? attempts : nil
+        )
         Task { await record(entry) }
     }
 }

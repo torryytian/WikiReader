@@ -29,11 +29,13 @@ struct OpenAITTSClientTests {
     }
 
     private func client(status: Int, body: String = "", error: (any Error)? = nil) -> OpenAITTSClient {
-        OpenAITTSClient { request in
+        var client = OpenAITTSClient { request in
             if let error { throw error }
             let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
             return (Data(body.utf8), response)
         }
+        client.retry = .never   // these tests are about what one attempt turns into
+        return client
     }
 
     @Test func successReturnsAudio() async throws {
@@ -212,5 +214,199 @@ struct KeychainStoreTests {
         try store.save("value")
         try store.save("")
         #expect(store.read() == nil)
+    }
+}
+
+/// Counts what a stand-in network was asked, from any thread.
+private actor Calls {
+    private(set) var count = 0
+    func next() -> Int { count += 1; return count }
+}
+
+struct OpenAITTSRetryTests {
+    let speech = OpenAISpeechRequest(model: "m", voice: "v", input: "Hello world.", instructions: nil)
+
+    private func ok(_ request: URLRequest, status: Int = 200, headers: [String: String]? = nil, body: String = "ID3audio") -> (Data, URLResponse) {
+        (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: headers)!)
+    }
+
+    /// A client whose network answers each call in turn from `script`; the last answer repeats.
+    private func client(_ calls: Calls, retry: RetryPolicy = .immediately, log: OpenAICallLog = .standard,
+                        script: @escaping @Sendable (Int, URLRequest) throws -> (Data, URLResponse)) -> OpenAITTSClient {
+        var client = OpenAITTSClient { request in try script(await calls.next(), request) }
+        client.retry = retry
+        client.log = log
+        return client
+    }
+
+    @Test func aStuckAttemptIsRepeatedAndTheSecondOneWorks() async throws {
+        let calls = Calls()
+        let client = client(calls) { call, request in
+            if call == 1 { throw URLError(.timedOut) }
+            return ok(request)
+        }
+        let audio = try await client.synthesize(speech, apiKey: "k")
+        #expect(audio == Data("ID3audio".utf8))
+        #expect(await calls.count == 2)
+    }
+
+    @Test func givesUpAfterThreeAttemptsWithTheLastError() async {
+        let calls = Calls()
+        let client = client(calls) { _, _ in throw URLError(.timedOut) }
+        await #expect(throws: OpenAITTSError.timedOut) { try await client.synthesize(speech, apiKey: "k") }
+        #expect(await calls.count == RetryPolicy.standard.maxAttempts)
+    }
+
+    @Test(arguments: [503, 500, 429])
+    func transientServerAnswersAreRepeated(status: Int) async throws {
+        let calls = Calls()
+        let client = client(calls) { call, request in
+            call == 1 ? ok(request, status: status, body: #"{"error":{"message":"busy","code":"rate_limit_exceeded"}}"#) : ok(request)
+        }
+        _ = try await client.synthesize(speech, apiKey: "k")
+        #expect(await calls.count == 2)
+    }
+
+    @Test func aDroppedConnectionIsRepeated() async throws {
+        let calls = Calls()
+        let client = client(calls) { call, request in
+            if call == 1 { throw URLError(.networkConnectionLost) }
+            return ok(request)
+        }
+        _ = try await client.synthesize(speech, apiKey: "k")
+        #expect(await calls.count == 2)
+    }
+
+    @Test(arguments: [
+        (401, #"{"error":{"message":"Incorrect API key","code":"invalid_api_key"}}"#),
+        (429, #"{"error":{"message":"You exceeded your quota","code":"insufficient_quota"}}"#),
+        (400, #"{"error":{"message":"Invalid voice"}}"#),
+    ])
+    func answersThatWouldRepeatTheSameFailureAreNotRetried(status: Int, body: String) async {
+        let calls = Calls()
+        let client = client(calls) { _, request in ok(request, status: status, body: body) }
+        await #expect(throws: (any Error).self) { try await client.synthesize(speech, apiKey: "k") }
+        #expect(await calls.count == 1)
+    }
+
+    @Test func emptyAudioIsNotRetried() async {
+        let calls = Calls()
+        let client = client(calls) { _, request in ok(request, body: "") }
+        await #expect(throws: OpenAITTSError.badResponse) { try await client.synthesize(speech, apiKey: "k") }
+        #expect(await calls.count == 1)
+    }
+
+    @Test func cancellingWhileWaitingToRetryStopsRetrying() async throws {
+        let calls = Calls()
+        let client = client(calls, retry: RetryPolicy(maxAttempts: 3, delays: [.seconds(30), .seconds(30)])) { _, _ in
+            throw URLError(.timedOut)
+        }
+        let task = Task { try await client.synthesize(speech, apiKey: "k") }
+        while await calls.count < 1 { try await Task.sleep(for: .milliseconds(5)) }
+        task.cancel()
+        let started = ContinuousClock.now
+        _ = await task.result
+        #expect(ContinuousClock.now - started < .seconds(2))
+        #expect(await calls.count == 1)
+    }
+
+    @Test func retryAfterHeaderIsReadAsSeconds() {
+        func response(_ value: String?) -> HTTPURLResponse {
+            HTTPURLResponse(url: URL(string: "https://x.test")!, statusCode: 429, httpVersion: nil, headerFields: value.map { ["Retry-After": $0] })!
+        }
+        #expect(OpenAITTSClient.retryAfter(response("3")) == .seconds(3))
+        #expect(OpenAITTSClient.retryAfter(response(" 0 ")) == .seconds(0))
+        #expect(OpenAITTSClient.retryAfter(response("1.5")) == .seconds(1.5))
+        #expect(OpenAITTSClient.retryAfter(response("Wed, 21 Oct 2026 07:28:00 GMT")) == nil)
+        #expect(OpenAITTSClient.retryAfter(response("-4")) == nil)
+        #expect(OpenAITTSClient.retryAfter(response(nil)) == nil)
+    }
+
+    @Test func rateLimitWaitsForRetryAfterNotTheBackoff() async throws {
+        let calls = Calls()
+        // A backoff of 30 s would make this test time out; Retry-After: 0 must win.
+        let client = client(calls, retry: RetryPolicy(maxAttempts: 2, delays: [.seconds(30)])) { call, request in
+            call == 1 ? ok(request, status: 429, headers: ["Retry-After": "0"], body: #"{"error":{"code":"rate_limit_exceeded"}}"#) : ok(request)
+        }
+        _ = try await client.synthesize(speech, apiKey: "k")
+        #expect(await calls.count == 2)
+    }
+
+    @Test func attemptTimeoutGrowsWithTheTextAndIsBounded() {
+        #expect(OpenAITTSClient.attemptTimeout(forCharacters: 0) == 15)
+        #expect(OpenAITTSClient.attemptTimeout(forCharacters: 300) == 15)       // the usual paragraph: 15 s
+        #expect(OpenAITTSClient.attemptTimeout(forCharacters: 1000) == 28)
+        #expect(OpenAITTSClient.attemptTimeout(forCharacters: 2000) == 48)
+        #expect(OpenAITTSClient.attemptTimeout(forCharacters: 4096) < 90)
+        #expect(OpenAITTSClient.attemptTimeout(forCharacters: 100_000) == 90)
+        var long = speech
+        long.input = String(repeating: "x", count: 2000)
+        #expect(OpenAITTSClient.urlRequest(for: long, apiKey: "k").timeoutInterval == 48)
+    }
+
+    @Test func theSessionIsDedicatedAndBounded() {
+        let configuration = OpenAITTSClient.session.configuration
+        #expect(configuration.timeoutIntervalForResource <= 120)
+        #expect(configuration.urlCache == nil)
+    }
+
+    @Test func whichErrorsAreWorthRetrying() {
+        let retryable: [OpenAITTSError] = [.timedOut, .rateLimited, .server(status: 503), .network("x")]
+        let notRetryable: [OpenAITTSError] = [.missingKey, .invalidKey, .quotaExceeded, .badRequest("x"), .badResponse, .audio("x")]
+        #expect(retryable.allSatisfy { $0.isRetryable })
+        #expect(notRetryable.allSatisfy { !$0.isRetryable })
+    }
+
+    @Test func theLogNotesHowManyAttemptsItTookAndHowEachWent() async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: "calls-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let log = OpenAICallLog(fileURL: file)
+        let calls = Calls()
+        let client = client(calls, log: log) { call, request in
+            if call < 3 { throw URLError(.timedOut) }
+            return ok(request)
+        }
+        _ = try await client.synthesize(speech, apiKey: "k")
+        var records = await log.all()
+        for _ in 0..<100 where records.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+            records = await log.all()
+        }
+        let record = try #require(records.first)
+        #expect(records.count == 1)   // one request as far as the reader is concerned
+        #expect(record.outcome == .ok && record.attempts == 3 && record.wasRetried)
+        let detail = try #require(record.detail)
+        #expect(detail.contains("attempt 1 timed out") && detail.contains("attempt 2 timed out") && detail.contains("attempt 3 ok"))
+    }
+
+    @Test func aFailedRetriedRequestIsLoggedOnceWithItsAttempts() async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: "calls-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let log = OpenAICallLog(fileURL: file)
+        let client = client(Calls(), log: log) { _, _ in throw URLError(.timedOut) }
+        await #expect(throws: OpenAITTSError.timedOut) { try await client.synthesize(speech, apiKey: "k") }
+        var records = await log.all()
+        for _ in 0..<100 where records.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+            records = await log.all()
+        }
+        #expect(records.count == 1)
+        #expect(records.first?.outcome == .timedOut && records.first?.attempts == 3)
+    }
+
+    @Test func recordsWrittenBeforeRetriesExistedStillLoad() throws {
+        let old = #"{"id":"6F1E1B9B-7A52-4E9C-9F43-1F7D2B1C2A10","date":0,"kind":"speech","size":10,"seconds":1.5,"outcome":"ok"}"#
+        let record = try JSONDecoder().decode(CallRecord.self, from: Data(old.utf8))
+        #expect(record.attempts == nil && !record.wasRetried)
+        #expect(CallStats([record]).retriedCount == 0)
+    }
+
+    @Test func statsCountRetriedRequestsAndHowManyWorked() {
+        func record(_ outcome: CallOutcome, attempts: Int?) -> CallRecord {
+            CallRecord(date: .now, kind: .speech, size: 10, seconds: 3, outcome: outcome, attempts: attempts)
+        }
+        let stats = CallStats([record(.ok, attempts: nil), record(.ok, attempts: 2), record(.timedOut, attempts: 3), record(.ok, attempts: 3)])
+        #expect(stats.retriedCount == 3)
+        #expect(stats.retriedOKCount == 2)
     }
 }

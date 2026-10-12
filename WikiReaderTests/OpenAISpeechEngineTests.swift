@@ -169,7 +169,7 @@ struct OpenAISpeechEngineTests {
 
     @Test func prepareGeneratesOnceAhead() async throws {
         let engine = makeEngine()
-        engine.prepare("The next block.")
+        engine.prepare(upcoming: ["The next block."])
         try await wait { await requestCount == 1 }
         try await Task.sleep(for: .milliseconds(50))
         engine.speak(SpeechUtterance(id: 1, text: "The next block.", rate: .normal))
@@ -179,10 +179,73 @@ struct OpenAISpeechEngineTests {
 
     @Test func speakWhilePreparingSharesTheRequest() async throws {
         let engine = makeEngine(delay: .milliseconds(100))
-        engine.prepare("Shared text.")
+        engine.prepare(upcoming: ["Shared text."])
         engine.speak(SpeechUtterance(id: 1, text: "Shared text.", rate: .normal))
         try await wait { recorder.clips.count == 1 }
         #expect(await requestCount == 1)
+    }
+
+    @Test func aheadAudioIsGeneratedTwoAtATimeNearestFirst() async throws {
+        let engine = makeEngine(delay: .milliseconds(150))
+        engine.prepare(upcoming: ["A.", "B.", "C.", "D."])
+        try await Task.sleep(for: .milliseconds(60))
+        #expect(await log.inputs.sorted() == ["A.", "B."])   // only two at once
+        try await wait { await requestCount == 4 }
+        #expect(await log.inputs.count == 4)
+        let order = await log.inputs
+        #expect(Set(order.prefix(2)) == ["A.", "B."])
+        #expect(Set(order.suffix(2)) == ["C.", "D."])
+        _ = engine
+    }
+
+    @Test func theBlockBeingReadDoesNotWaitBehindThoseAhead() async throws {
+        let engine = makeEngine(delay: .milliseconds(150))
+        engine.prepare(upcoming: ["A.", "B.", "C."])
+        engine.speak(SpeechUtterance(id: 1, text: "Now.", rate: .normal))
+        try await Task.sleep(for: .milliseconds(60))
+        // Two ahead are running, and the block being read started at once on top of them.
+        #expect(await log.inputs.sorted() == ["A.", "B.", "Now."])
+        try await wait { recorder.clips.count == 1 }
+        _ = engine
+    }
+
+    @Test func aNewHintReplacesWhatWasWaiting() async throws {
+        let engine = makeEngine(delay: .milliseconds(100))
+        engine.prepare(upcoming: ["A.", "B.", "C.", "D."])
+        engine.prepare(upcoming: ["C."])   // the reader jumped: only C is wanted now
+        try await Task.sleep(for: .milliseconds(450))
+        let sent = await log.inputs
+        #expect(Set(sent) == ["A.", "B.", "C."])
+        #expect(!sent.contains("D."))
+        _ = engine
+    }
+
+    @Test func stoppingDropsWhatWasWaiting() async throws {
+        let engine = makeEngine(delay: .milliseconds(100))
+        engine.prepare(upcoming: ["A.", "B.", "C.", "D."])
+        engine.stop()
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(await requestCount == 2)   // the two already running finish and are kept; nothing new starts
+    }
+
+    @Test func textAlreadyCachedOrRunningIsNotQueuedAgain() async throws {
+        let engine = makeEngine(delay: .milliseconds(80))
+        engine.prepare(upcoming: ["A."])
+        engine.prepare(upcoming: ["A.", "B."])
+        try await wait { await requestCount == 2 }
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await log.inputs.sorted() == ["A.", "B."])
+        engine.prepare(upcoming: ["A.", "B."])   // both cached by now
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await requestCount == 2)
+        _ = engine
+    }
+
+    @Test func nothingIsPreparedWithoutAKey() async throws {
+        let engine = makeEngine(key: nil)
+        engine.prepare(upcoming: ["A.", "B."])
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await requestCount == 0)
     }
 
     @Test func longBlockPlaysItsChunksInOrder() async throws {

@@ -55,6 +55,11 @@ final class ReadingSession {
     /// the user does and by an utterance that played to its end.
     @ObservationIgnored private var stallRestarts = 0
     static let maxStallRestarts = 2
+    /// How far ahead audio is prepared: up to this many seconds of speech after the current block, but never more than
+    /// `maxLookaheadBlocks` blocks. A heading is read in a second or two while the paragraph after it takes several
+    /// seconds to generate, so preparing only the next block would leave the reader waiting.
+    nonisolated static let lookaheadSeconds = 75.0
+    nonisolated static let maxLookaheadBlocks = 4
 
     init(blocks: [ContentBlock], startBlock: Int = 0, rate: SpeechRate = .normal, engine: SpeechEngine, log: PlaybackLog = .standard) {
         self.playbackLog = log
@@ -294,10 +299,23 @@ final class ReadingSession {
             pauseAfter: block.kind == .heading ? Self.pauseAfterHeading : 0
         ))
         Log.speech.info("Speaking block \(self.currentBlock) from offset \(start) at \(self.rate.label, privacy: .public)")
-        // Let engines that need time to produce audio get the next block ready (only one ahead).
-        if currentBlock + 1 < blocks.count {
-            engine.prepare(blocks[currentBlock + 1].text)
+        // Let engines that need time to produce audio get the blocks after this one ready.
+        engine.prepare(upcoming: upcomingTexts())
+    }
+
+    /// The texts of the blocks after the current one that are worth preparing: about `lookaheadSeconds` of speech at
+    /// the current speed (always at least the next block), at most `maxLookaheadBlocks`.
+    private func upcomingTexts() -> [String] {
+        var texts: [String] = []
+        var seconds = 0.0
+        var index = currentBlock + 1
+        while index < blocks.count, texts.count < Self.maxLookaheadBlocks, texts.isEmpty || seconds < Self.lookaheadSeconds {
+            let text = blocks[index].text
+            texts.append(text)
+            seconds += Double((text as NSString).length) / (Self.charactersPerSecond * rate.rawValue)
+            index += 1
         }
+        return texts
     }
 
     private func discardUtterance() {

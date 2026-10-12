@@ -71,6 +71,9 @@ struct OpenAIDiagnosticsView: View {
             if let p90 = stats.p90 { LabeledContent("9 in 10 within", value: Self.time(p90)) }
             if let slowest = stats.slowest { LabeledContent("Slowest success", value: Self.time(slowest)) }
             LabeledContent("Over \(Int(CallStats.slowThreshold)) s", value: "\(stats.slowCount)")
+            if stats.retriedCount > 0 {
+                LabeledContent("Repeated", value: "\(stats.retriedCount) (\(stats.retriedOKCount) worked)")
+            }
         }
     }
 
@@ -89,7 +92,7 @@ struct OpenAIDiagnosticsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(record.date, format: .dateTime.month().day().hour().minute().second())
                             .font(.footnote.monospacedDigit())
-                        if let detail = record.detail, record.outcome != .ok {
+                        if let detail = record.detail, record.outcome != .ok || record.wasRetried {
                             Text(detail)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -104,6 +107,11 @@ struct OpenAIDiagnosticsView: View {
                         Text(Self.describe(record))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
+                        if record.wasRetried {
+                            Text("\(record.attempts ?? 1) attempts")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
                     }
                 }
             }
@@ -135,6 +143,9 @@ nonisolated enum CallReport {
                 lines.append("  time of successes: typical \(fixed(median)) s, 9 in 10 within \(fixed(p90)) s, slowest \(fixed(slowest)) s")
             }
             lines.append("  over \(Int(CallStats.slowThreshold)) s: \(stats.slowCount)")
+            if stats.retriedCount > 0 {
+                lines.append("  repeated after a failed attempt: \(stats.retriedCount) (\(stats.retriedOKCount) worked in the end)")
+            }
             for failure in stats.failures {
                 lines.append("  \(failure.outcome.label): \(failure.count)")
             }
@@ -142,7 +153,8 @@ nonisolated enum CallReport {
             for record in items.suffix(15) {
                 let when = record.date.formatted(.iso8601)
                 let detail = record.detail.map { " (\($0))" } ?? ""
-                lines.append("    \(when)  \(record.outcome.label)\(detail)  \(fixed(record.seconds)) s  size \(record.size)")
+                let attempts = record.wasRetried ? "  attempts \(record.attempts ?? 1)" : ""
+                lines.append("    \(when)  \(record.outcome.label)\(detail)  \(fixed(record.seconds)) s  size \(record.size)\(attempts)")
             }
             lines.append("")
         }

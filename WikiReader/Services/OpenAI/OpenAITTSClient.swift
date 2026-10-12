@@ -55,6 +55,15 @@ nonisolated enum OpenAITTSError: Error, Equatable {
         SpeechFailure(message: message, isFixableInSettings: self == .missingKey || self == .invalidKey)
     }
 
+    /// Whether asking again is likely to help: the request got stuck, the connection dropped, OpenAI had a
+    /// hiccup or is rate limiting. A rejected key, no credit or a bad request would only fail the same way.
+    var isRetryable: Bool {
+        switch self {
+        case .timedOut, .rateLimited, .server, .network: true
+        case .missingKey, .invalidKey, .quotaExceeded, .badRequest, .badResponse, .audio: false
+        }
+    }
+
     /// Shown to the user in the reader.
     var message: String {
         switch self {
@@ -72,7 +81,30 @@ nonisolated enum OpenAITTSError: Error, Equatable {
     }
 }
 
-/// Generates speech audio with OpenAI. Called only for the block being read and the next one.
+/// How a failed request is repeated. Most requests answer in about 5 s, but a few percent get stuck for a minute;
+/// asking again almost always works at once, so a stuck attempt is given up on early rather than waited out.
+nonisolated struct RetryPolicy: Sendable {
+    /// Requests in all, the first one included.
+    var maxAttempts = 3
+    /// Waits before the second and third attempt (when OpenAI doesn't say how long via `Retry-After`).
+    var delays: [Duration] = [.seconds(1), .seconds(2)]
+    /// The longest `Retry-After` that is honoured; a longer one means the reader is better off told.
+    var maxRetryAfter: Duration = .seconds(15)
+
+    static let standard = RetryPolicy()
+    /// One attempt, no waiting: for tests of single outcomes.
+    static let never = RetryPolicy(maxAttempts: 1, delays: [])
+    /// Retries without waiting, for tests.
+    static let immediately = RetryPolicy(maxAttempts: 3, delays: [.zero, .zero])
+}
+
+/// A failed attempt, with how long OpenAI asked to wait before the next one.
+nonisolated struct TTSAttemptFailure: Error {
+    var error: OpenAITTSError
+    var retryAfter: Duration?
+}
+
+/// Generates speech audio with OpenAI. Called for the block being read and a few after it (see `ReadingSession`).
 nonisolated struct OpenAITTSClient: Sendable {
     typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
@@ -80,43 +112,95 @@ nonisolated struct OpenAITTSClient: Sendable {
     /// AVAudioPlayer plays MP3 natively, and it is compact for caching.
     static let audioFormat = "mp3"
 
+    /// Its own session rather than `.shared`: nothing cached, and a ceiling on one attempt's total time.
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForResource = 120
+        configuration.httpMaximumConnectionsPerHost = 4
+        // The audio is kept by `SpeechAudioCache`; a second copy in memory would be wasted.
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
     /// Injected so tests can answer requests without the network.
-    var transport: Transport = { request in try await URLSession.shared.data(for: request) }
+    var transport: Transport = { request in try await session.data(for: request) }
 
     /// Where each request's time and result are noted, for the diagnostics page.
     var log: OpenAICallLog = .standard
 
-    /// Returns MP3 audio for the request. Runs off the main actor.
+    var retry = RetryPolicy.standard
+
+    /// How long one attempt may take before it is given up on, by size. The answer arrives only when the audio
+    /// is complete, so a longer text legitimately takes longer: 15 s covers the usual paragraph (typically 5 s,
+    /// 9 in 10 within 8 s), then roughly 1 s more per 50 characters, up to 90 s for the longest.
+    static func attemptTimeout(forCharacters count: Int) -> TimeInterval {
+        min(max(8 + Double(count) / 50, 15), 90)
+    }
+
+    /// Returns MP3 audio for the request, trying again (see `RetryPolicy`) when an attempt gets stuck or fails
+    /// in a way that may pass. Runs off the main actor.
     @concurrent
     func synthesize(_ speech: OpenAISpeechRequest, apiKey: String) async throws(OpenAITTSError) -> Data {
         guard !apiKey.isEmpty else { throw .missingKey }
         let start = ContinuousClock.now
-        do {
-            let audio = try await perform(speech, apiKey: apiKey)
-            log.note(.speech, size: speech.input.count, since: start, outcome: .ok)
-            return audio
-        } catch {
-            log.note(.speech, size: speech.input.count, since: start, outcome: error.outcome, detail: error.detail)
-            throw error
+        var attempt = 0
+        var notes: [String] = []
+        while true {
+            attempt += 1
+            let attemptStart = ContinuousClock.now
+            do {
+                let audio = try await perform(speech, apiKey: apiKey)
+                notes.append("attempt \(attempt) ok in \(Self.fixed(attemptStart))")
+                log.note(.speech, size: speech.input.count, since: start, outcome: .ok, detail: attempt > 1 ? notes.joined(separator: "; ") : nil, attempts: attempt)
+                return audio
+            } catch {
+                notes.append("attempt \(attempt) \(error.error.outcome.label.lowercased()) after \(Self.fixed(attemptStart))")
+                let willRetry = error.error.isRetryable && attempt < retry.maxAttempts && !Task.isCancelled
+                guard willRetry else {
+                    let detail = [error.error.detail, attempt > 1 ? notes.joined(separator: "; ") : nil].compactMap { $0 }.joined(separator: " · ")
+                    log.note(.speech, size: speech.input.count, since: start, outcome: error.error.outcome, detail: detail.isEmpty ? nil : detail, attempts: attempt)
+                    throw error.error
+                }
+                let backoff = retry.delays.indices.contains(attempt - 1) ? retry.delays[attempt - 1] : (retry.delays.last ?? .zero)
+                let wait = error.retryAfter.map { min($0, retry.maxRetryAfter) } ?? backoff
+                try? await Task.sleep(for: wait)
+                if Task.isCancelled {
+                    log.note(.speech, size: speech.input.count, since: start, outcome: error.error.outcome, detail: notes.joined(separator: "; "), attempts: attempt)
+                    throw error.error
+                }
+            }
         }
     }
 
-    private func perform(_ speech: OpenAISpeechRequest, apiKey: String) async throws(OpenAITTSError) -> Data {
+    private static func fixed(_ start: ContinuousClock.Instant) -> String {
+        String(format: "%.1f s", start.duration(to: .now).seconds)
+    }
+
+    private func perform(_ speech: OpenAISpeechRequest, apiKey: String) async throws(TTSAttemptFailure) -> Data {
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await transport(Self.urlRequest(for: speech, apiKey: apiKey))
         } catch let error as URLError where error.code == .timedOut {
-            throw .timedOut
+            throw TTSAttemptFailure(error: .timedOut)
         } catch {
-            throw .network(error.localizedDescription)
+            throw TTSAttemptFailure(error: .network(error.localizedDescription))
         }
-        guard let http = response as? HTTPURLResponse else { throw .badResponse }
+        guard let http = response as? HTTPURLResponse else { throw TTSAttemptFailure(error: .badResponse) }
         guard (200..<300).contains(http.statusCode) else {
-            throw Self.error(status: http.statusCode, body: data)
+            throw TTSAttemptFailure(error: Self.error(status: http.statusCode, body: data), retryAfter: Self.retryAfter(http))
         }
-        guard !data.isEmpty else { throw .badResponse }
+        guard !data.isEmpty else { throw TTSAttemptFailure(error: .badResponse) }
         return data
+    }
+
+    /// The `Retry-After` header, when it is a number of seconds.
+    static func retryAfter(_ response: HTTPURLResponse) -> Duration? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = Double(value.trimmingCharacters(in: .whitespaces)), seconds >= 0, seconds.isFinite
+        else { return nil }
+        return .seconds(seconds)
     }
 
     static func urlRequest(for speech: OpenAISpeechRequest, apiKey: String) -> URLRequest {
@@ -124,7 +208,7 @@ nonisolated struct OpenAITTSClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60
+        request.timeoutInterval = attemptTimeout(forCharacters: speech.input.count)
 
         var body: [String: String] = [
             "model": speech.model,

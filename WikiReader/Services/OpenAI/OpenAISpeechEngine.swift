@@ -27,6 +27,12 @@ final class OpenAISpeechEngine: SpeechEngine {
 
     /// Generation in progress, by cache key: `speak` and `prepare` share one request per text.
     private var inFlight: [String: Task<Result<URL, OpenAITTSError>, Never>] = [:]
+    /// Texts to generate ahead of time, nearest first, not started yet. Replaced by each `prepare`.
+    private var queued: [(key: String, request: OpenAISpeechRequest)] = []
+    /// The generations in `inFlight` that were started ahead of time; at most `maxConcurrentPrefetch` run at once, so
+    /// preparing several blocks doesn't flood the API (new accounts are rate limited) or slow the one being read.
+    private var prefetching: Set<String> = []
+    static let maxConcurrentPrefetch = 2
     private var current: Playback?
 
     /// Playback state of the utterance being spoken.
@@ -122,13 +128,38 @@ final class OpenAISpeechEngine: SpeechEngine {
     }
 
     func stop() {
+        queued = []
         stopPlayback()
         SpokenAudioSession.deactivate()
     }
 
-    func prepare(_ text: String) {
-        for chunk in SpeechChunking.chunks(of: text) {
-            _ = audioFile(for: (text as NSString).substring(with: chunk))
+    func prepare(upcoming texts: [String]) {
+        var wanted: [(key: String, request: OpenAISpeechRequest)] = []
+        for text in texts {
+            let ns = text as NSString
+            for chunk in SpeechChunking.chunks(of: text) {
+                let request = request(for: ns.substring(with: chunk))
+                let key = SpeechAudioCache.key(for: request)
+                guard inFlight[key] == nil, !wanted.contains(where: { $0.key == key }), cache.cachedFile(for: request) == nil else { continue }
+                wanted.append((key, request))
+            }
+        }
+        queued = wanted
+        if !wanted.isEmpty { log.record("prefetch", "queued \(wanted.count) request(s) ahead; running \(prefetching.count)") }
+        pumpPrefetch()
+    }
+
+    /// Starts queued generations while fewer than `maxConcurrentPrefetch` of them are running.
+    private func pumpPrefetch() {
+        guard let key = apiKey(), !key.isEmpty else {
+            queued = []
+            return
+        }
+        while prefetching.count < Self.maxConcurrentPrefetch, !queued.isEmpty {
+            let next = queued.removeFirst()
+            guard inFlight[next.key] == nil, cache.cachedFile(for: next.request) == nil else { continue }
+            prefetching.insert(next.key)
+            _ = startGeneration(next.request, key: next.key, apiKey: key)
         }
     }
 
@@ -281,7 +312,8 @@ final class OpenAISpeechEngine: SpeechEngine {
         OpenAISpeechRequest(model: Self.model, voice: voice, input: text, instructions: Self.instructions)
     }
 
-    /// The cached audio for `text`, generating it if needed. Concurrent callers share one request.
+    /// The cached audio for `text`, generating it at once if needed (this is what is being read, so it doesn't wait
+    /// behind the queue of audio prepared ahead). Concurrent callers share one request.
     private func audioFile(for text: String) -> Task<Result<URL, OpenAITTSError>, Never> {
         let request = request(for: text)
         let key = SpeechAudioCache.key(for: request)
@@ -292,14 +324,20 @@ final class OpenAISpeechEngine: SpeechEngine {
         guard let apiKey = apiKey(), !apiKey.isEmpty else {
             return Task { .failure(.missingKey) }
         }
+        queued.removeAll { $0.key == key }
+        return startGeneration(request, key: key, apiKey: apiKey)
+    }
 
-        Log.speech.info("Generating OpenAI audio for \((text as NSString).length) characters")
+    private func startGeneration(_ request: OpenAISpeechRequest, key: String, apiKey: String) -> Task<Result<URL, OpenAITTSError>, Never> {
+        Log.speech.info("Generating OpenAI audio for \(request.input.utf16.count) characters")
         let client = client, cache = cache
         let task = Task { await Self.generate(request, apiKey: apiKey, client: client, cache: cache) }
         inFlight[key] = task
         Task {
             _ = await task.value
             inFlight[key] = nil
+            // A finished generation frees a slot for the next one waiting.
+            if prefetching.remove(key) != nil { pumpPrefetch() }
         }
         return task
     }
