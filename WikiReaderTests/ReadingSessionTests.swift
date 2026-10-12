@@ -385,4 +385,66 @@ struct ReadingSessionTests {
         #expect(engine.lastSpoken?.text == "Early life")
         #expect(engine.lastSpoken?.rate == .slow)
     }
+
+    // MARK: - Silence
+
+    @Test func silentUtteranceIsStartedAgainFromTheCurrentWord() {
+        let session = makeSession()
+        session.play()
+        engine.emitWord(NSRange(location: 6, length: 4))
+        let before = engine.spoken.count
+        engine.onEvent?(.stalled(id: engine.lastSpoken!.id))
+        #expect(engine.spoken.count == before + 1)
+        #expect(engine.lastSpoken?.startOffset == 6)
+        #expect(session.state == .playing)
+    }
+
+    @Test func staleStallReportsAreIgnored() {
+        let session = makeSession()
+        session.play()
+        let staleID = engine.lastSpoken!.id
+        session.next()
+        let before = engine.spoken.count
+        engine.onEvent?(.stalled(id: staleID))
+        #expect(engine.spoken.count == before)
+    }
+
+    @Test func keepsStallingEndsInAPausedStateWithAMessage() {
+        let session = makeSession()
+        session.play()
+        for _ in 0...ReadingSession.maxStallRestarts {
+            engine.onEvent?(.stalled(id: engine.lastSpoken!.id))
+        }
+        #expect(session.state == .paused)
+        #expect(session.failure?.message.contains("Sound isn't coming out") == true)
+        // Play tries again from scratch, with the restart budget back.
+        session.play()
+        #expect(session.state == .playing)
+        engine.onEvent?(.stalled(id: engine.lastSpoken!.id))
+        #expect(session.state == .playing)
+    }
+
+    @Test func aFinishedUtteranceGivesTheRestartsBack() {
+        let session = makeSession()
+        session.play()
+        for _ in 0..<ReadingSession.maxStallRestarts {
+            engine.onEvent?(.stalled(id: engine.lastSpoken!.id))
+        }
+        engine.emitFinished()
+        for _ in 0..<ReadingSession.maxStallRestarts {
+            engine.onEvent?(.stalled(id: engine.lastSpoken!.id))
+        }
+        #expect(session.state == .playing)
+    }
+
+    @Test func stallWhilePausedIsIgnored() {
+        let session = makeSession()
+        session.play()
+        let id = engine.lastSpoken!.id
+        session.pause()
+        let before = engine.spoken.count
+        engine.onEvent?(.stalled(id: id))
+        #expect(engine.spoken.count == before)
+        #expect(session.state == .paused)
+    }
 }

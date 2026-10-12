@@ -11,6 +11,8 @@ nonisolated enum SettingsKeys {
     static let speechEngine = "speechEngine"
     /// Name of the chosen OpenAI voice, e.g. "marin".
     static let openAIVoice = "openAIVoice"
+    /// How much the cloud voice is amplified (`SpeechLoudness`).
+    static let speechLoudness = "speechLoudness"
     /// `PlaybackMode.rawValue`: what happens when an article has been read to the end.
     static let playbackMode = "playbackMode"
     /// The tab the reader's bottom menu was left on (`playback`, `font`, `theme` or `layout`), so it opens there next time.

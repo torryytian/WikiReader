@@ -19,8 +19,11 @@ final class OpenAISpeechEngine: SpeechEngine {
     private let client: OpenAITTSClient
     private let cache: SpeechAudioCache
     private let apiKey: () -> String?
-    private let makeClip: (URL) throws -> AudioClip
+    private let makeClip: (URL) async throws -> AudioClip
     private let tickInterval: Duration
+    /// How long after starting a clip it must have moved before it is called stalled; nil turns the check off.
+    private let stallCheck: Duration?
+    private let log: PlaybackLog
 
     /// Generation in progress, by cache key: `speak` and `prepare` share one request per text.
     private var inFlight: [String: Task<Result<URL, OpenAITTSError>, Never>] = [:]
@@ -41,6 +44,8 @@ final class OpenAISpeechEngine: SpeechEngine {
         var lastWord: NSRange?
         var loading: Task<Void, Never>?
         var ticker: Task<Void, Never>?
+        /// Checks that the clip's playhead really moves after it was started or continued.
+        var watchdog: Task<Void, Never>?
 
         init(_ utterance: SpeechUtterance) {
             id = utterance.id
@@ -58,8 +63,10 @@ final class OpenAISpeechEngine: SpeechEngine {
         client: OpenAITTSClient = OpenAITTSClient(),
         cache: SpeechAudioCache = .standard,
         apiKey: @escaping () -> String? = { KeychainStore.openAIKey.read() },
-        makeClip: @escaping (URL) throws -> AudioClip = { try AVAudioClip(contentsOf: $0) },
-        tickInterval: Duration = .milliseconds(80)
+        makeClip: @escaping (URL) async throws -> AudioClip = { try await AVAudioClip.make(contentsOf: $0) },
+        tickInterval: Duration = .milliseconds(80),
+        stallCheck: Duration? = .milliseconds(500),
+        log: PlaybackLog = .standard
     ) {
         self.voice = voice
         self.client = client
@@ -67,6 +74,8 @@ final class OpenAISpeechEngine: SpeechEngine {
         self.apiKey = apiKey
         self.makeClip = makeClip
         self.tickInterval = tickInterval
+        self.stallCheck = stallCheck
+        self.log = log
         Log.speech.info("Using OpenAI voice \(voice, privacy: .public)")
     }
 
@@ -77,6 +86,7 @@ final class OpenAISpeechEngine: SpeechEngine {
         SpokenAudioSession.activate()
         let playback = Playback(utterance)
         current = playback
+        log.record("engine", "speak id=\(utterance.id) chars=\(playback.text.length) from=\(utterance.startOffset) chunks=\(playback.chunks.count) rate=\(utterance.rate.rawValue) \(AudioDiagnostics.sessionSummary())")
         let first = playback.chunks.firstIndex { utterance.startOffset < $0.upperBound } ?? playback.chunks.count - 1
         play(chunk: first, of: playback, from: utterance.startOffset)
         // The rest of a long block is generated while its start plays.
@@ -86,15 +96,27 @@ final class OpenAISpeechEngine: SpeechEngine {
     }
 
     func pause() {
-        guard let playback = current else { return }
+        guard let playback = current else {
+            log.record("engine", "pause: nothing is being played")
+            return
+        }
         playback.isPaused = true
         playback.clip?.pause()
         playback.ticker?.cancel()
+        playback.watchdog?.cancel()
+        log.record("engine", "pause chunk=\(playback.chunkIndex + 1)/\(playback.chunks.count) \(AudioDiagnostics.clipSummary(playback.clip))")
     }
 
     func resume() {
-        guard let playback = current, playback.isPaused else { return }
+        guard let playback = current, playback.isPaused else {
+            log.record("engine", "resume ignored: \(current == nil ? "nothing is being played" : "not paused")")
+            return
+        }
         playback.isPaused = false
+        // `speak` activates the audio session; continuing a paused clip has to as well, in case the system
+        // deactivated it while nothing was playing.
+        SpokenAudioSession.activate()
+        log.record("engine", "resume chunk=\(playback.chunkIndex + 1)/\(playback.chunks.count) \(AudioDiagnostics.clipSummary(playback.clip)) \(AudioDiagnostics.sessionSummary())")
         // If the audio is still being generated, it starts when ready.
         if playback.clip != nil { start(playback) }
     }
@@ -118,6 +140,7 @@ final class OpenAISpeechEngine: SpeechEngine {
         // Generation itself isn't cancelled: the audio is paid for, so let it reach the cache.
         playback.loading?.cancel()
         playback.ticker?.cancel()
+        playback.watchdog?.cancel()
         playback.clip?.stop()
     }
 
@@ -136,8 +159,14 @@ final class OpenAISpeechEngine: SpeechEngine {
                 fail(playback, error)
             case .success(let url):
                 do {
-                    try load(url, text: chunkText, startingAt: offset.map { $0 - chunkRange.location }, into: playback)
-                    if !playback.isPaused { start(playback) }
+                    try await load(url, text: chunkText, startingAt: offset.map { $0 - chunkRange.location }, into: playback)
+                    // Opening the clip took a moment (it is amplified off the main actor): look again.
+                    guard current === playback, !Task.isCancelled else { return }
+                    if playback.isPaused {
+                        log.record("engine", "chunk \(index + 1)/\(playback.chunks.count) ready but paused; waiting for play")
+                    } else {
+                        start(playback)
+                    }
                 } catch {
                     fail(playback, .audio(error.localizedDescription))
                 }
@@ -146,8 +175,8 @@ final class OpenAISpeechEngine: SpeechEngine {
     }
 
     /// Opens a chunk's audio, seeked to `offset` (relative to the chunk text) if given.
-    private func load(_ url: URL, text: String, startingAt offset: Int?, into playback: Playback) throws {
-        let clip = try makeClip(url)
+    private func load(_ url: URL, text: String, startingAt offset: Int?, into playback: Playback) async throws {
+        let clip = try await makeClip(url)
         let timeline = WordTimeline(text: text)
         clip.rate = Float(playback.rate.rawValue)
         if let offset, offset > 0 {
@@ -164,7 +193,9 @@ final class OpenAISpeechEngine: SpeechEngine {
 
     private func start(_ playback: Playback) {
         guard let clip = playback.clip else { return }
-        clip.play()
+        let accepted = clip.play()
+        log.record("clip", "play() -> \(accepted) chunk=\(playback.chunkIndex + 1)/\(playback.chunks.count) \(AudioDiagnostics.clipSummary(clip))")
+        watch(playback, clip: clip)
         if !playback.hasStarted {
             playback.hasStarted = true
             onEvent?(.started(id: playback.id))
@@ -175,6 +206,35 @@ final class OpenAISpeechEngine: SpeechEngine {
                 reportWord(playback)
                 try? await Task.sleep(for: tickInterval)
             }
+        }
+    }
+
+    /// After a clip is started or continued, checks that its playhead moves. If it doesn't (the system accepted
+    /// `play()` but nothing is coming out) it tries the audio session once more, and if that doesn't help either
+    /// reports `stalled`, so the reader starts the utterance again with a fresh player.
+    private func watch(_ playback: Playback, clip: AudioClip) {
+        playback.watchdog?.cancel()
+        guard let stallCheck else { return }
+        playback.watchdog = Task {
+            for attempt in 1...2 {
+                let from = clip.currentTime
+                try? await Task.sleep(for: stallCheck)
+                guard !Task.isCancelled, current === playback, !playback.isPaused, playback.clip === clip else { return }
+                // A clip about to end has nothing left to move through.
+                if clip.duration - from < 0.4 { return }
+                // A quarter of how far a healthy player would have moved in that time.
+                let needed = 0.25 * (Double(stallCheck.components.seconds) + Double(stallCheck.components.attoseconds) / 1e18) * Double(max(clip.rate, 0.5))
+                let moved = clip.currentTime - from
+                if clip.isPlaying, moved >= needed { return }
+                log.record("stall", "no audio progress after \(stallCheck) (moved \(String(format: "%.2f", moved)) s) attempt \(attempt) \(AudioDiagnostics.clipSummary(clip)) \(AudioDiagnostics.sessionSummary())")
+                if attempt == 1 {
+                    SpokenAudioSession.activate()
+                    let accepted = clip.play()
+                    log.record("stall", "re-activated the session and called play() -> \(accepted)")
+                }
+            }
+            log.record("stall", "still silent: asking the reader to start again from the current word")
+            onEvent?(.stalled(id: playback.id))
         }
     }
 
@@ -193,6 +253,8 @@ final class OpenAISpeechEngine: SpeechEngine {
     private func chunkFinished(_ playback: Playback) {
         guard current === playback else { return }
         playback.ticker?.cancel()
+        playback.watchdog?.cancel()
+        log.record("clip", "chunk \(playback.chunkIndex + 1)/\(playback.chunks.count) finished")
         if playback.chunkIndex + 1 < playback.chunks.count {
             play(chunk: playback.chunkIndex + 1, of: playback, from: nil)
             return

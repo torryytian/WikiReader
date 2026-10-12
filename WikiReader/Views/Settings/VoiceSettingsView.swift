@@ -7,6 +7,7 @@ struct VoiceSettingsView: View {
     @AppStorage(SettingsKeys.speechEngine) private var engineChoice = SpeechEngineChoice.system
     @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
+    @AppStorage(SettingsKeys.speechLoudness) private var loudness = SpeechLoudness.default
     @AppStorage(SettingsKeys.speechRate) private var rateValue = SpeechRate.normal.rawValue
 
     @State private var voices: [VoiceInfo] = []
@@ -58,6 +59,24 @@ struct VoiceSettingsView: View {
         }
     }
 
+    // MARK: - Loudness
+
+    /// Sits above the voices, so a voice can be previewed right after changing it.
+    private var loudnessRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Loudness")
+            Picker("Loudness", selection: $loudness) {
+                ForEach(SpeechLoudness.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text("OpenAI voices are quiet next to music and videos, so switching apps is a jolt. Louder and Loudest raise the voice beyond what the volume buttons reach, without distortion. It applies from the next paragraph; preview a voice below to hear it. The iPhone voices are not affected.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
     // MARK: - OpenAI
 
     private var openAISection: some View {
@@ -78,6 +97,8 @@ struct VoiceSettingsView: View {
                     .font(.callout)
                     .foregroundStyle(.red)
             }
+
+            loudnessRows
 
             ForEach(OpenAISpeechEngine.voices, id: \.self) { voice in
                 voiceRow(
@@ -267,6 +288,9 @@ struct VoiceSettingsView: View {
             case .failed(_, let failure):
                 previewingVoice = nil
                 previewError = failure.message
+            case .stalled:
+                previewingVoice = nil
+                previewError = "Sound isn't coming out. Check the volume and the output device."
             case .started, .willSpeak:
                 break
             }

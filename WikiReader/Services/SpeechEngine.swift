@@ -44,6 +44,9 @@ nonisolated enum SpeechEvent: Equatable, Sendable {
     case finished(id: Int)
     /// The utterance can't be spoken, e.g. a cloud voice without network.
     case failed(id: Int, failure: SpeechFailure)
+    /// The engine believes it is playing but nothing is coming out (the playhead isn't moving). The reader
+    /// starts the utterance again from the current word.
+    case stalled(id: Int)
 }
 
 /// Why speech failed, for the user.

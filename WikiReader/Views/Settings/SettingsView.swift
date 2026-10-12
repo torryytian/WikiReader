@@ -6,6 +6,7 @@ private enum SettingsPage: Hashable {
     case voice
     case backup
     case diagnostics
+    case playbackLog
 }
 
 struct SettingsView: View {
@@ -48,6 +49,8 @@ struct SettingsView: View {
                     LibraryBackupView()
                 case .diagnostics:
                     OpenAIDiagnosticsView()
+                case .playbackLog:
+                    PlaybackDiagnosticsView()
                 }
             }
             // The sheet carries its own appearance: a presented sheet keeps the style it was shown with, so it
@@ -120,8 +123,11 @@ struct SettingsView: View {
             NavigationLink(value: SettingsPage.diagnostics) {
                 Label("OpenAI Diagnostics", systemImage: "waveform.path.ecg")
             }
+            NavigationLink(value: SettingsPage.playbackLog) {
+                Label("Playback Log", systemImage: "list.bullet.rectangle")
+            }
         } footer: {
-            Text("How long OpenAI requests take and why some fail, for when reading stalls or times out.")
+            Text("How long OpenAI requests take and why some fail, and a log of every pause, play and audio event, for when reading stalls, times out or goes silent.")
         }
     }
 

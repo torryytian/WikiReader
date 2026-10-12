@@ -7,6 +7,7 @@ struct WikiReaderApp: App {
     init() {
         Log.app.info("App launched")
         DictionaryLookup.prepareLemmaModel()
+        AudioSessionMonitor.shared.start()
     }
 
     var body: some Scene {

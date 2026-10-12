@@ -50,8 +50,14 @@ final class ReadingSession {
     @ObservationIgnored private var hasActiveUtterance = false
     /// UTF-16 offset in the block to start from on the next `speakCurrentBlock`.
     @ObservationIgnored private var resumeOffset = 0
+    @ObservationIgnored private let playbackLog: PlaybackLog
+    /// How many times in a row an engine reported silence and the utterance was started again; reset by anything
+    /// the user does and by an utterance that played to its end.
+    @ObservationIgnored private var stallRestarts = 0
+    static let maxStallRestarts = 2
 
-    init(blocks: [ContentBlock], startBlock: Int = 0, rate: SpeechRate = .normal, engine: SpeechEngine) {
+    init(blocks: [ContentBlock], startBlock: Int = 0, rate: SpeechRate = .normal, engine: SpeechEngine, log: PlaybackLog = .standard) {
+        self.playbackLog = log
         self.blocks = blocks
         self.currentBlock = blocks.indices.contains(startBlock) ? startBlock : 0
         self.rate = rate
@@ -61,23 +67,33 @@ final class ReadingSession {
 
     var isPlaying: Bool { state == .playing }
 
+    /// One line in the playback log, with where reading is.
+    private func record(_ kind: String, _ detail: String = "") {
+        let word = spokenWord.map { "@\($0.range.location)" } ?? "-"
+        playbackLog.record(kind, "\(detail)\(detail.isEmpty ? "" : " ")[state=\(state) block=\(currentBlock + 1)/\(blocks.count) word=\(word) active=\(hasActiveUtterance) waiting=\(isWaitingForAudio)]")
+    }
+
     // MARK: - Controls
 
     /// Continues where speech left off: the paused word, else the start of `currentBlock`.
     func play() {
         guard !blocks.isEmpty, state != .playing else { return }
         failure = nil
+        stallRestarts = 0
         if state == .paused && hasActiveUtterance {
+            record("play", "resume the paused utterance")
             engine.resume()
             state = .playing
             Log.speech.info("Resumed block \(self.currentBlock)")
         } else {
+            record("play", "start speaking")
             speakCurrentBlock()
         }
     }
 
     func pause() {
         guard state == .playing else { return }
+        record("pause")
         engine.pause()
         state = .paused
         Log.speech.info("Paused in block \(self.currentBlock)")
@@ -90,6 +106,8 @@ final class ReadingSession {
     /// Starts reading at a block, e.g. after a long press on a paragraph.
     func start(at block: Int) {
         guard blocks.indices.contains(block) else { return }
+        stallRestarts = 0
+        record("start", "at block \(block + 1)")
         move(to: block)
         speakCurrentBlock()
     }
@@ -98,16 +116,19 @@ final class ReadingSession {
     /// there; while paused or stopped, it stays so and play starts there.
     func go(to block: Int) {
         guard blocks.indices.contains(block) else { return }
+        record("jump", "go to block \(block + 1)")
         jump(to: block)
     }
 
     func next() {
         guard currentBlock + 1 < blocks.count else { return }
+        record("jump", "next")
         jump(to: currentBlock + 1)
     }
 
     /// Goes to the previous block; at the first block, back to its start.
     func previous() {
+        record("jump", "previous")
         jump(to: max(currentBlock - 1, 0))
     }
 
@@ -124,6 +145,8 @@ final class ReadingSession {
         let text = blocks[target.block].text as NSString
         let offset = Self.wordStart(in: text, atOrBefore: min(target.offset, max(text.length - 1, 0)))
         Log.speech.info("Skip \(Int(seconds)) s: block \(self.currentBlock) -> \(target.block), offset \(offset)")
+        stallRestarts = 0
+        record("skip", "\(Int(seconds)) s -> block \(target.block + 1) offset \(offset)")
 
         switch state {
         case .playing:
@@ -208,6 +231,7 @@ final class ReadingSession {
         newEngine.onEvent = { [weak self] event in self?.handle(event) }
         failure = nil
         Log.speech.info("Speech engine replaced")
+        record("engine", "replaced the speech engine")
         if state == .playing {
             speakCurrentBlock(from: wordOffset)
         } else {
@@ -224,6 +248,7 @@ final class ReadingSession {
 
     func stop() {
         guard state != .stopped || hasActiveUtterance else { return }
+        record("stop")
         discardUtterance()
         state = .stopped
         spokenWord = nil
@@ -296,13 +321,29 @@ final class ReadingSession {
             guard id == utteranceID else { return }
             // Keep the place: play retries from the last word heard.
             Log.speech.error("Speech failed in block \(self.currentBlock): \(failure.message, privacy: .public)")
+            record("failed", failure.message)
             resumeOffset = spokenWord?.range.location ?? 0
             hasActiveUtterance = false
             isWaitingForAudio = false
             self.failure = failure
             state = .paused
+        case .stalled(let id):
+            guard id == utteranceID, state == .playing else { return }
+            stallRestarts += 1
+            let word = spokenWord?.range.location ?? resumeOffset
+            if stallRestarts > Self.maxStallRestarts {
+                record("stall", "gave up after \(Self.maxStallRestarts) restarts")
+                failure = SpeechFailure(message: "Sound isn't coming out. Check the volume and the output device, then press Play.")
+                resumeOffset = word
+                discardUtterance()
+                state = .paused
+            } else {
+                record("stall", "restart \(stallRestarts)/\(Self.maxStallRestarts) from word @\(word)")
+                speakCurrentBlock(from: word)
+            }
         case .finished(let id):
             guard id == utteranceID else { return }
+            stallRestarts = 0
             hasActiveUtterance = false
             isWaitingForAudio = false
             spokenWord = nil

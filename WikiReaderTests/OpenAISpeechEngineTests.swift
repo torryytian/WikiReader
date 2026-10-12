@@ -6,16 +6,35 @@ import Testing
 final class FakeClip: AudioClip {
     let url: URL
     var duration: TimeInterval = 10
-    var currentTime: TimeInterval = 0
+    /// Moved by hand, unless `advances` is set.
+    var currentTime: TimeInterval {
+        get { isPlaying && advances && playCount >= advancesFromPlay ? base + Date.now.timeIntervalSince(playingSince) : base }
+        set { base = newValue; playingSince = .now }
+    }
     var rate: Float = 1
     var onFinish: (() -> Void)?
+    /// A healthy player: the playhead moves in real time while playing.
+    var advances = false
+    /// The playhead only moves from this call of `play()` on (1: always); earlier calls leave it frozen.
+    var advancesFromPlay = 1
+    /// False makes `play()` refuse, like a player whose audio session is gone.
+    var acceptsPlay = true
+    private var base: TimeInterval = 0
+    private var playingSince = Date.now
     private(set) var isPlaying = false
     private(set) var playCount = 0
 
     init(url: URL) { self.url = url }
 
-    func play() { isPlaying = true; playCount += 1 }
-    func pause() { isPlaying = false }
+    func play() -> Bool {
+        playCount += 1
+        guard acceptsPlay else { return false }
+        base = currentTime
+        playingSince = .now
+        isPlaying = true
+        return true
+    }
+    func pause() { base = currentTime; isPlaying = false }
     func stop() { isPlaying = false }
     func finish() { isPlaying = false; onFinish?() }
 }
@@ -39,7 +58,10 @@ struct OpenAISpeechEngineTests {
     }
 
     /// An engine whose network answers after `delay` with `status` (200: fake MP3 bytes).
-    private func makeEngine(status: Int = 200, delay: Duration = .zero, key: String? = "sk-test") -> OpenAISpeechEngine {
+    private func makeEngine(
+        status: Int = 200, delay: Duration = .zero, key: String? = "sk-test", stallCheck: Duration? = nil,
+        configure: @escaping (FakeClip) -> Void = { _ in }
+    ) -> OpenAISpeechEngine {
         let log = log
         let client = OpenAITTSClient { request in
             let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
@@ -55,10 +77,12 @@ struct OpenAISpeechEngineTests {
             apiKey: { key },
             makeClip: { url in
                 let clip = FakeClip(url: url)
+                configure(clip)
                 recorder.clips.append(clip)
                 return clip
             },
-            tickInterval: .milliseconds(5)
+            tickInterval: .milliseconds(5),
+            stallCheck: stallCheck
         )
         engine.onEvent = { recorder.events.append($0) }
         return engine
@@ -250,5 +274,66 @@ struct OpenAISpeechEngineTests {
         #expect(OpenAITTSError.invalidKey.failure.isFixableInSettings)
         #expect(!OpenAITTSError.rateLimited.failure.isFixableInSettings)
         #expect(recorder.clips.isEmpty)
+    }
+
+    // MARK: - Silence
+
+    @Test func aPlayheadThatMovesIsNotStalled() async throws {
+        let engine = makeEngine(stallCheck: .milliseconds(40)) { $0.advances = true }
+        engine.speak(SpeechUtterance(id: 1, text: "Healthy audio.", rate: .normal))
+        try await wait { recorder.clips.first?.isPlaying == true }
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(!recorder.events.contains(.stalled(id: 1)))
+        #expect(recorder.clips[0].playCount == 1)
+    }
+
+    @Test func aFrozenPlayheadGetsOneRetryThenIsReportedStalled() async throws {
+        let engine = makeEngine(stallCheck: .milliseconds(40))
+        engine.speak(SpeechUtterance(id: 1, text: "Silent audio.", rate: .normal))
+        try await wait { recorder.events.contains(.stalled(id: 1)) }
+        #expect(recorder.events.contains(.stalled(id: 1)))
+        // The first play() plus the retry after re-activating the session.
+        #expect(recorder.clips[0].playCount == 2)
+        _ = engine
+    }
+
+    @Test func aPlayerThatRefusesToPlayIsReportedStalled() async throws {
+        let engine = makeEngine(stallCheck: .milliseconds(40)) { $0.acceptsPlay = false }
+        engine.speak(SpeechUtterance(id: 1, text: "Refused audio.", rate: .normal))
+        try await wait { recorder.events.contains(.stalled(id: 1)) }
+        #expect(recorder.events.contains(.stalled(id: 1)))
+        _ = engine
+    }
+
+    @Test func aRetryThatWorksEndsTheCheckQuietly() async throws {
+        // Frozen after the first play(), healthy once the engine has activated the session and called play() again.
+        let engine = makeEngine(stallCheck: .milliseconds(60)) { $0.advances = true; $0.advancesFromPlay = 2 }
+        engine.speak(SpeechUtterance(id: 1, text: "Recovers.", rate: .normal))
+        try await wait { recorder.clips.first?.playCount == 2 }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(recorder.clips[0].playCount == 2)
+        #expect(!recorder.events.contains(.stalled(id: 1)))
+        _ = engine
+    }
+
+    @Test func pausingStopsTheCheck() async throws {
+        let engine = makeEngine(stallCheck: .milliseconds(60))
+        engine.speak(SpeechUtterance(id: 1, text: "Paused quickly.", rate: .normal))
+        try await wait { recorder.clips.first?.isPlaying == true }
+        engine.pause()
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(!recorder.events.contains(.stalled(id: 1)))
+    }
+
+    @Test func resumeIsCheckedToo() async throws {
+        let engine = makeEngine(stallCheck: .milliseconds(40)) { $0.advances = true }
+        engine.speak(SpeechUtterance(id: 1, text: "Pause then play.", rate: .normal))
+        try await wait { recorder.clips.first?.isPlaying == true }
+        engine.pause()
+        let clip = try #require(recorder.clips.first)
+        clip.acceptsPlay = false   // the system no longer lets the paused player continue
+        engine.resume()
+        try await wait { recorder.events.contains(.stalled(id: 1)) }
+        #expect(recorder.events.contains(.stalled(id: 1)))
     }
 }

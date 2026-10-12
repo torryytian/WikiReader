@@ -11,11 +11,16 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     /// Delegate callbacks identify utterances by object, so this maps them back; callbacks for any
     /// other utterance are stale and dropped.
     private var current: (utterance: ObjectIdentifier, id: Int, startOffset: Int)?
+    private let log: PlaybackLog
+    /// Time of the last word the synthesizer reported, to notice speech that doesn't come back after a pause.
+    private var lastCallback = Date.now
+    private var watchdog: Task<Void, Never>?
 
     /// - Parameter voiceIdentifier: The voice to use; if nil or no longer installed, the best
     ///   installed English voice. Voices are always chosen explicitly: `AVSpeechSynthesisVoice(language:)`
     ///   has been seen to ignore the user's chosen voice on iOS 26.
-    init(voiceIdentifier: String? = nil) {
+    init(voiceIdentifier: String? = nil, log: PlaybackLog = .standard) {
+        self.log = log
         let chosen = VoiceSelection.voice(preferring: voiceIdentifier, from: VoiceSelection.installedVoices())
         voice = chosen.flatMap { AVSpeechSynthesisVoice(identifier: $0.identifier) }
         super.init()
@@ -32,6 +37,8 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
         spoken.rate = utterance.rate.systemRate
         spoken.postUtteranceDelay = utterance.pauseAfter
         current = (ObjectIdentifier(spoken), utterance.id, start)
+        lastCallback = .now
+        log.record("engine", "system speak id=\(utterance.id) from=\(start) \(AudioDiagnostics.sessionSummary())")
 
         if synthesizer.isSpeaking || synthesizer.isPaused {
             synthesizer.stopSpeaking(at: .immediate)
@@ -42,14 +49,36 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     func pause() {
         // Immediate, not at the next word boundary: by the time a pause request arrives the synthesizer
         // has often started the following word, which it then repeats after continueSpeaking.
-        synthesizer.pauseSpeaking(at: .immediate)
+        watchdog?.cancel()
+        let paused = synthesizer.pauseSpeaking(at: .immediate)
+        log.record("engine", "system pause -> \(paused) speaking=\(synthesizer.isSpeaking) paused=\(synthesizer.isPaused)")
     }
 
     func resume() {
-        synthesizer.continueSpeaking()
+        // `speak` activates the audio session; continuing a paused utterance has to as well.
+        SpokenAudioSession.activate()
+        let continued = synthesizer.continueSpeaking()
+        lastCallback = .now
+        log.record("engine", "system resume -> \(continued) speaking=\(synthesizer.isSpeaking) paused=\(synthesizer.isPaused) \(AudioDiagnostics.sessionSummary())")
+        watchSilence()
+    }
+
+    /// If no word is reported for a while after continuing, speech didn't come back: ask the reader to start again.
+    private func watchSilence() {
+        watchdog?.cancel()
+        guard let utterance = current else { return }
+        watchdog = Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled, current?.utterance == utterance.utterance, !synthesizer.isPaused else { return }
+            if Date.now.timeIntervalSince(lastCallback) >= 2.4 {
+                log.record("stall", "system voice silent 2.5 s after resume; asking the reader to start again")
+                onEvent?(.stalled(id: utterance.id))
+            }
+        }
     }
 
     func stop() {
+        watchdog?.cancel()
         current = nil
         synthesizer.stopSpeaking(at: .immediate)
         SpokenAudioSession.deactivate()
@@ -60,6 +89,7 @@ final class SystemSpeechEngine: NSObject, SpeechEngine {
     /// Passes on an event for the current utterance; `makeEvent` gets its id and start offset.
     private func deliver(_ utterance: ObjectIdentifier, _ makeEvent: (_ id: Int, _ startOffset: Int) -> SpeechEvent) {
         guard let current, current.utterance == utterance else { return }
+        lastCallback = .now
         onEvent?(makeEvent(current.id, current.startOffset))
     }
 }

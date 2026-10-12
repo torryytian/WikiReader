@@ -6,7 +6,7 @@
 
 ## 0. 接手须知（新会话先读这里）
 
-**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。311 个单元测试全过。**但阅读页的触摸操作和词典上的浮动按钮从来没有人点过，真机上也还没装最近几版。**
+**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。375 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
 
 **先做这几件事**
 1. `git pull`，按 CLAUDE.md 编译并跑测试（见第 6 节的环境注意事项）。
@@ -32,7 +32,7 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：311 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：375 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
@@ -105,6 +105,15 @@
 ### 设置页（2026-10-08）
 - 去掉 "Read With" 切换。设置主页只有一行 "Voice"（显示如 "Marin · OpenAI"），点进 Voice 页：OpenAI 分组（Key、13 个声音、缓存、删除 Key）在上，iPhone 声音在下，整页只有一个对勾，选哪个声音就用哪个引擎（`VoiceChoice`）。
 - 没有 Key 时 OpenAI 声音带锁、不可选；删除 Key 时若正在用 OpenAI 声音，自动改回 iPhone 声音。存储的设置项（`speechEngine`、`voiceIdentifier`、`openAIVoice`）不变，不用迁移。
+
+### 暂停后再播放偶尔没声音：日志与自愈；OpenAI 声音加响（2026-10-13）
+- **现象**（用户）：OpenAI 声音，没有外部 App 打断，普通点暂停再播放，有时没声音；快进/快退能恢复。
+- **推断**：暂停→播放走 `engine.resume()`（只 `player.play()`，且**不重新激活音频会话**，也**丢弃 `play()` 的返回值**），而快进快退走 `speak()`（重新激活会话 + 新建播放器）。所以问题在"继续"这条路径假设播放器和会话还活着。**根因没有确定**：我读完代码没找到能稳定复现的 App 内部竞态，也不能在模拟器里复现。所以先做日志和自愈，下次出问题就有证据。OpenAI 声音下高亮是计时器估算的，沉默时高亮可能仍在走，看起来像在播放。
+- **播放日志**（`PlaybackLog`，主线程隔离、内存 + 防抖落盘到 Application Support/Diagnostics/playback-events.json，最近 600 条，测试里不记录）：设置 → Playback Log（`PlaybackDiagnosticsView`），可 "Copy Report"（带毫秒的纯文本）和清空。记录：`ReadingSession` 的 play/pause/skip/jump/stop/失败/静音重启（带 state、块号、词位置、是否有活动 utterance）；引擎的 speak/pause/resume（带播放器 `isPlaying/currentTime/rate` 和音频会话的类别、模式、是否有别的 App 在出声、音量、输出设备）；`play()` 的返回值；`AudioSessionMonitor` 记录系统的打断（原因、shouldResume）、路由变化（原因、上一个设备）、媒体服务丢失/重置、锁屏/解锁、进后台/回前台、内存警告。不含文章文字。
+- **自愈**：`OpenAISpeechEngine.resume()` 先 `SpokenAudioSession.activate()`；`start()` 之后起一个看门狗（`watch`）：500 ms 后播放头（`currentTime`）没前进到应有距离的 1/4（或 `isPlaying` 为假）就判定静音，先重新激活会话再 `play()` 一次，再 500 ms 仍不动就发新事件 `SpeechEvent.stalled`，`ReadingSession` 按当前词重新 `speak()`（OpenAI 有缓存，不重复花钱）；连续 2 次重启仍静音（`maxStallRestarts`）就暂停并提示 "Sound isn't coming out…"；用户的任何操作或一段读完会重置次数。系统声音引擎同样在 `resume()` 里重新激活，并在继续后 2.5 s 没有任何朗读回调时报 `stalled`。`AudioClip.play()` 现在返回 Bool、多了 `isPlaying`。
+- **要看什么**：下次再没声音时，设置 → Playback Log → Copy Report 发给我。关键看 `resume` 那一行的 `session[...]`（类别是不是 Playback、输出设备是什么）、`play() -> true/false`、有没有 `stall` 行（自愈有没有触发、第几次恢复）、前面有没有 `route`/`session`/`app` 事件。**未验证**：自愈在真机上是否真的触发和恢复（模拟器里只有单元测试：假播放器冻结、拒绝播放、重试后恢复、暂停取消检查）。
+- **响度**：量过模拟器里 10 段真实 OpenAI 音频（marin，24 kHz 单声道）：平均响度约 −21 dBFS（只算非静音部分），峰值约 −3 到 −8 dBFS，所以比普通 App 小一截，切过去会觉得突然变大。`AVAudioPlayer.volume` 最大 1.0 放不大，所以打开片段时放大音频本身（`LoudnessBoost`）：测量非静音部分的 RMS 和 99.9 百分位峰值，加固定增益（≤10 dB，且 99.9 百分位峰值不超过 0.9），再用平滑限幅器（拐点 0.8，tanh）处理极少数冲过满幅的峰值，输出 16 位 WAV 交给 `AVAudioPlayer(data:)`。**缓存里的 mp3 不动**，所以备份、缓存文件名、已下载的语音都不受影响；只放大不减小；处理在后台线程（`@concurrent`，Release 下 57 秒音频约 60 ms）。
+- **档位**（设置 → Voice，API Key 下面，键 `speechLoudness`，随备份迁移）：Normal（原样）、Louder（目标 −17 dBFS，约 +3.5 dB）、**Loudest（默认，目标 −14 dBFS，约 +6.5 dB，振幅约 2.2 倍）**。实测 10 段：Loudest 后平均响度 −14.1 到 −14.8，0 个样本被硬削顶；峰值高的片段（如 650015de）增益被峰值上限卡在约 6 dB，所以只到 −14.8。从下一段开始生效，试听按钮也走同一条路径。**只对 OpenAI 声音有效**；iPhone 系统声音的 `utterance.volume` 上限就是 1.0，无法放大。**未验证**：真机上听感，和别的 App 的实际响度差；音乐类 App 通常平均响度 −10 到 −14 dBFS、峰值顶到 0，所以 Loudest 之后仍可能略小于它们，需要的话可以再加一档或调高目标（代价是限幅器动作更多）。
 
 ### 自己的词典页，取代系统词典（2026-10-13）
 - **起因**：① 系统词典的内容区是另一个进程画的，触摸 App 收不到，下滑关不掉（试了三版都只能靠小横条/标题栏拖动区）；② 苹果词库释义不好用、没装英汉词典就没有中文。AI 讲解页和翻译页因为是我们自己的 SwiftUI，所以任意位置下滑都能关。**结论：点词直接弹自己的词典页，下滑关闭和 AI 页一样。**
