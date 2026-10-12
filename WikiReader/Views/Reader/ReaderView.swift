@@ -322,7 +322,11 @@ private struct ArticleReader: View {
 
     /// Back to immersive reading: the menus go away, except a pinned bottom menu, which the reader asked to keep.
     private func hideMenus() {
-        menus.hide(pinned: isMenuPinned)
+        // Called every time a scroll begins, so don't write the state (which makes SwiftUI update the screen)
+        // when there is nothing to hide.
+        var hidden = menus
+        hidden.hide(pinned: isMenuPinned)
+        if hidden != menus { menus = hidden }
     }
 
     private func prepare() {
