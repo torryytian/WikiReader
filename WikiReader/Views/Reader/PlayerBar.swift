@@ -11,15 +11,23 @@ struct PlayerBar: View {
     let accent: Color
     let onAccent: Color
 
+    /// Extra space between a paragraph button and the 10-second button beside it. Small enough that the row still
+    /// fits the narrowest iPhone (375 pt wide: 44 + 44 for the mode and speed buttons, 10 + 10 padding, and the
+    /// transport buttons' 224 pt plus two of these).
+    static let paragraphGap: CGFloat = 16
+
     var body: some View {
         HStack(spacing: 0) {
             modeButton
             Spacer(minLength: 0)
+            // Paragraph buttons sit well apart from the 10-second ones: next to each other they were easy to mis-tap.
             transportButton("Previous Paragraph", symbol: "backward.end.fill", size: 18, action: session.previous)
+                .padding(.trailing, Self.paragraphGap)
             transportButton("Back 10 Seconds", symbol: "gobackward.10", size: 23) { session.skip(seconds: -10) }
             playButton
             transportButton("Forward 10 Seconds", symbol: "goforward.10", size: 23) { session.skip(seconds: 10) }
             transportButton("Next Paragraph", symbol: "forward.end.fill", size: 18, action: session.next)
+                .padding(.leading, Self.paragraphGap)
             Spacer(minLength: 0)
             speedMenu
         }

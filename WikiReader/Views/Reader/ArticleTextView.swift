@@ -54,6 +54,9 @@ struct ArticleTextView: UIViewRepresentable {
     var initialBlock = 0
     /// Called with the block at the top of the screen after the user scrolls and lets go.
     var onScrollSettled: (Int) -> Void = { _ in }
+    /// Height of something that stays over the bottom of the text (the pinned menu). The text can be scrolled
+    /// clear of it, and following the spoken word keeps that word above it.
+    var bottomObstruction: CGFloat = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -101,6 +104,7 @@ struct ArticleTextView: UIViewRepresentable {
         coordinator.onSelectionChanged = onSelectionChanged
         coordinator.onScrollBegan = onScrollBegan
         coordinator.onScrollSettled = onScrollSettled
+        coordinator.setBottomObstruction(bottomObstruction)
         coordinator.apply(style)
         coordinator.show(document)
         coordinator.showSavedWords(savedWordKeys)
@@ -258,6 +262,14 @@ struct ArticleTextView: UIViewRepresentable {
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             onSelectionChanged(textView.selectedRange.length > 0)
+        }
+
+        /// Makes room under the text for something covering its bottom edge. Not from inside layout, so the change
+        /// isn't swallowed by the update that is running.
+        func setBottomObstruction(_ height: CGFloat) {
+            guard let textView, abs(textView.contentInset.bottom - height) > 0.5 else { return }
+            textView.contentInset.bottom = height
+            textView.verticalScrollIndicatorInsets.bottom = height
         }
 
         func performPendingScroll() {

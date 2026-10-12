@@ -87,8 +87,14 @@ private struct ArticleReader: View {
     @State private var lookupResume = LookupResume()
     @Environment(\.dismiss) private var dismiss
     /// The reader is full screen; these menus appear when the reader taps near the top or bottom edge.
-    @State private var showsTopBar = false
-    @State private var showsBottomBar = false
+    @State private var menus = ReaderMenuVisibility()
+    /// The bottom menu stays on screen, so tapping the text, scrolling or looking up a word doesn't hide it.
+    @AppStorage(SettingsKeys.readerMenuPinned) private var isMenuPinned = false
+    /// Height of the bottom menu as laid out, so the text can be given room beneath it while it is pinned.
+    @State private var bottomMenuHeight: CGFloat = 0
+
+    /// The menu is up because the reader asked for it, or because it is pinned.
+    private var isBottomMenuShown: Bool { menus.isBottomShown(pinned: isMenuPinned) }
 
     private var style: ReaderStyle {
         ReaderStyle(
@@ -124,7 +130,8 @@ private struct ArticleReader: View {
                     onScrollSettled: { block in
                         // Scrolling only moves the reading position when nothing is being read.
                         session.moveWhileStopped(to: block)
-                    }
+                    },
+                    bottomObstruction: isMenuPinned ? bottomMenuHeight : 0
                 )
                 // Full screen except at the top, so the first line never hides behind the Dynamic Island.
                 .ignoresSafeArea(edges: .bottom)
@@ -132,7 +139,7 @@ private struct ArticleReader: View {
                 topTapStrip
 
                 VStack(spacing: 0) {
-                    if showsTopBar {
+                    if menus.top {
                         ReaderTopInfoBar(
                             title: article.title,
                             progress: ReadingProgress(blocks: blocks, currentBlock: session.currentBlock, rate: session.rate),
@@ -143,7 +150,7 @@ private struct ArticleReader: View {
                     }
                     Spacer(minLength: 0)
                     // A speech error must be seen even if the player is hidden.
-                    if showsBottomBar || session.failure != nil {
+                    if isBottomMenuShown || session.failure != nil {
                         VStack(spacing: 0) {
                             if let failure = session.failure {
                                 SpeechErrorBanner(
@@ -156,19 +163,25 @@ private struct ArticleReader: View {
                                 )
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
-                            if showsBottomBar {
+                            if isBottomMenuShown {
                                 ReaderBottomMenu(
                                     session: session, style: style, fontFamily: $fontFamily, fontSize: $fontSize,
                                     lineSpacing: $lineSpacing, margins: $margins, theme: $theme, playbackMode: $playbackMode,
-                                    onModeChanged: showToast
+                                    isPinned: $isMenuPinned, onModeChanged: showToast
                                 )
+                                .background {
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(key: BottomMenuHeightKey.self, value: proxy.size.height)
+                                    }
+                                }
                             }
                         }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .animation(.easeInOut(duration: 0.22), value: showsTopBar)
-                .animation(.easeInOut(duration: 0.22), value: showsBottomBar)
+                .animation(.easeInOut(duration: 0.22), value: menus.top)
+                .animation(.easeInOut(duration: 0.22), value: isBottomMenuShown)
+                .onPreferenceChange(BottomMenuHeightKey.self) { bottomMenuHeight = $0 }
                 .animation(.default, value: session.failure)
                 .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
                     // Only opened from the error banner, where the fix is a voice or an API key.
@@ -191,6 +204,9 @@ private struct ArticleReader: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: toast)
+        .onChange(of: isMenuPinned) { _, pinned in
+            menus.pinChanged(to: pinned)
+        }
         .background(Color(style.backgroundColor).ignoresSafeArea())
         .background(SwipeBackEnabler(onSwipe: handleSwipe))
         .preferredColorScheme(style.theme.colorScheme)
@@ -301,20 +317,12 @@ private struct ArticleReader: View {
     }
 
     private func handleTap(in zone: ArticleTextView.TapZone) {
-        switch zone {
-        case .top:
-            showsTopBar.toggle()
-        case .bottom:
-            showsBottomBar.toggle()
-        case .middle:
-            hideMenus()
-        }
+        menus.tap(zone, pinned: isMenuPinned)
     }
 
+    /// Back to immersive reading: the menus go away, except a pinned bottom menu, which the reader asked to keep.
     private func hideMenus() {
-        guard showsTopBar || showsBottomBar else { return }
-        showsTopBar = false
-        showsBottomBar = false
+        menus.hide(pinned: isMenuPinned)
     }
 
     private func prepare() {
@@ -414,4 +422,10 @@ private struct ArticleReader: View {
             setMeaning: { [article] meaning in article.setMeaning(meaning, forTerm: request.term) }
         )
     }
+}
+
+/// The laid-out height of the reader's bottom menu, reported up so the text can make room for it.
+private struct BottomMenuHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

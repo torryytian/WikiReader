@@ -17,6 +17,8 @@ nonisolated enum SettingsKeys {
     static let playbackMode = "playbackMode"
     /// The tab the reader's bottom menu was left on (`playback`, `font`, `theme` or `layout`), so it opens there next time.
     static let readerMenuTab = "readerMenuTab"
+    /// Whether the reader's bottom menu stays on screen instead of hiding when the text is tapped or scrolled.
+    static let readerMenuPinned = "readerMenuPinned"
     /// `AppAppearance.rawValue`: light, dark, or follow the system.
     static let appAppearance = "appAppearance"
     /// Reader typography, each the raw value of the matching `ReaderStyle` type (the size is a Double).

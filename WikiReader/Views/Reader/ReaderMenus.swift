@@ -151,6 +151,8 @@ struct ReaderBottomMenu: View {
     @Binding var margins: ReaderStyle.Margins
     @Binding var theme: ReaderStyle.Theme
     @Binding var playbackMode: PlaybackMode
+    /// Whether the menu stays on screen (pinned) instead of hiding when the text is tapped or scrolled.
+    @Binding var isPinned: Bool
     var onModeChanged: (PlaybackMode) -> Void = { _ in }
 
     /// The tab in view. Remembered, so the menu opens on the one used last.
@@ -164,11 +166,14 @@ struct ReaderBottomMenu: View {
                 .padding(.top, 12)
                 .padding(.bottom, 4)
 
-            HStack {
+            HStack(spacing: 0) {
                 ForEach(MenuTab.allCases, id: \.self) { item in
                     tabButton(item, colors: colors)
                         .frame(maxWidth: .infinity)
                 }
+                Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 0.5, height: 30).padding(.top, 4)
+                pinButton(colors: colors)
+                    .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, 6)
             .padding(.top, 2)
@@ -184,6 +189,30 @@ struct ReaderBottomMenu: View {
         // Taps on the menu itself must not reach the text underneath and toggle the menu.
         .contentShape(Rectangle())
         .onTapGesture {}
+    }
+
+    /// Keeps the menu open: it then stays while the text is tapped, scrolled or a word looked up, instead of hiding
+    /// for immersive reading. It isn't a tab: it has no panel of its own.
+    private func pinButton(colors: MenuColors) -> some View {
+        Button {
+            isPinned.toggle()
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: isPinned ? "pin.fill" : "pin")
+                    .font(.system(size: 18))
+                    .frame(width: 52, height: 28)
+                    .background(isPinned ? colors.accent.opacity(0.16) : .clear, in: Capsule())
+                Text(isPinned ? "Pinned" : "Pin")
+                    .font(.system(size: 10.5, weight: isPinned ? .semibold : .medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isPinned ? colors.accent : colors.secondary)
+            .padding(.top, 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Keep menu open")
+        .accessibilityValue(isPinned ? "On" : "Off")
+        .accessibilityAddTraits(isPinned ? .isSelected : [])
     }
 
     private func tabButton(_ item: MenuTab, colors: MenuColors) -> some View {
@@ -387,5 +416,42 @@ struct ReaderToast: View {
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.18), radius: 14, y: 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Which of the reader's menus are up, and how taps and scrolling change that.
+///
+/// Reading is immersive by default: both menus hide when the text is tapped, scrolled or a word is looked up,
+/// and a tap near the top or bottom edge brings one back. The bottom menu can be *pinned*, and then it stays:
+/// the text, a scroll or a lookup never hides it, and a tap near the bottom edge has nothing to toggle.
+/// The top bar always follows the immersive rules.
+nonisolated struct ReaderMenuVisibility: Equatable {
+    /// The top bar was asked for.
+    private(set) var top = false
+    /// The bottom menu was asked for (pinned or not).
+    private(set) var bottom = false
+
+    /// Whether the bottom menu is on screen: asked for, or pinned.
+    func isBottomShown(pinned: Bool) -> Bool { bottom || pinned }
+
+    /// A tap in one of the text's zones.
+    mutating func tap(_ zone: ArticleTextView.TapZone, pinned: Bool) {
+        switch zone {
+        case .top: top.toggle()
+        case .bottom: if !pinned { bottom.toggle() }
+        case .middle: hide(pinned: pinned)
+        }
+    }
+
+    /// Back to immersive reading, except for a pinned bottom menu.
+    mutating func hide(pinned: Bool) {
+        top = false
+        if !pinned { bottom = false }
+    }
+
+    /// The pin was switched. Pinning keeps the menu as it is; unpinning leaves it up until the next tap or
+    /// scroll hides it, instead of making it vanish under the finger that just pressed the button.
+    mutating func pinChanged(to pinned: Bool) {
+        if pinned { bottom = true }
     }
 }
