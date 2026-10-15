@@ -70,7 +70,7 @@ struct VoiceSettingsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            Text("OpenAI voices are quiet next to music and videos, so switching apps is a jolt. Louder and Loudest raise the voice beyond what the volume buttons reach, without distortion. It applies from the next paragraph; preview a voice below to hear it. The iPhone voices are not affected.")
+            Text("OpenAI voices are quiet next to music and videos, so switching apps is a jolt. Louder is about 5 dB above Normal and Loudest about 10 dB, beyond what the volume buttons reach; the loudest syllables are eased down so it doesn't distort. It applies from the next paragraph; preview a voice below to hear it. The iPhone voices are not affected.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

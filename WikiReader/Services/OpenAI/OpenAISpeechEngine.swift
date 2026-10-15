@@ -220,6 +220,9 @@ final class OpenAISpeechEngine: SpeechEngine {
         }
         playback.clip = clip
         playback.timeline = timeline
+        if let note = clip.loudnessNote {
+            log.record("clip", "opened chunk \(playback.chunkIndex + 1)/\(playback.chunks.count) \(note)")
+        }
     }
 
     private func start(_ playback: Playback) {

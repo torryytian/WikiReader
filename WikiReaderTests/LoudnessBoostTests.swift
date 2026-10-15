@@ -21,63 +21,104 @@ struct LoudnessBoostTests {
         // A sine of peak 0.1 has an RMS of 0.1/√2 = −23 dBFS; the silent half must not pull that down.
         let measured = try #require(LoudnessBoost.measure([speechLike(amplitude: 0.1)]))
         #expect(abs(measured.rmsDB - -23.0) < 0.3)
-        #expect(measured.p999 > 0.09 && measured.p999 < 0.11)
     }
 
     @Test func raisesQuietSpeechToTheTarget() throws {
         let original = speechLike(amplitude: 0.1)
-        let boosted = try #require(LoudnessBoost.boosted([original], target: -17))
-        #expect(abs(rmsDB(boosted[0]) - -17) < 0.3)
-        #expect(boosted[0].count == original.count)
-        #expect(boosted[0].allSatisfy { abs($0) <= 1 })
+        let result = try #require(LoudnessBoost.boosted([original], target: -17, sampleRate: 24_000))
+        let boosted = result.channels[0]
+        #expect(abs(rmsDB(boosted) - -17) < 0.3)
+        #expect(boosted.count == original.count)
+        #expect(boosted.allSatisfy { abs($0) <= 1 })
         // The silence stays silence.
-        #expect(boosted[0][Int(0.3 * 24_000)] == 0)
+        #expect(boosted[Int(0.3 * 24_000)] == 0)
+        // Plenty of room: the limiter has nothing to do.
+        #expect(result.report.deepestReduction < 0.01)
+        #expect(abs(result.report.gain - 6) < 0.4)
+        #expect(abs(result.report.originalRMS - -23) < 0.3)
     }
 
     @Test func neverMakesAnythingQuieter() {
-        #expect(LoudnessBoost.boosted([speechLike(amplitude: 0.5)], target: -30) == nil)
-        #expect(LoudnessBoost.boosted([speechLike(amplitude: 0.1)], target: -23.2) == nil)  // within half a dB
+        #expect(LoudnessBoost.boosted([speechLike(amplitude: 0.5)], target: -30, sampleRate: 24_000) == nil)
+        #expect(LoudnessBoost.boosted([speechLike(amplitude: 0.1)], target: -23.2, sampleRate: 24_000) == nil)  // within half a dB
     }
 
     @Test func silenceAndEmptyAudioAreLeftAlone() {
-        #expect(LoudnessBoost.boosted([[Float](repeating: 0, count: 1000)], target: -14) == nil)
-        #expect(LoudnessBoost.boosted([[]], target: -14) == nil)
-        #expect(LoudnessBoost.boosted([], target: -14) == nil)
+        #expect(LoudnessBoost.boosted([[Float](repeating: 0, count: 1000)], target: -14, sampleRate: 24_000) == nil)
+        #expect(LoudnessBoost.boosted([[]], target: -14, sampleRate: 24_000) == nil)
+        #expect(LoudnessBoost.boosted([], target: -14, sampleRate: 24_000) == nil)
+        // Channels of different lengths are not audio this knows how to handle.
+        #expect(LoudnessBoost.boosted([[0.1, 0.1], [0.1]], target: -14, sampleRate: 24_000) == nil)
     }
 
-    @Test func gainIsCappedAndHeldBackByThePeaks() {
-        // Very quiet: capped at maxGain.
-        #expect(LoudnessBoost.gainDB(for: .init(rmsDB: -40, p999: 0.01), target: -14) == LoudnessBoost.maxGain)
-        // Peaks already high: the gain stops where the 99.9th percentile would reach the ceiling.
-        let held = LoudnessBoost.gainDB(for: .init(rmsDB: -30, p999: 0.5), target: -14)
-        #expect(abs(held! - 20 * log10(LoudnessBoost.peakCeiling / 0.5)) < 0.001)
-        // Nothing to gain.
-        #expect(LoudnessBoost.gainDB(for: .init(rmsDB: -14, p999: 0.5), target: -14) == nil)
-    }
-
-    @Test func limiterIsTransparentBelowTheKneeAndNeverReachesOne() {
-        for x: Float in [0, 0.1, -0.5, 0.79, -0.8] { #expect(LoudnessBoost.limit(x) == x) }
-        for x: Float in [0.81, 1, 1.5, 4, 100] {
-            let y = LoudnessBoost.limit(x)
-            #expect(y > LoudnessBoost.limiterKnee && y <= 1)
-            #expect(LoudnessBoost.limit(-x) == -y)
-        }
-        // Monotonic: louder in never means quieter out.
-        var last: Float = 0
-        for step in 0...400 {
-            let y = LoudnessBoost.limit(Float(step) / 100)
-            #expect(y >= last)
-            last = y
-        }
-    }
-
-    @Test func peaksPushedPastFullScaleAreRoundedNotClipped() throws {
-        // Loud tone with a rare spike: after the boost the spike must stay under 1 without flattening the rest.
-        var samples = speechLike(amplitude: 0.2)
+    @Test func gainStopsWhereTheLoudestMomentWouldNeedTurningDownTooFar() throws {
+        // Quiet speech with one loud spike: its average asks for far more gain than the spike allows.
+        var samples = speechLike(amplitude: 0.1)
         samples[1000] = 0.9
-        let boosted = try #require(LoudnessBoost.boosted([samples], target: -10))
-        #expect(boosted[0].allSatisfy { abs($0) <= 1 })
-        #expect(boosted[0][1000] > 0.9)
+        let result = try #require(LoudnessBoost.boosted([samples], target: -8, sampleRate: 24_000))
+        let allowed = 20 * log10(Double(LoudnessBoost.ceiling) / 0.9) + LoudnessBoost.maxReduction
+        #expect(result.report.gain <= allowed + 0.01)
+        #expect(result.report.gain > allowed - 0.5)
+        #expect(result.report.deepestReduction <= LoudnessBoost.maxReduction + 0.1)
+        #expect(result.report.resultRMS < -8)   // the target was out of reach, and that is reported honestly
+        // Very quiet audio is raised by at most maxGain.
+        let whisper = LoudnessBoost.boosted([speechLike(amplitude: 0.001)], target: -14, sampleRate: 24_000)
+        #expect(whisper == nil || whisper!.report.gain <= LoudnessBoost.maxGain + 0.01)
+    }
+
+    @Test func nothingIsEverLouderThanTheCeilingAfterTheLimiter() throws {
+        // Speech-like bursts with spikes of several sizes, including right at the start and the end.
+        var samples = speechLike(amplitude: 0.15, seconds: 3)
+        for (index, size) in [(0, Float(0.7)), (500, 0.5), (12_345, 0.8), (40_000, -0.9), (samples.count - 1, 0.6)] { samples[index] = size }
+        let result = try #require(LoudnessBoost.boosted([samples, samples.map { $0 * 0.5 }], target: -10, sampleRate: 24_000))
+        for channel in result.channels {
+            #expect(channel.allSatisfy { abs($0) <= LoudnessBoost.ceiling + 0.0001 })
+            #expect(channel.count == samples.count)
+        }
+        #expect(result.report.deepestReduction > 1)
+    }
+
+    @Test func limiterLeavesAudioAloneWhenNothingReachesTheCeiling() {
+        let peaks: [Float] = [0, 0.1, 0.3, 0.2, 0.05]
+        let gains = LoudnessBoost.limiterGains(peaks: peaks, factor: 2, sampleRate: 24_000)
+        #expect(gains == [Float](repeating: 1, count: peaks.count))
+        #expect(LoudnessBoost.limiterGains(peaks: [], factor: 2, sampleRate: 24_000).isEmpty)
+    }
+
+    @Test func limiterTurnsDownBeforeAPeakAndLetsGoAfterIt() {
+        let rate = 24_000
+        var peaks = [Float](repeating: 0.2, count: rate)   // one second
+        peaks[12_000] = 0.8
+        let gains = LoudnessBoost.limiterGains(peaks: peaks, factor: 4, sampleRate: rate)   // the peak would be 3.2
+        let needed = LoudnessBoost.ceiling / 3.2
+        // Reaches the needed gain no later than the peak, and never goes below the need there.
+        #expect(gains[12_000] <= needed + 0.0001)
+        // Already coming down a few frames before: look-ahead.
+        #expect(gains[12_000 - 20] < 1)
+        // Mostly back to full gain at five times the 80 ms release (0.4 s), but not at once: a quarter of a release
+        // after the peak the voice is still held down.
+        #expect(gains[12_000 + 10_000] > 0.99)
+        #expect(gains[12_000 + 500] < 0.7)
+        // The base level is 0.2 × 4 = 0.8, under the ceiling, so away from the peak nothing is touched.
+        #expect(gains[100] == 1)
+        // A smooth ramp, not a step.
+        let steps = zip(gains, gains.dropFirst()).map { abs($0 - $1) }
+        #expect((steps.max() ?? 0) < 0.1)
+        // And the result never passes the ceiling.
+        for (peak, gain) in zip(peaks, gains) { #expect(peak * 4 * gain <= LoudnessBoost.ceiling + 0.0001) }
+    }
+
+    @Test func slidingMinimumMatchesTheObviousWay() {
+        var generator = SystemRandomNumberGenerator()
+        let values = (0..<500).map { _ in Float.random(in: 0.1...1, using: &generator) }
+        for radius in [1, 3, 10, 499, 1000] {
+            let fast = LoudnessBoost.slidingMinimum(values, radius: radius)
+            for index in values.indices {
+                let window = values[max(0, index - radius)...min(values.count - 1, index + radius)]
+                #expect(fast[index] == window.min())
+            }
+        }
+        #expect(LoudnessBoost.slidingMinimum([], radius: 3).isEmpty)
     }
 
     @Test func wavDataHasAValidHeaderAndSamples() {
@@ -96,8 +137,8 @@ struct LoudnessBoostTests {
         try LoudnessBoost.wav(channels: [speechLike(amplitude: 0.1, seconds: 1)], sampleRate: 24_000).write(to: url)
 
         #expect(LoudnessBoost.boostedWAV(from: url, level: .normal) == nil)
-        let louder = try #require(LoudnessBoost.boostedWAV(from: url, level: .louder))
-        let loudest = try #require(LoudnessBoost.boostedWAV(from: url, level: .loudest))
+        let louder = try #require(LoudnessBoost.boostedWAV(from: url, level: .louder)).data
+        let loudest = try #require(LoudnessBoost.boostedWAV(from: url, level: .loudest)).data
         #expect(loudest.count == louder.count)
 
         func level(_ data: Data) throws -> Double {
@@ -110,8 +151,8 @@ struct LoudnessBoostTests {
             let channel = Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
             return rmsDB(channel)
         }
-        #expect(abs(try level(louder) - -17) < 0.5)
-        #expect(abs(try level(loudest) - -14) < 0.5)
+        #expect(abs(try level(louder) - -16) < 0.5)
+        #expect(abs(try level(loudest) - -11) < 0.5)
         // The result is a clip AVAudioPlayer accepts, with the original's length.
         let player = try AVAudioPlayer(data: loudest, fileTypeHint: AVFileType.wav.rawValue)
         #expect(abs(player.duration - 1) < 0.01)
@@ -155,20 +196,26 @@ struct LoudnessBoostTests {
             try audio.read(into: buffer)
             return rmsDB(Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))))
         }
-        #expect(abs(try level(louder) - -17) < 0.6)
-        // This clip's peaks are high (99.9th percentile near −7 dBFS), so the gain is held back to about 6 dB:
-        // a little under the −14 target rather than clipping.
-        let loudestLevel = try level(loudest)
-        #expect(loudestLevel > -15.2 && loudestLevel < -13.8)
+        #expect(abs(try level(louder.data) - -16) < 0.6)
+        // This clip's loudest moment is high (−3.7 dBFS), so the limiter's 6 dB allowance runs out at about 9 dB of
+        // gain: a little short of the −11 target rather than squashed.
+        let loudestLevel = try level(loudest.data)
+        #expect(loudestLevel > -13.8 && loudestLevel < -12.2)
+        #expect(loudest.report.deepestReduction <= LoudnessBoost.maxReduction + 0.1)
+        #expect(abs(loudest.report.resultRMS - loudestLevel) < 0.3)
+        // Louder and Loudest really are different, by several dB.
+        #expect(try level(loudest.data) - level(louder.data) > 2.5)
         // Same length as the original, so the word timing estimate and seeking are unaffected.
-        let player = try AVAudioPlayer(data: loudest, fileTypeHint: AVFileType.wav.rawValue)
+        let player = try AVAudioPlayer(data: loudest.data, fileTypeHint: AVFileType.wav.rawValue)
         #expect(abs(player.duration - original.duration) < 0.05)
 
         // And through the same path the engine uses, off the main actor.
         let clip = try await AVAudioClip.make(contentsOf: url, loudness: .loudest)
         #expect(abs(clip.duration - original.duration) < 0.05)
+        #expect(clip.loudnessNote?.hasPrefix("loudness=loudest gain=+") == true)
         let untouched = try await AVAudioClip.make(contentsOf: url, loudness: .normal)
         #expect(abs(untouched.duration - original.duration) < 0.05)
+        #expect(untouched.loudnessNote == "loudness=normal as generated")
     }
 
     private final class BundleToken {}

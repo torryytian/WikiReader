@@ -14,20 +14,30 @@ protocol AudioClip: AnyObject {
     @discardableResult func play() -> Bool
     func pause()
     func stop()
+    /// How the clip was amplified, for the playback log.
+    var loudnessNote: String? { get }
+}
+
+extension AudioClip {
+    var loudnessNote: String? { nil }
 }
 
 /// `AudioClip` backed by `AVAudioPlayer`.
 final class AVAudioClip: NSObject, AudioClip {
     private let player: AVAudioPlayer
     var onFinish: (() -> Void)?
+    let loudnessNote: String?
 
-    /// - Parameter boosted: The same audio, amplified (see `LoudnessBoost`); played instead of the file when given.
-    init(contentsOf url: URL, boosted: Data? = nil) throws {
+    /// - Parameters:
+    ///   - boosted: The same audio, amplified (see `LoudnessBoost`); played instead of the file when given.
+    ///   - loudnessNote: What was done to it, for the log.
+    init(contentsOf url: URL, boosted: Data? = nil, loudnessNote: String? = nil) throws {
         if let boosted {
             player = try AVAudioPlayer(data: boosted, fileTypeHint: AVFileType.wav.rawValue)
         } else {
             player = try AVAudioPlayer(contentsOf: url)
         }
+        self.loudnessNote = loudnessNote
         super.init()
         player.enableRate = true  // must be set before prepareToPlay
         player.delegate = self
@@ -37,7 +47,15 @@ final class AVAudioClip: NSObject, AudioClip {
     /// Opens a clip at the loudness the user chose, doing the amplifying off the main actor.
     static func make(contentsOf url: URL, loudness: SpeechLoudness = .current) async throws -> AVAudioClip {
         let boosted = await LoudnessBoost.boostedWAVInBackground(from: url, level: loudness)
-        return try AVAudioClip(contentsOf: url, boosted: boosted)
+        let note: String
+        if loudness == .normal {
+            note = "loudness=normal as generated"
+        } else if let boosted {
+            note = "loudness=\(loudness.rawValue) \(boosted.report.summary)"
+        } else {
+            note = "loudness=\(loudness.rawValue) left as generated (already loud enough or unreadable)"
+        }
+        return try AVAudioClip(contentsOf: url, boosted: boosted?.data, loudnessNote: note)
     }
 
     var duration: TimeInterval { player.duration }
