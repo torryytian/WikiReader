@@ -3,6 +3,8 @@ import UIKit
 extension NSAttributedString.Key {
     /// On the "Translate" label after a paragraph: the index of the block it translates.
     static let translateBlock = NSAttributedString.Key("WikiReader.translateBlock")
+    /// On the bookmark marker before a bookmarked block: the index of that block.
+    static let bookmarkBlock = NSAttributedString.Key("WikiReader.bookmarkBlock")
 }
 
 /// The whole article as one attributed string, plus where each block lives in it.
@@ -34,7 +36,7 @@ struct ArticleDocument {
             text.append(NSAttributedString(string: "\n"))
             let kind: Style = block.kind == .heading ? .heading(level: block.level) : .paragraph
             if bookmarkedBlocks.contains(index) {
-                text.append(Self.bookmarkMarker(for: kind, style: style))
+                text.append(Self.bookmarkMarker(forBlock: index, kind: kind, style: style))
             }
             let start = text.length
             text.append(NSAttributedString(string: block.text, attributes: Self.attributes(for: kind, style: style)))
@@ -80,6 +82,12 @@ struct ArticleDocument {
     func translateBlock(at location: Int) -> Int? {
         guard location >= 0, location < attributedText.length else { return nil }
         return attributedText.attribute(.translateBlock, at: location, effectiveRange: nil) as? Int
+    }
+
+    /// The block whose bookmark marker is at a text location, if any.
+    func bookmarkBlock(at location: Int) -> Int? {
+        guard location >= 0, location < attributedText.length else { return nil }
+        return attributedText.attribute(.bookmarkBlock, at: location, effectiveRange: nil) as? Int
     }
 
     /// Full-text range of a range inside a block.
@@ -159,7 +167,7 @@ struct ArticleDocument {
 
     /// A small filled bookmark before a bookmarked block, in the theme's accent color. It carries the block's own
     /// style (as the first character, it sets the paragraph's spacing) and sits outside the block's range.
-    static func bookmarkMarker(for kind: Style, style: ReaderStyle) -> NSAttributedString {
+    static func bookmarkMarker(forBlock block: Int, kind: Style, style: ReaderStyle) -> NSAttributedString {
         var attributes = attributes(for: kind, style: style)
         let font = attributes[.font] as? UIFont ?? .preferredFont(forTextStyle: .body)
         let color = style.theme.accent ?? UIColor.tintColor
@@ -173,6 +181,7 @@ struct ArticleDocument {
         }
         let marker = NSMutableAttributedString(attachment: attachment)
         attributes[.foregroundColor] = color
+        attributes[.bookmarkBlock] = block
         marker.addAttributes(attributes, range: NSRange(location: 0, length: marker.length))
         marker.append(NSAttributedString(string: "\u{2009}", attributes: attributes))  // a thin space before the text
         return marker

@@ -92,6 +92,12 @@ private struct ArticleReader: View {
     @AppStorage(SettingsKeys.readerMenuPinned) private var isMenuPinned = false
     /// Height of the bottom menu as laid out, so the text can be given room beneath it while it is pinned.
     @State private var bottomMenuHeight: CGFloat = 0
+    /// Height of the top bar as laid out: it covers the top of the text while it is up.
+    @State private var topMenuHeight: CGFloat = 0
+    @State private var textProxy = ArticleTextViewProxy()
+    /// The paragraph the top bar's bookmark button acts on while nothing is being read: the first one whose start is
+    /// on screen below the bar. Worked out when the bar appears (scrolling hides the bar, so it can't go stale).
+    @State private var paragraphOnScreen: Int?
 
     /// The menu is up because the reader asked for it, or because it is pinned.
     private var isBottomMenuShown: Bool { menus.isBottomShown(pinned: isMenuPinned) }
@@ -132,6 +138,7 @@ private struct ArticleReader: View {
                         // Scrolling only moves the reading position when nothing is being read.
                         session.moveWhileStopped(to: block)
                     },
+                    proxy: textProxy,
                     bottomObstruction: isMenuPinned ? bottomMenuHeight : 0
                 )
                 // Full screen except at the top, so the first line never hides behind the Dynamic Island.
@@ -145,10 +152,15 @@ private struct ArticleReader: View {
                             title: article.title,
                             progress: ReadingProgress(blocks: blocks, currentBlock: session.currentBlock, rate: session.rate),
                             style: style,
-                            isBookmarked: article.isBookmarked(block: session.currentBlock),
+                            isBookmarked: article.isBookmarked(block: bookmarkTarget(session)),
                             onBack: { dismiss() },
-                            onToggleBookmark: { toggleBookmark(block: session.currentBlock) }
+                            onToggleBookmark: { toggleBookmark(block: bookmarkTarget(session)) }
                         )
+                        .background {
+                            GeometryReader { proxy in
+                                Color.clear.preference(key: TopMenuHeightKey.self, value: proxy.size.height)
+                            }
+                        }
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     Spacer(minLength: 0)
@@ -185,6 +197,13 @@ private struct ArticleReader: View {
                 .animation(.easeInOut(duration: 0.22), value: menus.top)
                 .animation(.easeInOut(duration: 0.22), value: isBottomMenuShown)
                 .onPreferenceChange(BottomMenuHeightKey.self) { bottomMenuHeight = $0 }
+                .onPreferenceChange(TopMenuHeightKey.self) { height in
+                    topMenuHeight = height
+                    findParagraphOnScreen()
+                }
+                .onChange(of: menus.top) { _, isUp in
+                    if isUp { findParagraphOnScreen() }
+                }
                 .animation(.default, value: session.failure)
                 .sheet(isPresented: $isShowingSettings, onDismiss: { settingsClosed(session) }) {
                     // Only opened from the error banner, where the fix is a voice or an API key.
@@ -327,13 +346,25 @@ private struct ArticleReader: View {
         }
     }
 
-    /// Bookmarks the block, or removes its bookmark, and says which.
+    /// The paragraph the top bar's bookmark button acts on: the one being read (or paused in), otherwise the first
+    /// one whose start is on screen below the bar.
+    private func bookmarkTarget(_ session: ReadingSession) -> Int {
+        session.spokenWord != nil ? session.currentBlock : (paragraphOnScreen ?? session.currentBlock)
+    }
+
+    private func findParagraphOnScreen() {
+        guard menus.top else { return }
+        paragraphOnScreen = textProxy.firstBlockStartingOnScreen(topObstruction: topMenuHeight)
+    }
+
+    /// Bookmarks the block, or removes its bookmark, and says which. The paragraph flashes, so it is clear which one.
     private func toggleBookmark(block: Int) {
         guard blocks.indices.contains(block) else { return }
         let isMarked = article.toggleBookmark(block: block, text: blocks[block].text)
         try? article.modelContext?.save()
         Log.app.info("Bookmark \(isMarked ? "added" : "removed", privacy: .public) at block \(block)")
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        textProxy.flashWhenShown(block: block)
         rebuildDocument(style: style)
         showMessage(symbol: isMarked ? "bookmark.fill" : "bookmark.slash", text: isMarked ? "Bookmarked" : "Bookmark Removed")
     }
@@ -489,6 +520,12 @@ private struct ArticleReader: View {
 struct ReaderMessage: Equatable {
     var symbol: String
     var text: String
+}
+
+/// The laid-out height of the reader's top bar.
+private struct TopMenuHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// The laid-out height of the reader's bottom menu, reported up so the text can make room for it.

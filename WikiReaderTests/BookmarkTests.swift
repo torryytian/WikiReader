@@ -69,6 +69,10 @@ struct BookmarkTests {
         // A selection over the marker still belongs to the block after it.
         #expect(marked.blockIndex(nearest: marked.blockRanges[2].location - 1) == 2)
         #expect(marked.bookmarkedBlocks == [0, 2])
+        // Each marker knows its block, so tapping it can remove that bookmark.
+        #expect(marked.bookmarkBlock(at: marked.blockRanges[2].location - 2) == 2)
+        #expect(marked.bookmarkBlock(at: marked.blockRanges[2].location) == nil)
+        #expect(plain.bookmarkBlock(at: plain.blockRanges[0].location - 1) == nil)
         #expect(marked.layout == plain.layout)
     }
 }

@@ -56,6 +56,8 @@ struct ArticleTextView: UIViewRepresentable {
     var initialBlock = 0
     /// Called with the block at the top of the screen after the user scrolls and lets go.
     var onScrollSettled: (Int) -> Void = { _ in }
+    /// Lets the reader ask the text view about what is on screen (which paragraph a bookmark would go on).
+    var proxy: ArticleTextViewProxy?
     /// Height of something that stays over the bottom of the text (the pinned menu). The text can be scrolled
     /// clear of it, and following the spoken word keeps that word above it.
     var bottomObstruction: CGFloat = 0
@@ -101,6 +103,7 @@ struct ArticleTextView: UIViewRepresentable {
         coordinator.onWordTapped = onWordTapped
         coordinator.onReadFromHere = onReadFromHere
         coordinator.onToggleBookmark = onToggleBookmark
+        proxy?.coordinator = coordinator
         coordinator.onTranslate = onTranslate
         coordinator.onTapZone = onTapZone
         coordinator.onSwipeLeft = onSwipeLeft
@@ -182,6 +185,7 @@ struct ArticleTextView: UIViewRepresentable {
                 textView.layoutIfNeeded()
                 textView.setContentOffset(CGPoint(x: offset.x, y: textView.clampedOffset(offset.y)), animated: false)
             }
+            flashPendingBlock()
         }
 
         /// Colors and margins; the fonts and text colors are in the document itself.
@@ -311,15 +315,40 @@ struct ArticleTextView: UIViewRepresentable {
             Log.app.info("Restored reading position: block \(block)")
         }
 
-        /// The block whose text is at the top of the visible area.
-        func topVisibleBlock() -> Int? {
+        /// The block whose text is at the top of the visible area, below anything covering `topObstruction` of it.
+        func topVisibleBlock(topObstruction: CGFloat = 0) -> Int? {
             guard let textView, let document else { return nil }
             let point = CGPoint(
                 x: textView.textContainerInset.left + 1,
-                y: textView.contentOffset.y + textView.adjustedContentInset.top + textView.textContainerInset.top
+                y: textView.contentOffset.y + textView.adjustedContentInset.top + textView.textContainerInset.top + topObstruction
             )
             guard let position = textView.closestPosition(to: point) else { return nil }
             return document.blockIndex(nearest: textView.offset(from: textView.beginningOfDocument, to: position))
+        }
+
+        /// The first block whose start can be seen below `topObstruction`: what a reader takes to be "the paragraph at
+        /// the top". The tail of a paragraph above it doesn't count. When one long paragraph fills the screen, that one.
+        func firstBlockStartingOnScreen(topObstruction: CGFloat) -> Int? {
+            guard let textView, let document, let top = topVisibleBlock(topObstruction: topObstruction) else { return nil }
+            let visibleTop = textView.contentOffset.y + textView.adjustedContentInset.top + topObstruction
+            let visibleBottom = textView.contentOffset.y + textView.bounds.height - textView.adjustedContentInset.bottom
+            for block in top..<min(top + 40, document.blockRanges.count) {
+                let start = NSRange(location: document.blockRanges[block].location, length: 1)
+                guard let rect = textView.rect(of: start) else { continue }
+                if rect.minY >= visibleTop - 2 {
+                    return rect.minY < visibleBottom ? block : top
+                }
+            }
+            return top
+        }
+
+        /// A block to tint briefly once the next text is shown (a bookmark was just added there).
+        var pendingFlashBlock: Int?
+
+        private func flashPendingBlock() {
+            guard let block = pendingFlashBlock, let textView, let document, document.blockRanges.indices.contains(block) else { return }
+            pendingFlashBlock = nil
+            flashHighlight(document.blockRanges[block], in: textView)
         }
 
         private func reportScrollSettled() {
@@ -417,8 +446,13 @@ struct ArticleTextView: UIViewRepresentable {
             }
 
             onTapZone(.middle)
-            if let label = translateLabel(at: point, in: textView, document: document) {
+            if let label = labelBlock(at: point, in: textView, lookup: document.translateBlock(at:)) {
                 if let text = document.blockText(label) { onTranslate(text) }
+                return
+            }
+            // Tapping a bookmark marker removes that bookmark, whichever paragraph it is on.
+            if let marked = labelBlock(at: point, in: textView, lookup: document.bookmarkBlock(at:)) {
+                onToggleBookmark(marked)
                 return
             }
             guard let range = textView.lookupWordRange(at: point) else { return }
@@ -432,13 +466,14 @@ struct ArticleTextView: UIViewRepresentable {
             return TapZone.zone(forY: y, viewHeight: textView.bounds.height, topInset: insets.top, bottomInset: insets.bottom)
         }
 
-        /// The block whose "Translate" label is under `point`.
-        private func translateLabel(at point: CGPoint, in textView: UITextView, document: ArticleDocument) -> Int? {
+        /// The block of the label (a "Translate" link, a bookmark marker) under `point`, as `lookup` reads it from a
+        /// text location.
+        private func labelBlock(at point: CGPoint, in textView: UITextView, lookup: (Int) -> Int?) -> Int? {
             guard let position = textView.closestPosition(to: point) else { return nil }
             let location = textView.offset(from: textView.beginningOfDocument, to: position)
             // closestPosition may land just after the label, so look at the character before it as well.
             for candidate in [location, location - 1] {
-                guard let block = document.translateBlock(at: candidate),
+                guard let block = lookup(candidate),
                       let start = textView.position(from: textView.beginningOfDocument, offset: candidate),
                       let end = textView.position(from: start, offset: 1),
                       let range = textView.textRange(from: start, to: end)
@@ -526,5 +561,20 @@ extension UITextView {
         let insets = adjustedContentInset
         let maxOffset = max(contentSize.height + insets.bottom - bounds.height, -insets.top)
         return min(max(y, -insets.top), maxOffset)
+    }
+}
+
+/// A handle on the reader's text view for questions SwiftUI can't answer from state, like which paragraph starts at the
+/// top of the screen right now. The text view fills it in.
+final class ArticleTextViewProxy {
+    fileprivate weak var coordinator: ArticleTextView.Coordinator?
+
+    func firstBlockStartingOnScreen(topObstruction: CGFloat) -> Int? {
+        coordinator?.firstBlockStartingOnScreen(topObstruction: topObstruction)
+    }
+
+    /// Tints a block briefly when the next text appears, so the reader sees which paragraph a change applied to.
+    func flashWhenShown(block: Int) {
+        coordinator?.pendingFlashBlock = block
     }
 }
