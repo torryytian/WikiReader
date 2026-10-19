@@ -2,7 +2,7 @@ import OSLog
 import SwiftData
 import SwiftUI
 
-/// Home screen: the list of saved articles, newest first. Swiping a row opens its info page; the + menu adds
+/// Home screen: the list of saved articles, newest first. Swiping a row reveals its Info button; the + menu adds
 /// articles, selects several for batch work, downloads all audio and shows storage.
 struct LibraryView: View {
     @Query(sort: \Article.addedAt, order: .reverse) private var articles: [Article]
@@ -17,6 +17,8 @@ struct LibraryView: View {
     /// What to do once the info sheet has gone: an article can't be opened, or deleted, under its own sheet.
     @State private var afterInfo: AfterInfo?
     @State private var searchText = ""
+    /// The row slid open to show its Info block; one at a time.
+    @State private var openRow: PersistentIdentifier?
 
     @State private var isSelecting = false
     @State private var selection = Set<PersistentIdentifier>()
@@ -43,18 +45,26 @@ struct LibraryView: View {
                 }
                 Section {
                     ForEach(shownArticles) { article in
-                        NavigationLink(value: article) {
+                        let id = article.persistentModelID
+                        SwipeRevealRow(
+                            isOpen: openRow == id,
+                            isEnabled: !isSelecting,
+                            onOpenChange: { openRow = $0 ? id : nil },
+                            onInfo: {
+                                openRow = nil
+                                infoArticle = article
+                            },
+                            onTap: isSelecting ? nil : {
+                                openRow = nil
+                                path = [article]
+                            }
+                        ) {
                             row(article)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button {
-                                infoArticle = article
-                            } label: {
-                                Label("Info", systemImage: "info.circle")
-                            }
-                            // A quiet gray, like Mail's More: the row, not the button, should catch the eye.
-                            .tint(Self.infoTint)
-                        }
+                        // The row draws its own card, so the list's background and separators stay out of the way.
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
                     }
                 }
             }
@@ -141,9 +151,6 @@ struct LibraryView: View {
         }
     }
 
-    /// Dark: a gray a step lighter than the row. Light: the system gray.
-    private static let infoTint = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemGray3 : .systemGray })
-
     private enum AfterInfo {
         case open(Article, block: Int)
         case delete(Article, withAudio: Bool)
@@ -159,16 +166,27 @@ struct LibraryView: View {
     // MARK: - Rows
 
     private func row(_ article: Article) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(article.title)
-                .font(.headline)
-            HStack(spacing: 6) {
-                Text(article.addedAt, format: .dateTime.year().month().day().hour().minute())
-                audioBadge(article)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(article.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                HStack(spacing: 6) {
+                    Text(article.addedAt, format: .dateTime.year().month().day().hour().minute())
+                    audioBadge(article)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if !isSelecting {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
 
     @ViewBuilder
