@@ -77,7 +77,7 @@ docs/           会话记录
 
 - 访问 Wikipedia 的每个请求都带 User-Agent：`WikiReader/0.1 (personal app; contact: torryytian@gmail.com)`
 - 只在我添加文章时请求 Wikipedia，不预取、不批量抓。
-- 选用 OpenAI 朗读时，为当前段和它之后的几段请求 `api.openai.com` 生成音频：向后最多约 75 秒语音、最多 4 段（取先到者），最多同时 2 个预取请求；每次换位置（跳段、快进快退）都重新算，没轮到的不请求，停止朗读时丢掉排队的。生成结果缓存在本地，不重复请求（朗读和批量下载共用"正在生成"登记，同一段不会同时请求两次）。**批量生成整篇/多篇的语音只在我手动触发时进行**（文库 + 菜单的 Download All Audio、多选后的 Download Audio、文章属性页的 Download Remaining Audio），开始前先弹窗显示预计时长和费用，我确认后才开始；同时 2 个请求，Key 无效/没额度立即停，连续 4 段失败也停。请求超时、断网、5xx、429 时自动重试，最多共 3 次（401、没额度、请求被拒不重试）。
+- 选用 OpenAI 朗读时，为当前段和它之后的几段请求 `api.openai.com` 生成音频：向后最多约 75 秒语音、最多 4 段（取先到者），最多同时 2 个预取请求；每次换位置（跳段、快进快退）都重新算，没轮到的不请求，停止朗读时丢掉排队的。生成结果缓存在本地，不重复请求（朗读和批量下载共用"正在生成"登记，同一段不会同时请求两次）。**批量生成整篇/多篇的语音只在我手动触发时进行**（多选后的 Download Audio、文库与存储页的 Download All Remaining Audio、文章属性页的 Download Remaining Audio），开始前先弹窗显示预计时长和费用，我确认后才开始；同时 2 个请求，Key 无效/没额度立即停，连续 4 段失败也停。请求超时、断网、5xx、429 时自动重试，最多共 3 次（401、没额度、请求被拒不重试）。
 - AI 讲解（词典界面的 AI 按钮）：只在我点按钮时请求 `api.openai.com/v1/chat/completions`，一次只发被查的单词和它所在的句子，不发全文，不预取，不自动触发；用的是设置页保存的同一个 OpenAI Key。
 - 词典页（点词弹出）：离线词库 ECDICT 在 App 里，不联网。打开词典页时请求 `en.wiktionary.org/api/rest_v1/page/definition/<词>` 取英文释义，只发被查的单词（不发句子），结果缓存在本地，失败静默；点喇叭时请求 `upload.wikimedia.org` 上的真人录音 mp3（`En-us-<词>.ogg` 的转码版），只发单词，结果缓存，没有录音就用系统声音。这两个都是 Wikimedia 的服务，带同样的 User-Agent。**不要把 User-Agent 里的邮箱发给 Wikimedia 以外的任何服务**（dictionaryapi.dev 试过，服务端常 522，已放弃）。
 - 任何 API Key 都不写进代码、不提交到 git。以后接云端服务时，Key 在 App 的设置页输入，存 Keychain。

@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 
 /// Home screen: the list of saved articles, newest first. Swiping a row reveals its Info button; the + menu adds
-/// articles, selects several for batch work, downloads all audio and shows storage.
+/// articles, selects several for batch work (a swipe right leaves) and shows storage.
 struct LibraryView: View {
     @Query(sort: \Article.addedAt, order: .reverse) private var articles: [Article]
     @Environment(\.modelContext) private var modelContext
@@ -69,6 +69,8 @@ struct LibraryView: View {
                 }
             }
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
+            // While selecting, a swipe to the right anywhere leaves, like going back; rows can't be swiped then.
+            .simultaneousGesture(leaveSelectingSwipe, including: isSelecting ? .all : .subviews)
             .searchable(text: $searchText, prompt: "Search titles")
             .overlay {
                 if articles.isEmpty {
@@ -229,11 +231,8 @@ struct LibraryView: View {
                 withAnimation { isSelecting = true }
             }
             .disabled(articles.isEmpty)
+            // Downloading audio is in Select Articles (Select All covers the whole library) and in Library & Storage.
             Section {
-                Button("Download All Audio", systemImage: "arrow.down.circle") {
-                    Task { downloadPrompt = await LibraryActions.downloadPrompt(for: articles) }
-                }
-                .disabled(articles.isEmpty || downloader.isRunning)
                 Button("Library & Storage", systemImage: "internaldrive") {
                     isShowingStorage = true
                 }
@@ -289,6 +288,15 @@ struct LibraryView: View {
     private func deleteSelected(withAudio: Bool) {
         LibraryActions.delete(selectedArticles, withAudio: withAudio, library: articles, context: modelContext)
         endSelecting()
+    }
+
+    private var leaveSelectingSwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                let dx = value.translation.width, dy = value.translation.height
+                guard isSelecting, dx > 80, dx > abs(dy) * 2 else { return }
+                endSelecting()
+            }
     }
 
     private func endSelecting() {
