@@ -59,12 +59,15 @@ private struct MenuColors {
 }
 
 /// Shown at the top of the reader when the reader taps near the top edge: a button back to the library, the title,
-/// and how far along the article is.
+/// how far along the article is, and a button that bookmarks the paragraph being read.
 struct ReaderTopInfoBar: View {
     let title: String
     let progress: ReadingProgress
     let style: ReaderStyle
+    /// Whether the paragraph the bookmark button acts on is bookmarked.
+    let isBookmarked: Bool
     let onBack: () -> Void
+    let onToggleBookmark: () -> Void
 
     var body: some View {
         let colors = MenuColors(style)
@@ -104,7 +107,17 @@ struct ReaderTopInfoBar: View {
                 .padding(.top, 6)
             }
             .padding(.top, 6)
-            .padding(.trailing, 16)
+
+            Button(action: onToggleBookmark) {
+                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(colors.accent)
+                    .frame(width: 44, height: 44)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isBookmarked ? "Remove Bookmark" : "Bookmark This Paragraph")
+            .padding(.trailing, 4)
         }
         .foregroundStyle(colors.text)
         .padding(.leading, 8)

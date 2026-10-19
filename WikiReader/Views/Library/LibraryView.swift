@@ -14,7 +14,9 @@ struct LibraryView: View {
     @State private var isShowingSettings = false
     @State private var isShowingStorage = false
     @State private var infoArticle: Article?
-    /// What to do once the info sheet has gone: an article can't be opened, or deleted, under its own sheet.
+    /// An article with bookmarks being opened: where to start is asked first.
+    @State private var startChoice: Article?
+    /// What to do once the info or start sheet has gone: an article can't be opened, or deleted, under its own sheet.
     @State private var afterInfo: AfterInfo?
     @State private var searchText = ""
     /// The row slid open to show its Info block; one at a time.
@@ -56,10 +58,19 @@ struct LibraryView: View {
                             },
                             onTap: isSelecting ? nil : {
                                 openRow = nil
-                                path = [article]
+                                // With bookmarks, ask where to start; otherwise carry on where reading stopped.
+                                if article.bookmarks.isEmpty {
+                                    path = [article]
+                                } else {
+                                    startChoice = article
+                                }
                             }
                         ) {
                             row(article)
+                        }
+                        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: SwipeRevealRow<EmptyView>.cornerRadius, style: .continuous))
+                        .contextMenu {
+                            if !isSelecting { rowMenu(article) }
                         }
                         // The row draws its own card, so the list's background and separators stay out of the way.
                         .listRowBackground(Color.clear)
@@ -131,6 +142,12 @@ struct LibraryView: View {
                     }
                 )
             }
+            .sheet(item: $startChoice, onDismiss: performAfterInfo) { article in
+                StartPointView(article: article) { block in
+                    afterInfo = .open(article, block: block)
+                    startChoice = nil
+                }
+            }
             .audioDownloadPrompt($downloadPrompt)
             .confirmationDialog(deleteTitle, isPresented: $isConfirmingDelete, titleVisibility: .visible) {
                 Button("Delete Articles and Their Audio", role: .destructive) { deleteSelected(withAudio: true) }
@@ -176,6 +193,13 @@ struct LibraryView: View {
                 HStack(spacing: 6) {
                     Text(article.addedAt, format: .dateTime.year().month().day().hour().minute())
                     audioBadge(article)
+                    let marks = article.bookmarks.count
+                    if marks > 0 {
+                        Text("·")
+                        Label("\(marks)", systemImage: "bookmark")
+                            .labelStyle(BadgeLabelStyle())
+                            .accessibilityLabel(marks == 1 ? "1 bookmark" : "\(marks) bookmarks")
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -218,6 +242,38 @@ struct LibraryView: View {
                 configuration.title
             }
         }
+    }
+
+    /// Long press on a row: carry on reading, start from one of the bookmarks, or see the article's info.
+    @ViewBuilder
+    private func rowMenu(_ article: Article) -> some View {
+        Button("Continue Reading", systemImage: "book") {
+            openRow = nil
+            path = [article]
+        }
+        let marks = article.bookmarks
+        if !marks.isEmpty {
+            Section("Bookmarks") {
+                ForEach(marks) { mark in
+                    Button(mark.excerpt, systemImage: "bookmark.fill") {
+                        open(article, at: mark.block)
+                    }
+                }
+            }
+        }
+        Section {
+            Button("Info", systemImage: "info.circle") {
+                openRow = nil
+                infoArticle = article
+            }
+        }
+    }
+
+    /// Opens an article at a block (a bookmark, a section), which becomes its reading position.
+    private func open(_ article: Article, at block: Int) {
+        openRow = nil
+        article.lastReadBlockIndex = block
+        path = [article]
     }
 
     // MARK: - + menu
@@ -313,8 +369,7 @@ struct LibraryView: View {
         afterInfo = nil
         switch action {
         case .open(let article, let block):
-            article.lastReadBlockIndex = block
-            path = [article]
+            open(article, at: block)
         case .delete(let article, let withAudio):
             LibraryActions.delete([article], withAudio: withAudio, library: articles, context: modelContext)
         }

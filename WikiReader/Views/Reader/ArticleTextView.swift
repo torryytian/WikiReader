@@ -36,6 +36,8 @@ struct ArticleTextView: UIViewRepresentable {
     var onWordTapped: (NSRange) -> Void = { _ in }
     /// Called with the index of the block where a selection starts, from the selection menu's "Read From Here".
     var onReadFromHere: (Int) -> Void = { _ in }
+    /// Called with the index of the block where a selection starts, from the selection menu's "Bookmark".
+    var onToggleBookmark: (Int) -> Void = { _ in }
     /// Called with article text to translate: a selection, or a paragraph whose "Translate" label was tapped.
     var onTranslate: (String) -> Void = { _ in }
     /// Called for a tap that isn't on a word: near the top or bottom edge (where the menus are), or elsewhere.
@@ -98,6 +100,7 @@ struct ArticleTextView: UIViewRepresentable {
         let coordinator = context.coordinator
         coordinator.onWordTapped = onWordTapped
         coordinator.onReadFromHere = onReadFromHere
+        coordinator.onToggleBookmark = onToggleBookmark
         coordinator.onTranslate = onTranslate
         coordinator.onTapZone = onTapZone
         coordinator.onSwipeLeft = onSwipeLeft
@@ -118,6 +121,7 @@ struct ArticleTextView: UIViewRepresentable {
         weak var textView: UITextView?
         var onWordTapped: (NSRange) -> Void = { _ in }
         var onReadFromHere: (Int) -> Void = { _ in }
+        var onToggleBookmark: (Int) -> Void = { _ in }
         var onTranslate: (String) -> Void = { _ in }
         var onTapZone: (TapZone) -> Void = { _ in }
         var onSwipeLeft: () -> Void = {}
@@ -160,15 +164,24 @@ struct ArticleTextView: UIViewRepresentable {
             // Compare identity, not contents: highlights edit the text view's copy,
             // and resetting the text would also reset the scroll position.
             guard let textView, shownText !== document.attributedText else { return }
-            // A new text (e.g. after changing the font size) starts at the top; scroll back to where the reader was.
-            let anchor = shownText == nil ? nil : topVisibleBlock()
+            // A new text starts at the top. After a restyle (e.g. a new font size) everything has moved, so scroll back
+            // to the block that was at the top; when only a bookmark marker came or went, the lines are where they
+            // were, so keep the exact offset instead of jumping to a block's start.
+            let sameLayout = self.document?.layout == document.layout
+            let offset = textView.contentOffset
+            let anchor = shownText == nil || sameLayout ? nil : topVisibleBlock()
             self.document = document
             shownText = document.attributedText
             spokenRange = nil
             savedKeys = nil
             savedRanges = []
             textView.attributedText = document.attributedText
-            if let anchor { scroll(toBlock: anchor) }
+            if let anchor {
+                scroll(toBlock: anchor)
+            } else if sameLayout {
+                textView.layoutIfNeeded()
+                textView.setContentOffset(CGPoint(x: offset.x, y: textView.clampedOffset(offset.y)), animated: false)
+            }
         }
 
         /// Colors and margins; the fonts and text colors are in the document itself.
@@ -452,7 +465,7 @@ struct ArticleTextView: UIViewRepresentable {
 
         // MARK: Selection menu
 
-        /// The menu over a selection: translate it, read from it, or copy it. Our own menu instead of the system's,
+        /// The menu over a selection: translate it, read from it, bookmark its paragraph, or copy it. Our own menu instead of the system's,
         /// whose "Look Up" and "Share" lead to web search.
         func textView(_ textView: UITextView, editMenuForTextIn range: NSRange, suggestedActions: [UIMenuElement]) -> UIMenu? {
             guard let document, range.length > 0 else { return nil }
@@ -469,6 +482,14 @@ struct ArticleTextView: UIViewRepresentable {
                     textView?.selectedTextRange = nil
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     self?.onReadFromHere(block)
+                })
+                let isMarked = document.bookmarkedBlocks.contains(block)
+                actions.append(UIAction(
+                    title: isMarked ? "Remove Bookmark" : "Bookmark",
+                    image: UIImage(systemName: isMarked ? "bookmark.slash" : "bookmark")
+                ) { [weak self, weak textView] _ in
+                    textView?.selectedTextRange = nil
+                    self?.onToggleBookmark(block)
                 })
             }
             actions.append(UIAction(title: "Copy", image: UIImage(systemName: "doc.on.doc")) { _ in

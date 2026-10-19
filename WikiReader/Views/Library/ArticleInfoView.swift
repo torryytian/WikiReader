@@ -33,6 +33,7 @@ struct ArticleInfoView: View {
             List {
                 summarySection
                 overviewSection
+                bookmarksSection
                 audioSection
                 contentsSection
                 Section {
@@ -137,6 +138,50 @@ struct ArticleInfoView: View {
         let before = blocks.prefix(block).reduce(0) { $0 + $1.text.count }
         let percent = outline.totalCharacters > 0 ? Int((Double(before) / Double(outline.totalCharacters) * 100).rounded()) : 0
         return "\(percent)% · \(entry.title)"
+    }
+
+    // MARK: - Bookmarks
+
+    @ViewBuilder
+    private var bookmarksSection: some View {
+        let marks = article.bookmarks.filter { blocks.indices.contains($0.block) }
+        if !marks.isEmpty {
+            Section {
+                ForEach(marks) { mark in
+                    Button {
+                        onOpen(mark.block)
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "bookmark.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.top, 2)
+                            let section = outline.currentEntry(atBlock: mark.block)?.title ?? article.title
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(section)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                if mark.excerpt != section {
+                                    Text(mark.excerpt)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .tint(.primary)
+                }
+                .onDelete { offsets in
+                    for index in offsets { article.removeBookmark(id: marks[index].id) }
+                }
+            } header: {
+                Text("Bookmarks")
+            } footer: {
+                Text("Tap a bookmark to read from there.")
+            }
+        }
     }
 
     // MARK: - Audio

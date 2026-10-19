@@ -4,13 +4,34 @@ import SwiftUI
 /// down the left with a node for each section. Main sections get a numbered node and room around them, subsections
 /// a small dot and an indent. What has been read is colored in, the section being read is the filled node, and
 /// each row shows how long the section takes to read. Tapping a section jumps there.
+///
+/// A switch at the top shows the article's bookmarks instead: each with its section, where it is in the article and
+/// the start of its text. Tapping one jumps there.
 struct ContentsView: View {
+    /// A bookmark as listed: with the section it is in and how far into the article it is.
+    struct BookmarkItem: Identifiable {
+        var bookmark: Bookmark
+        var section: String
+        var percent: Int
+        var id: Bookmark.ID { bookmark.id }
+    }
+
+    enum Tab: String, CaseIterable {
+        case contents = "Contents"
+        case bookmarks = "Bookmarks"
+    }
+
     let articleTitle: String
     let outline: ArticleOutline
     let currentBlock: Int
     let style: ReaderStyle
+    let bookmarks: [BookmarkItem]
     let onSelect: (ArticleOutline.Entry) -> Void
+    let onSelectBookmark: (Bookmark) -> Void
+    let onDeleteBookmark: (Bookmark) -> Void
     let onClose: () -> Void
+
+    @State private var tab = Tab.contents
 
     private struct Palette {
         let text: Color
@@ -38,28 +59,32 @@ struct ContentsView: View {
         VStack(spacing: 0) {
             header(palette)
 
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                            Button {
-                                onSelect(entry)
-                            } label: {
-                                row(entry, index: index, number: numbers[index], currentIndex: currentIndex,
-                                    isFirst: index == 0, isLast: index == entries.count - 1, palette: palette)
+            if tab == .bookmarks {
+                bookmarkList(palette)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                                Button {
+                                    onSelect(entry)
+                                } label: {
+                                    row(entry, index: index, number: numbers[index], currentIndex: currentIndex,
+                                        isFirst: index == 0, isLast: index == entries.count - 1, palette: palette)
+                                }
+                                .buttonStyle(.plain)
+                                .id(entry.id)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(index == currentIndex ? .isSelected : [])
                             }
-                            .buttonStyle(.plain)
-                            .id(entry.id)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(index == currentIndex ? .isSelected : [])
                         }
+                        .padding(.top, 8)
+                        .padding(.bottom, 40)
                     }
-                    .padding(.top, 8)
-                    .padding(.bottom, 40)
-                }
-                // Opens with the section being read in view.
-                .onAppear {
-                    if entries.indices.contains(currentIndex) { proxy.scrollTo(entries[currentIndex].id, anchor: .center) }
+                    // Opens with the section being read in view.
+                    .onAppear {
+                        if entries.indices.contains(currentIndex) { proxy.scrollTo(entries[currentIndex].id, anchor: .center) }
+                    }
                 }
             }
         }
@@ -100,12 +125,127 @@ struct ContentsView: View {
                 }
                 .accessibilityLabel("Close")
             }
+            tabSwitch(palette)
+                .padding(.top, 4)
         }
         .padding(.horizontal, 20)
         .padding(.top, 14)
         .padding(.bottom, 12)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 0.5)
+        }
+    }
+
+    /// Two chips in the theme's colors, rather than a system segmented control that ignores the reader's theme.
+    private func tabSwitch(_ palette: Palette) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Tab.allCases, id: \.self) { option in
+                let isOn = tab == option
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { tab = option }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(option.rawValue)
+                        if option == .bookmarks, !bookmarks.isEmpty {
+                            Text("\(bookmarks.count)")
+                                .monospacedDigit()
+                                .foregroundStyle(isOn ? palette.onAccent.opacity(0.8) : palette.secondary)
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isOn ? palette.onAccent : palette.text)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(isOn ? palette.accent : Color.clear, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isOn ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(Color.primary.opacity(0.07), in: Capsule())
+    }
+
+    // MARK: - Bookmarks
+
+    @ViewBuilder
+    private func bookmarkList(_ palette: Palette) -> some View {
+        if bookmarks.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "bookmark")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(palette.secondary)
+                Text("No Bookmarks")
+                    .font(.headline)
+                Text("Tap the bookmark at the top right of the reader, or select some text and choose Bookmark.")
+                    .font(.subheadline)
+                    .foregroundStyle(palette.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(bookmarks) { item in
+                        bookmarkRow(item, palette: palette)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private func bookmarkRow(_ item: BookmarkItem, palette: Palette) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Button {
+                onSelectBookmark(item.bookmark)
+            } label: {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(palette.accent)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(item.section)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            Text("\(item.percent)%")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(palette.secondary)
+                        }
+                        // A bookmarked heading's text is the section's name, already shown above.
+                        if item.bookmark.excerpt != item.section {
+                            Text(item.bookmark.excerpt)
+                                .font(.subheadline)
+                                .foregroundStyle(palette.secondary)
+                                .lineLimit(3)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                withAnimation { onDeleteBookmark(item.bookmark) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(palette.secondary)
+                    .frame(width: 26, height: 26)
+                    .background(Color.primary.opacity(0.07), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove Bookmark")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5).padding(.leading, 50)
         }
     }
 

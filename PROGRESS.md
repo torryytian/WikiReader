@@ -6,7 +6,7 @@
 
 ## 0. 接手须知（新会话先读这里）
 
-**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。432 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、下载全部语音、文库与存储）。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
+**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。439 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、文库与存储）、文章书签。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
 
 **先做这几件事**
 1. `git pull`，按 CLAUDE.md 编译并跑测试（见第 6 节的环境注意事项）。
@@ -32,13 +32,13 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：432 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：439 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
 **App/**：`WikiReaderApp`（入口、SwiftData 容器、启动时请求词形还原模型）、`Log`（os_log 的各个 logger，subsystem `tik.tian.com.WikiReader`）、`SettingsKeys`（所有 `@AppStorage` 的键，以及 `SpeechEngineChoice`）。
 
-**Models/**：`Article`（SwiftData：标题、来源 URL、添加时间、内容块 JSON、上次读到的块序号）、`ContentBlock`（标题或段落）。
+**Models/**：`Article`（SwiftData：标题、来源 URL、添加时间、内容块 JSON、上次读到的块序号、单词本 JSON、书签 JSON）、`ContentBlock`（标题或段落）、`SavedWord`、`Bookmark`。
 
 **Services/**
 - 抓取与清洗：`ArticleInput`（链接/标题解析）、`WikipediaClient`（`action=parse` 取 HTML，专用 URLSession，15/30 秒超时）、`ArticleHTMLParser`（HTML → 标题/段落，白名单）、`ArticleCleaner`（章节排除、去音标、引用标记兜底、标点整理）、`ArticleImporter`（输入 → 标题 → 抓取 → 清洗）。
@@ -50,7 +50,7 @@
   - 聊天（讲解、翻译）：`OpenAIChatClient`（共用请求层：Structured Outputs、错误映射 `OpenAIChatError`、专用 URLSession）、`OpenAIExplainClient`（单词讲解 + `WordExplanation`）、`OpenAITranslateClient`（翻译 + `PassageTranslation`）、`TranslationCache`（磁盘缓存）。
 
 **Views/**
-- `Library/`：`LibraryView`（文章列表、搜索、左滑 Info、+ 菜单、多选模式）、`AddArticleView`（添加文章 sheet）、`ArticleInfoView`（文章属性页）、`LibraryStorageView`（文库与存储）、`LibraryActions`（删除文章/语音、下载确认弹窗、下载进度行、格式化）。
+- `Library/`：`LibraryView`（文章列表、搜索、左滑 Info、+ 菜单、多选模式）、`AddArticleView`（添加文章 sheet）、`ArticleInfoView`（文章属性页）、`LibraryStorageView`（文库与存储）、`LibraryActions`（删除文章/语音、下载确认弹窗、下载进度行、格式化）、`SwipeRevealRow`（自做的左滑卡片）、`StartPointView`（有书签的文章打开时选从哪开始）。
 - `Reader/`：
   - `ReaderView`：阅读页容器——沉浸式（隐藏导航栏/状态栏）、顶/底菜单的显隐、各个 sheet（设置、排版、翻译）、查词和翻译的入口。
   - `ArticleTextView`：只负责 UIKit `UITextView` 的那一层——点词、选择菜单、点击区域（`TapZone`）、高亮、自动跟随滚动、位置恢复。
@@ -133,6 +133,17 @@
 - **要看什么**：下次再没声音时，设置 → Playback Log → Copy Report 发给我。关键看 `resume` 那一行的 `session[...]`（类别是不是 Playback、输出设备是什么）、`play() -> true/false`、有没有 `stall` 行（自愈有没有触发、第几次恢复）、前面有没有 `route`/`session`/`app` 事件。**未验证**：自愈在真机上是否真的触发和恢复（模拟器里只有单元测试：假播放器冻结、拒绝播放、重试后恢复、暂停取消检查）。
 - **响度**：量过模拟器里 10 段真实 OpenAI 音频（marin，24 kHz 单声道）：平均响度约 −21 dBFS（只算非静音部分），峰值约 −3 到 −8 dBFS，所以比普通 App 小一截，切过去会觉得突然变大。`AVAudioPlayer.volume` 最大 1.0 放不大，所以打开片段时放大音频本身（`LoudnessBoost`）：先测非静音部分的 RMS，加增益，再过一个**带预读的限幅器**（天花板 0.95，提前 1.5 ms 开始压、80 ms 放开，只压会冲过天花板的那几个最响的音节），输出 16 位 WAV 交给 `AVAudioPlayer(data:)`。**缓存里的 mp3 不动**，所以备份、缓存文件名、已下载的语音都不受影响；只放大不减小；处理在后台线程（`@concurrent`，Release 下 42 秒音频连写 WAV 约 125 ms，**Debug 下约 2 秒、57 秒的要近 4 秒，每段开头会有明显停顿——真机请装 Release**）。
 - **档位**（设置 → Voice，API Key 下面，键 `speechLoudness`，随备份迁移）：Normal（原样，约 −21 dBFS）、Louder（目标 −16，约 +5 dB）、**Loudest（默认，目标 −11，约 +10 dB，振幅约 3 倍）**。10-15 改过一次：第一版只用“99.9 百分位峰值不超过 0.9”卡增益（实际只到约 +6 dB，Loudest 和原音听感差别不大，用户反馈“作用不大”），改成限幅器之后平均响度可以抬得更高。因为限幅器会吃掉一部分增益，增益是迭代找的（割线法，最多 4 次，误差 0.25 dB 内）；增益上限 18 dB，且限幅器在一段里最响的那一下最多压 6 dB（`maxReduction`），超过就不再加增益，免得声音发扁，所以峰值很高的短片段（标题那种）到不了目标。实测 10 段：Loudest 后平均响度 −11.0 到 −13.0，限幅器平均只压 0.2–1.3 dB（大部分时间没动），最深压 6 dB。**Playback Log 里每段开头有一行 `clip ... opened chunk i/n loudness=loudest gain=+11.2dB rms -20.9→-11.1 limiter avg 0.5 max 6.0dB`，能看出到底有没有生效。**从下一段开始生效，试听按钮也走同一条路径。**只对 OpenAI 声音有效**；iPhone 系统声音的 `utterance.volume` 上限就是 1.0，无法放大。**未验证**：真机上的听感（压缩感、失真、和别的 App 的响度差）。
+
+### 书签（2026-10-19）
+- 用户要求：文章加书签；点文章时如果有书签就列出来选从哪开始，没有就从上次位置开始；选择页还要有"从头开始"和"从上次位置继续"；加书签放在阅读页顶部那条栏里。用户说"你看着来搞，直接干活"。
+- **数据**：`Bookmark`（块序号、时间、开头 140 字摘要），存在 `Article.bookmarksData`（JSON，和单词本同样做法，默认空，老数据库原地升级；模拟器上确认迁移后有 `ZBOOKMARKSDATA` 列）。一个块最多一个书签，按阅读顺序排。**粒度是段落（块）**，和阅读位置一致。
+- **添加**：①阅读页顶部栏右边的书签按钮，作用于"当前段"（`session.currentBlock`：朗读时是正在读的段，停止时是屏幕最上面那段；暂停后再滚动走开，仍是暂停的那段），实心=已加，点击切换，中间弹"Bookmarked / Bookmark Removed"提示；②长按选中文字的菜单里加了 "Bookmark / Remove Bookmark"，作用于选区开头那段。
+- **正文标记**：加了书签的段落/标题前面有一个主题色的小实心书签（`NSTextAttachment`，放在块的文字区间之外，所以朗读、高亮、点词的偏移都不受影响；有单元测试）。加/删书签会重建富文本，同样式下保持原滚动位置不跳。
+- **列表**：右滑出的目录页顶部加了 Contents / Bookmarks 切换（主题色胶囊），书签页每条显示章节名、百分比、摘要（书签在标题上时摘要和章节名一样，就不重复显示），点击跳过去，右边 × 删除。
+- **打开文章**：有书签时，点卡片先弹一个半屏选择页（`StartPointView`）：Continue Reading（上次位置>0 时才有，显示百分比、章节、摘要）、From the Beginning、各个书签；没书签直接从上次位置打开。选完把它设成阅读位置再打开。长按卡片也有菜单：Continue Reading、各书签、Info。属性页也有 Bookmarks 一节（点击打开，左滑删除）。行内显示书签数。
+- **备份**：书签随备份导出；导入时新文章带上书签，已有文章按块补上本机没有的（超出正文长度的丢掉）；老备份没有书签字段照常导入。
+- 截图验证过（深色）：文库行内书签数、打开时的选择页、阅读页顶部书签按钮、正文里的书签标记、目录页的书签列表。**未验证**：点按钮/菜单的实际操作、长按卡片的菜单、选择页点选后的跳转、提示动画。
+- 测试：`BookmarkTests`（5 个）+ 备份 2 个。
 
 ### 文章属性页、+ 菜单与批量管理（2026-10-19）
 - 用户要求：左滑按钮从 Delete 改成"查看属性"；右上角 + 不再直接新增，加批量管理（清理文章、缓存所有文章音频等），并让我补充没想到的。

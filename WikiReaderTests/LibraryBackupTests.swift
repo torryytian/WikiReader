@@ -171,6 +171,47 @@ struct LibraryBackupTests {
         #expect(local.savedWords.first { $0.term == "river" }?.meaning == "河")
     }
 
+    @Test func bookmarksTravelWithTheBackupAndMergeByBlock() throws {
+        let context = try makeContext()
+        let local = article("Paris")
+        context.insert(local)
+        local.toggleBookmark(block: 0, text: "here")
+
+        let incoming = [
+            Bookmark(block: 0, createdAt: .now, excerpt: "same block"),
+            Bookmark(block: 1, createdAt: .now, excerpt: "new"),
+            Bookmark(block: 99, createdAt: .now, excerpt: "past the end"),
+        ]
+        let library = LibraryExport(articles: [
+            ExportedArticle(
+                title: "Paris", sourceURL: local.sourceURL, addedAt: .now, lastReadBlockIndex: 0,
+                blocks: local.blocks, savedWords: [], bookmarks: incoming
+            ),
+            ExportedArticle(
+                title: "Rome", sourceURL: ArticleInput.articleURL(forTitle: "Rome"), addedAt: .now, lastReadBlockIndex: 0,
+                blocks: [.paragraph("A."), .paragraph("B.")], savedWords: [], bookmarks: incoming
+            ),
+        ], settings: [:])
+        _ = try LibraryBackup.merge(library, into: context, applySettings: false, defaults: isolatedDefaults())
+
+        // The local one keeps its own bookmark on block 0 and gains block 1; nothing past the text.
+        #expect(local.bookmarks.map(\.block) == [0, 1])
+        #expect(local.bookmarks.first?.excerpt == "here")
+        let rome = try context.fetch(FetchDescriptor<Article>()).first { $0.title == "Rome" }
+        #expect(rome?.bookmarks.map(\.block) == [0, 1])
+    }
+
+    @Test func backupsFromBeforeBookmarksStillImport() throws {
+        let json = #"{"formatVersion":1,"exportedAt":"2026-10-08T10:00:00Z","settings":{},"articles":[{"title":"Paris","sourceURL":"https:\/\/en.wikipedia.org\/wiki\/Paris","addedAt":"2026-10-08T10:00:00Z","lastReadBlockIndex":0,"blocks":[{"kind":"paragraph","level":0,"text":"A."}],"savedWords":[]}]}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let library = try decoder.decode(LibraryExport.self, from: Data(json.utf8))
+        #expect(library.articles.first?.bookmarks == nil)
+        let context = try makeContext()
+        _ = try LibraryBackup.merge(library, into: context, applySettings: false, defaults: isolatedDefaults())
+        #expect(try context.fetch(FetchDescriptor<Article>()).first?.bookmarks.isEmpty == true)
+    }
+
     @Test func settingsAreOnlyAppliedWhenAsked() throws {
         let library = LibraryExport(articles: [], settings: [SettingsKeys.readerTheme: .text("dark")])
         let defaults = isolatedDefaults()

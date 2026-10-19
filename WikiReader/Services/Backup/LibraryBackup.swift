@@ -32,6 +32,8 @@ nonisolated struct ExportedArticle: Codable, Equatable, Sendable {
     var lastReadBlockIndex: Int
     var blocks: [ContentBlock]
     var savedWords: [SavedWord]
+    /// Missing in backups made before bookmarks existed.
+    var bookmarks: [Bookmark]? = nil
 }
 
 /// The contents of a backup file's `library.json`.
@@ -112,7 +114,8 @@ nonisolated enum LibraryBackup {
         let exported = articles.map {
             ExportedArticle(
                 title: $0.title, sourceURL: $0.sourceURL, addedAt: $0.addedAt,
-                lastReadBlockIndex: $0.lastReadBlockIndex, blocks: $0.blocks, savedWords: $0.savedWords
+                lastReadBlockIndex: $0.lastReadBlockIndex, blocks: $0.blocks, savedWords: $0.savedWords,
+                bookmarks: $0.bookmarks
             )
         }
 
@@ -247,6 +250,11 @@ nonisolated enum LibraryBackup {
                 if !added.isEmpty || words != article.savedWords {
                     article.savedWords = (words + added).sorted { $0.savedAt > $1.savedAt }
                 }
+                // Bookmarks on blocks this copy hasn't marked yet (matched by block: same title, same text).
+                let marked = article.bookmarkedBlocks
+                let blockCount = article.blocks.count
+                let newMarks = (incoming.bookmarks ?? []).filter { !marked.contains($0.block) && $0.block < blockCount }
+                if !newMarks.isEmpty { article.bookmarks += newMarks }
                 report.wordsAdded += added.count
                 report.articlesMerged += 1
             } else {
@@ -255,6 +263,7 @@ nonisolated enum LibraryBackup {
                 )
                 article.lastReadBlockIndex = min(max(incoming.lastReadBlockIndex, 0), max(incoming.blocks.count - 1, 0))
                 article.savedWords = incoming.savedWords
+                article.bookmarks = (incoming.bookmarks ?? []).filter { incoming.blocks.indices.contains($0.block) }
                 context.insert(article)
                 byTitle[key] = article
                 report.wordsAdded += incoming.savedWords.count

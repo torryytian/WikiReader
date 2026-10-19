@@ -72,8 +72,8 @@ private struct ArticleReader: View {
     @AppStorage(SettingsKeys.readerDarkLevel) private var darkLevel = ReaderStyle.defaultDarkLevel
     @AppStorage(SettingsKeys.playbackMode) private var playbackMode = PlaybackMode.sequential
     @State private var blocks: [ContentBlock] = []
-    /// A message shown in the middle of the screen for a few seconds (the play mode just chosen).
-    @State private var toast: PlaybackMode?
+    /// A message shown in the middle of the screen for a few seconds (the play mode just chosen, a bookmark).
+    @State private var toast: ReaderMessage?
     @State private var toastGeneration = 0
     @State private var translation: PassageTranslationModel?
     @State private var isShowingSavedWords = false
@@ -116,6 +116,7 @@ private struct ArticleReader: View {
                         Log.speech.info("Read from here: start at block \(block)")
                         session.start(at: block)
                     },
+                    onToggleBookmark: toggleBookmark(block:),
                     onTranslate: { translate($0, pausing: session) },
                     onTapZone: handleTap(in:),
                     savedWordKeys: Set(article.savedWords.flatMap { [$0.word.lowercased(), $0.term.lowercased()] }),
@@ -144,7 +145,9 @@ private struct ArticleReader: View {
                             title: article.title,
                             progress: ReadingProgress(blocks: blocks, currentBlock: session.currentBlock, rate: session.rate),
                             style: style,
-                            onBack: { dismiss() }
+                            isBookmarked: article.isBookmarked(block: session.currentBlock),
+                            onBack: { dismiss() },
+                            onToggleBookmark: { toggleBookmark(block: session.currentBlock) }
                         )
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
@@ -167,7 +170,7 @@ private struct ArticleReader: View {
                                 ReaderBottomMenu(
                                     session: session, style: style, fontFamily: $fontFamily, fontSize: $fontSize,
                                     lineSpacing: $lineSpacing, margins: $margins, theme: $theme, playbackMode: $playbackMode,
-                                    isPinned: $isMenuPinned, onModeChanged: showToast
+                                    isPinned: $isMenuPinned, onModeChanged: { showMessage(symbol: $0.symbol, text: $0.menuTitle) }
                                 )
                                 .background {
                                     GeometryReader { proxy in
@@ -197,7 +200,7 @@ private struct ArticleReader: View {
                 contentsPanel(session: session)
 
                 if let toast {
-                    ReaderToast(symbol: toast.symbol, text: toast.menuTitle, style: style)
+                    ReaderToast(symbol: toast.symbol, text: toast.text, style: style)
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         .allowsHitTesting(false)
                 }
@@ -219,7 +222,7 @@ private struct ArticleReader: View {
         .onChange(of: style) { oldStyle, newStyle in
             // New fonts and text colors mean a new text; the text view keeps the reader's place.
             guard oldStyle.textLayout != newStyle.textLayout else { return }
-            document = ArticleDocument(title: article.title, blocks: blocks, style: newStyle)
+            rebuildDocument(style: newStyle)
         }
         .onAppear(perform: prepare)
         .onDisappear {
@@ -274,16 +277,70 @@ private struct ArticleReader: View {
     private func contentsPanel(session: ReadingSession) -> some View {
         ZStack(alignment: .leading) {
             if isShowingContents {
-                ContentsView(articleTitle: article.title, outline: outline, currentBlock: session.currentBlock, style: style, onSelect: { entry in
-                    isShowingContents = false
-                    Log.app.info("Contents: jump to block \(entry.block)")
-                    session.go(to: entry.block)
-                    scrollTarget = ArticleTextView.ScrollTarget(token: (scrollTarget?.token ?? 0) + 1, block: entry.block)
-                }, onClose: { isShowingContents = false })
+                ContentsView(
+                    articleTitle: article.title, outline: outline, currentBlock: session.currentBlock, style: style,
+                    bookmarks: bookmarkItems,
+                    onSelect: { entry in
+                        Log.app.info("Contents: jump to block \(entry.block)")
+                        jump(to: entry.block, in: session)
+                    },
+                    onSelectBookmark: { bookmark in
+                        Log.app.info("Bookmarks: jump to block \(bookmark.block)")
+                        jump(to: bookmark.block, in: session)
+                    },
+                    onDeleteBookmark: { bookmark in
+                        article.removeBookmark(id: bookmark.id)
+                        rebuildDocument(style: style)
+                    },
+                    onClose: { isShowingContents = false }
+                )
                 .transition(.move(edge: .leading))
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isShowingContents)
+    }
+
+    /// Closes the contents and goes to a block: reading continues from there if it was going.
+    private func jump(to block: Int, in session: ReadingSession) {
+        isShowingContents = false
+        session.go(to: block)
+        scrollTarget = ArticleTextView.ScrollTarget(token: (scrollTarget?.token ?? 0) + 1, block: block)
+    }
+
+    // MARK: - Bookmarks
+
+    /// The article's bookmarks as the contents panel lists them.
+    private var bookmarkItems: [ContentsView.BookmarkItem] {
+        let total = max(outline.totalCharacters, 1)
+        var before = 0
+        var starts: [Int] = []
+        for block in blocks {
+            starts.append(before)
+            before += block.text.count
+        }
+        return article.bookmarks.filter { blocks.indices.contains($0.block) }.map { bookmark in
+            ContentsView.BookmarkItem(
+                bookmark: bookmark,
+                section: outline.currentEntry(atBlock: bookmark.block)?.title ?? article.title,
+                percent: Int((Double(starts[bookmark.block]) / Double(total) * 100).rounded())
+            )
+        }
+    }
+
+    /// Bookmarks the block, or removes its bookmark, and says which.
+    private func toggleBookmark(block: Int) {
+        guard blocks.indices.contains(block) else { return }
+        let isMarked = article.toggleBookmark(block: block, text: blocks[block].text)
+        try? article.modelContext?.save()
+        Log.app.info("Bookmark \(isMarked ? "added" : "removed", privacy: .public) at block \(block)")
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        rebuildDocument(style: style)
+        showMessage(symbol: isMarked ? "bookmark.fill" : "bookmark.slash", text: isMarked ? "Bookmarked" : "Bookmark Removed")
+    }
+
+    /// Lays the article out again, with the bookmark markers as they are now.
+    private func rebuildDocument(style: ReaderStyle) {
+        document = ArticleDocument(title: article.title, blocks: blocks, style: style, bookmarkedBlocks: article.bookmarkedBlocks)
     }
 
     private func closeSavedWords() {
@@ -292,10 +349,10 @@ private struct ArticleReader: View {
 
     // MARK: - Menus
 
-    /// Announces the play mode in the middle of the screen for about three seconds. A newer message replaces it
-    /// and restarts the time.
-    private func showToast(_ mode: PlaybackMode) {
-        toast = mode
+    /// Shows a message (the play mode just chosen, a bookmark added) in the middle of the screen for about three
+    /// seconds. A newer message replaces it and restarts the time.
+    private func showMessage(symbol: String, text: String) {
+        toast = ReaderMessage(symbol: symbol, text: text)
         toastGeneration += 1
         let generation = toastGeneration
         Task {
@@ -334,7 +391,7 @@ private struct ArticleReader: View {
         let blocks = article.blocks
         self.blocks = blocks
         outline = ArticleOutline(blocks: blocks)
-        document = ArticleDocument(title: article.title, blocks: blocks, style: style)
+        rebuildDocument(style: style)
 
         let session = ReadingSession(
             blocks: blocks,
@@ -426,6 +483,12 @@ private struct ArticleReader: View {
             setMeaning: { [article] meaning in article.setMeaning(meaning, forTerm: request.term) }
         )
     }
+}
+
+/// A short message in the middle of the reader.
+struct ReaderMessage: Equatable {
+    var symbol: String
+    var text: String
 }
 
 /// The laid-out height of the reader's bottom menu, reported up so the text can make room for it.

@@ -8,14 +8,20 @@ extension NSAttributedString.Key {
 /// The whole article as one attributed string, plus where each block lives in it.
 /// `blockRanges[i]` is the range of `blocks[i]`; speech, highlighting and
 /// "start reading from this paragraph" all map between blocks and text through it.
-/// Text that isn't a block (the title, the line breaks, the "Translate" labels) sits outside those ranges.
+/// Text that isn't a block (the title, the line breaks, the "Translate" labels, bookmark markers) sits outside those ranges.
 struct ArticleDocument {
     let attributedText: NSAttributedString
     let blockRanges: [NSRange]
     /// Range of the article title shown above the first block.
     let titleRange: NSRange
+    /// The style it was laid out with (`textLayout`), so a text view can tell a restyle, which moves everything,
+    /// from a bookmark coming or going, which doesn't.
+    let layout: ReaderStyle
+    let bookmarkedBlocks: Set<Int>
 
-    init(title: String, blocks: [ContentBlock], style: ReaderStyle = .default) {
+    init(title: String, blocks: [ContentBlock], style: ReaderStyle = .default, bookmarkedBlocks: Set<Int> = []) {
+        layout = style.textLayout
+        self.bookmarkedBlocks = bookmarkedBlocks
         let text = NSMutableAttributedString()
 
         let titleStart = text.length
@@ -27,6 +33,9 @@ struct ArticleDocument {
         for (index, block) in blocks.enumerated() {
             text.append(NSAttributedString(string: "\n"))
             let kind: Style = block.kind == .heading ? .heading(level: block.level) : .paragraph
+            if bookmarkedBlocks.contains(index) {
+                text.append(Self.bookmarkMarker(for: kind, style: style))
+            }
             let start = text.length
             text.append(NSAttributedString(string: block.text, attributes: Self.attributes(for: kind, style: style)))
             ranges.append(NSRange(location: start, length: text.length - start))
@@ -146,6 +155,27 @@ struct ArticleDocument {
             .foregroundColor: style.theme.text,
             .paragraphStyle: paragraph,
         ]
+    }
+
+    /// A small filled bookmark before a bookmarked block, in the theme's accent color. It carries the block's own
+    /// style (as the first character, it sets the paragraph's spacing) and sits outside the block's range.
+    static func bookmarkMarker(for kind: Style, style: ReaderStyle) -> NSAttributedString {
+        var attributes = attributes(for: kind, style: style)
+        let font = attributes[.font] as? UIFont ?? .preferredFont(forTextStyle: .body)
+        let color = style.theme.accent ?? UIColor.tintColor
+        let configuration = UIImage.SymbolConfiguration(pointSize: font.pointSize * 0.72, weight: .semibold)
+        let attachment = NSTextAttachment()
+        attachment.image = UIImage(systemName: "bookmark.fill", withConfiguration: configuration)?
+            .withTintColor(color, renderingMode: .alwaysOriginal)
+        if let size = attachment.image?.size {
+            // Sitting on the baseline like a capital letter.
+            attachment.bounds = CGRect(x: 0, y: (font.capHeight - size.height) / 2, width: size.width, height: size.height)
+        }
+        let marker = NSMutableAttributedString(attachment: attachment)
+        attributes[.foregroundColor] = color
+        marker.addAttributes(attributes, range: NSRange(location: 0, length: marker.length))
+        marker.append(NSAttributedString(string: "\u{2009}", attributes: attributes))  // a thin space before the text
+        return marker
     }
 
     /// The small "Translate" link at the end of a paragraph. It carries the paragraph's own style, so the

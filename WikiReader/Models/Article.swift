@@ -13,6 +13,8 @@ final class Article {
     var lastReadBlockIndex: Int
     /// `[SavedWord]` encoded as JSON (see `SavedWord.swift`). The default lets existing databases upgrade in place.
     var savedWordsData: Data = Data()
+    /// `[Bookmark]` encoded as JSON (see `Bookmark.swift`). The default lets existing databases upgrade in place.
+    var bookmarksData: Data = Data()
 
     init(title: String, sourceURL: URL, blocks: [ContentBlock], addedAt: Date = .now) {
         self.title = title
