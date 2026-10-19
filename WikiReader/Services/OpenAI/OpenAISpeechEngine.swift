@@ -8,10 +8,10 @@ import OSLog
 /// and speed is the player's rate, so neither generates new audio. Word positions are estimated
 /// from playback progress (`WordTimeline`), since OpenAI returns no timestamps.
 final class OpenAISpeechEngine: SpeechEngine {
-    static let model = "gpt-4o-mini-tts"
-    static let defaultVoice = "marin"
-    static let voices = ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
-    static let instructions = "Read like a clear, natural audiobook narrator, at a steady, moderate pace."
+    nonisolated static let model = "gpt-4o-mini-tts"
+    nonisolated static let defaultVoice = "marin"
+    nonisolated static let voices = ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
+    nonisolated static let instructions = "Read like a clear, natural audiobook narrator, at a steady, moderate pace."
 
     var onEvent: ((SpeechEvent) -> Void)?
 
@@ -24,6 +24,7 @@ final class OpenAISpeechEngine: SpeechEngine {
     /// How long after starting a clip it must have moved before it is called stalled; nil turns the check off.
     private let stallCheck: Duration?
     private let log: PlaybackLog
+    private let generations: SpeechGenerations
 
     /// Generation in progress, by cache key: `speak` and `prepare` share one request per text.
     private var inFlight: [String: Task<Result<URL, OpenAITTSError>, Never>] = [:]
@@ -72,8 +73,10 @@ final class OpenAISpeechEngine: SpeechEngine {
         makeClip: @escaping (URL) async throws -> AudioClip = { try await AVAudioClip.make(contentsOf: $0) },
         tickInterval: Duration = .milliseconds(80),
         stallCheck: Duration? = .milliseconds(500),
-        log: PlaybackLog = .standard
+        log: PlaybackLog = .standard,
+        generations: SpeechGenerations = .shared
     ) {
+        self.generations = generations
         self.voice = voice
         self.client = client
         self.cache = cache
@@ -312,7 +315,13 @@ final class OpenAISpeechEngine: SpeechEngine {
     // MARK: - Audio files
 
     private func request(for text: String) -> OpenAISpeechRequest {
-        OpenAISpeechRequest(model: Self.model, voice: voice, input: text, instructions: Self.instructions)
+        Self.request(for: text, voice: voice)
+    }
+
+    /// The request that reads `text` with `voice`. Its cache name depends on every field, so anything that looks for
+    /// an article's audio (backup, the article info page, the batch download) builds requests here.
+    nonisolated static func request(for text: String, voice: String) -> OpenAISpeechRequest {
+        OpenAISpeechRequest(model: model, voice: voice, input: text, instructions: instructions)
     }
 
     /// The cached audio for `text`, generating it at once if needed (this is what is being read, so it doesn't wait
@@ -331,10 +340,9 @@ final class OpenAISpeechEngine: SpeechEngine {
         return startGeneration(request, key: key, apiKey: apiKey)
     }
 
+    /// Joins a generation of the same text already running elsewhere (say, the batch download) rather than paying twice.
     private func startGeneration(_ request: OpenAISpeechRequest, key: String, apiKey: String) -> Task<Result<URL, OpenAITTSError>, Never> {
-        Log.speech.info("Generating OpenAI audio for \(request.input.utf16.count) characters")
-        let client = client, cache = cache
-        let task = Task { await Self.generate(request, apiKey: apiKey, client: client, cache: cache) }
+        let task = generations.generate(request, apiKey: apiKey, client: client, cache: cache)
         inFlight[key] = task
         Task {
             _ = await task.value
@@ -343,23 +351,5 @@ final class OpenAISpeechEngine: SpeechEngine {
             if prefetching.remove(key) != nil { pumpPrefetch() }
         }
         return task
-    }
-
-    /// Network and file work, off the main actor.
-    @concurrent
-    private static func generate(
-        _ request: OpenAISpeechRequest, apiKey: String, client: OpenAITTSClient, cache: SpeechAudioCache
-    ) async -> Result<URL, OpenAITTSError> {
-        let audio: Data
-        do {
-            audio = try await client.synthesize(request, apiKey: apiKey)
-        } catch {
-            return .failure(error)
-        }
-        do {
-            return .success(try cache.store(audio, for: request))
-        } catch {
-            return .failure(.audio(error.localizedDescription))
-        }
     }
 }

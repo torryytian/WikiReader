@@ -21,8 +21,6 @@ struct VoiceSettingsView: View {
     @State private var cacheSize: Int64 = 0
     @State private var isConfirmingClearCache = false
 
-    private static let sampleText = "This is how Wikipedia articles will sound with this voice."
-
     private var choice: VoiceChoice {
         VoiceChoice.current(
             engine: engineChoice, voiceIdentifier: voiceIdentifier, openAIVoice: openAIVoice,
@@ -296,7 +294,7 @@ struct VoiceSettingsView: View {
             }
         }
         previewError = nil
-        engine.speak(SpeechUtterance(id: 1, text: Self.sampleText, rate: SpeechRate(rawValue: rateValue) ?? .normal))
+        engine.speak(SpeechUtterance(id: 1, text: ArticleAudio.sampleText, rate: SpeechRate(rawValue: rateValue) ?? .normal))
         previewEngine = engine
         previewingVoice = id
     }

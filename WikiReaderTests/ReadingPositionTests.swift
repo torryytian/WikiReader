@@ -85,7 +85,8 @@ struct LibraryDeleteTests {
         context.insert(paris)
         try context.save()
 
-        LibraryView.delete([einstein], from: context)
+        // Without audio: deleting audio would touch the app's real cache.
+        LibraryActions.delete([einstein], withAudio: false, library: [einstein, paris], context: context)
 
         let remaining = try context.fetch(FetchDescriptor<Article>())
         #expect(remaining.map(\.title) == ["Paris"])

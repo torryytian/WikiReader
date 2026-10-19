@@ -23,6 +23,11 @@ final class Article {
     }
 
     var blocks: [ContentBlock] {
-        (try? JSONDecoder().decode([ContentBlock].self, from: blocksData)) ?? []
+        Self.decodeBlocks(blocksData)
+    }
+
+    /// For work off the main actor on a copy of `blocksData` (a long article takes a moment to decode).
+    nonisolated static func decodeBlocks(_ data: Data) -> [ContentBlock] {
+        (try? JSONDecoder().decode([ContentBlock].self, from: data)) ?? []
     }
 }

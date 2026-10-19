@@ -6,7 +6,7 @@
 
 ## 0. 接手须知（新会话先读这里）
 
-**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。411 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
+**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。432 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、下载全部语音、文库与存储）。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
 
 **先做这几件事**
 1. `git pull`，按 CLAUDE.md 编译并跑测试（见第 6 节的环境注意事项）。
@@ -32,7 +32,7 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：411 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：432 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
@@ -46,11 +46,11 @@
 - 查词：`DictionaryLookup`（候选词顺序、词形还原、所在句子）、`WordPronouncer`（喇叭：先真人录音，没有就系统美式声音）。`Dictionary/`：`DictionaryDatabase`、`DictionaryEntry`（离线词库）、`WiktionaryClient` + `DefinitionCache`、`WordAudioClient`。
 - 钥匙串：`KeychainStore`（OpenAI Key）。
 - `OpenAI/`：
-  - 朗读：`OpenAITTSClient`、`OpenAISpeechEngine`、`SpeechChunking`、`SpeechAudioCache`、`AudioClip`。
+  - 朗读：`OpenAITTSClient`、`OpenAISpeechEngine`、`SpeechChunking`、`SpeechAudioCache`、`AudioClip`、`SpeechGenerations`（全 App 共用的"正在生成"登记）、`ArticleAudio`（某篇文章/整个文库的语音缓存状态、清理）、`AudioDownloader`（批量下载）。
   - 聊天（讲解、翻译）：`OpenAIChatClient`（共用请求层：Structured Outputs、错误映射 `OpenAIChatError`、专用 URLSession）、`OpenAIExplainClient`（单词讲解 + `WordExplanation`）、`OpenAITranslateClient`（翻译 + `PassageTranslation`）、`TranslationCache`（磁盘缓存）。
 
 **Views/**
-- `Library/`：`LibraryView`（文章列表、左滑删除）、`AddArticleView`（添加文章 sheet）。
+- `Library/`：`LibraryView`（文章列表、搜索、左滑 Info、+ 菜单、多选模式）、`AddArticleView`（添加文章 sheet）、`ArticleInfoView`（文章属性页）、`LibraryStorageView`（文库与存储）、`LibraryActions`（删除文章/语音、下载确认弹窗、下载进度行、格式化）。
 - `Reader/`：
   - `ReaderView`：阅读页容器——沉浸式（隐藏导航栏/状态栏）、顶/底菜单的显隐、各个 sheet（设置、排版、翻译）、查词和翻译的入口。
   - `ArticleTextView`：只负责 UIKit `UITextView` 的那一层——点词、选择菜单、点击区域（`TapZone`）、高亮、自动跟随滚动、位置恢复。
@@ -133,6 +133,18 @@
 - **要看什么**：下次再没声音时，设置 → Playback Log → Copy Report 发给我。关键看 `resume` 那一行的 `session[...]`（类别是不是 Playback、输出设备是什么）、`play() -> true/false`、有没有 `stall` 行（自愈有没有触发、第几次恢复）、前面有没有 `route`/`session`/`app` 事件。**未验证**：自愈在真机上是否真的触发和恢复（模拟器里只有单元测试：假播放器冻结、拒绝播放、重试后恢复、暂停取消检查）。
 - **响度**：量过模拟器里 10 段真实 OpenAI 音频（marin，24 kHz 单声道）：平均响度约 −21 dBFS（只算非静音部分），峰值约 −3 到 −8 dBFS，所以比普通 App 小一截，切过去会觉得突然变大。`AVAudioPlayer.volume` 最大 1.0 放不大，所以打开片段时放大音频本身（`LoudnessBoost`）：先测非静音部分的 RMS，加增益，再过一个**带预读的限幅器**（天花板 0.95，提前 1.5 ms 开始压、80 ms 放开，只压会冲过天花板的那几个最响的音节），输出 16 位 WAV 交给 `AVAudioPlayer(data:)`。**缓存里的 mp3 不动**，所以备份、缓存文件名、已下载的语音都不受影响；只放大不减小；处理在后台线程（`@concurrent`，Release 下 42 秒音频连写 WAV 约 125 ms，**Debug 下约 2 秒、57 秒的要近 4 秒，每段开头会有明显停顿——真机请装 Release**）。
 - **档位**（设置 → Voice，API Key 下面，键 `speechLoudness`，随备份迁移）：Normal（原样，约 −21 dBFS）、Louder（目标 −16，约 +5 dB）、**Loudest（默认，目标 −11，约 +10 dB，振幅约 3 倍）**。10-15 改过一次：第一版只用“99.9 百分位峰值不超过 0.9”卡增益（实际只到约 +6 dB，Loudest 和原音听感差别不大，用户反馈“作用不大”），改成限幅器之后平均响度可以抬得更高。因为限幅器会吃掉一部分增益，增益是迭代找的（割线法，最多 4 次，误差 0.25 dB 内）；增益上限 18 dB，且限幅器在一段里最响的那一下最多压 6 dB（`maxReduction`），超过就不再加增益，免得声音发扁，所以峰值很高的短片段（标题那种）到不了目标。实测 10 段：Loudest 后平均响度 −11.0 到 −13.0，限幅器平均只压 0.2–1.3 dB（大部分时间没动），最深压 6 dB。**Playback Log 里每段开头有一行 `clip ... opened chunk i/n loudness=loudest gain=+11.2dB rms -20.9→-11.1 limiter avg 0.5 max 6.0dB`，能看出到底有没有生效。**从下一段开始生效，试听按钮也走同一条路径。**只对 OpenAI 声音有效**；iPhone 系统声音的 `utterance.volume` 上限就是 1.0，无法放大。**未验证**：真机上的听感（压缩感、失真、和别的 App 的响度差）。
+
+### 文章属性页、+ 菜单与批量管理（2026-10-19）
+- 用户要求：左滑按钮从 Delete 改成"查看属性"；右上角 + 不再直接新增，加批量管理（清理文章、缓存所有文章音频等），并让我补充没想到的。
+- **左滑 → Info（蓝色）**，打开 `ArticleInfoView`：标题 + 首段摘要（5 行，可展开）+ 打开 Wikipedia 原页；概况（词数、章节/段落数、1× 听完时长、阅读位置百分比和所在章节、收藏词数、添加时间）；**语音**（当前 OpenAI 声音已下载的百分比、分钟数、占用空间；下载剩余语音并显示预计时长和费用；其它声音的占用；删除本文语音）；**目录**（各章节按层级缩进，显示分钟数和语音下载小圆环，当前阅读章节有书签标记，点一节就从那里打开文章）；删除文章（可选连同语音一起删，或保留语音）。
+- **+ 变成菜单**（点一下就展开，不再直接添加）：Add Article、Select Articles、Download All Audio、Library & Storage。
+- **多选模式**：列表左边出现勾选框，顶部 Select All / Done，底部 Download Audio 和 Delete 菜单（Delete Audio Only / Delete Articles）。底部原本放三个文字按钮，iOS 26 会把第三个收进"…"，所以改成两个。
+- **Library & Storage**（sheet）：文库总量（篇数、词数、时长、收藏词）；整库当前声音的下载进度与"下载全部剩余"；音频存储：当前声音、其它声音、**没有任何文章用到的音频**（删文章留下的、或文章内容变了），后两项可一键删除；Backup & Transfer 入口。
+- **批量下载**（`AudioDownloader`）：先算计划（只算缺的段；时长按 14 字/秒、费用按 $0.015/分钟估），弹窗确认后开始；同时 2 个请求；Key 无效/没额度/没 Key 立即停；单段失败计数跳过，连续 4 段失败停（断网）；可随时 Stop（已发出的请求让它完成并存盘，钱已经花了）；下载期间屏幕常亮（App 被挂起下载就停了）。列表顶部显示进度条，行内显示"Audio 42%"/"Downloading"/"Audio downloaded"。**改了 CLAUDE.md 的联网规则**：原来是"不批量生成全文"，现在是"只在用户手动触发并确认费用后批量生成"。
+- **不重复付费**：新增 `SpeechGenerations`，朗读引擎、试听、批量下载共用"正在生成"登记（按缓存文件路径），同一段正在生成时再请求只会等同一个结果。
+- 删除文章时语音的处理：只删**其它文章没有用到**的文本对应的文件（13 个声音都删）。试听样本文本（`ArticleAudio.sampleText`）不算"没用到"。
+- 补充的功能：标题搜索；行内语音进度标记；"没用到的音频"清理；"其它声音"清理。**考虑过没做**：排序（按标题/最近打开）——阅读结束后"自动读下一篇"按添加时间排，列表换排序会和它不一致，要先定规则；"刷新文章"（重新抓取）——正文一变，已付费的语音全部失效；标记"已读完"。
+- 截图验证过（深色）：属性页上下两半、存储页、多选模式、下载进度行（用临时代码伪造的进度）。**未验证**：左滑手势本身、+ 菜单展开的样子（模拟器无法程序化打开菜单）、真实的批量下载（没有花钱跑）、点目录跳转、删除流程的弹窗、屏幕常亮。
 
 ### 自己的词典页，取代系统词典（2026-10-13）
 - **起因**：① 系统词典的内容区是另一个进程画的，触摸 App 收不到，下滑关不掉（试了三版都只能靠小横条/标题栏拖动区）；② 苹果词库释义不好用、没装英汉词典就没有中文。AI 讲解页和翻译页因为是我们自己的 SwiftUI，所以任意位置下滑都能关。**结论：点词直接弹自己的词典页，下滑关闭和 AI 页一样。**

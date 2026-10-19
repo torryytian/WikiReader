@@ -142,10 +142,7 @@ nonisolated enum LibraryBackup {
             for chunk in SpeechChunking.chunks(of: block.text) {
                 let input = text.substring(with: chunk)
                 for voice in OpenAISpeechEngine.voices {
-                    let request = OpenAISpeechRequest(
-                        model: OpenAISpeechEngine.model, voice: voice, input: input,
-                        instructions: OpenAISpeechEngine.instructions
-                    )
+                    let request = OpenAISpeechEngine.request(for: input, voice: voice)
                     guard let url = cache.cachedFile(for: request), seen.insert(url.lastPathComponent).inserted else { continue }
                     files.append((audioFolder + url.lastPathComponent, url))
                 }
