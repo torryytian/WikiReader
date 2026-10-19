@@ -258,6 +258,8 @@
 - [ ] 联网词典取真人录音/音标：要改 CLAUDE.md 的联网规定，用户没要求。
 - [ ] 段落翻译是否改成段落下方内联展开（现在是 sheet）。
 
+- [ ] **音频（YouTube 等）+ 字幕、主页分 Articles/Audio 两个标签页**：2026-10-19 讨论后用户决定**先不做**。结论备查：App 内解析 YouTube 只拿音频也一样会定期失效（坏的是"拿下载地址"那一步，音视频同一套流程），且违反 YouTube 条款；yt-dlp 是 Python 程序，iOS App 里跑不了。稳定的路是：Mac 或自建服务器上跑 yt-dlp（YouTube 自带/自动字幕一起下）、App 里做播客 RSS / 直接音频链接 / 文件导入，没字幕时用 iPhone 离线识别（iOS 26 SpeechAnalyzer，免费、带逐词时间）或 OpenAI 转写（约 $0.36/小时）。这台 Mac 没装 yt-dlp、ffmpeg、Homebrew。
+
 **已知问题**
 - [ ] 行内公式删除后句子缺词（见上）。
 
