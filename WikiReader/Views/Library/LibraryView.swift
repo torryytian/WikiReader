@@ -52,7 +52,8 @@ struct LibraryView: View {
                             } label: {
                                 Label("Info", systemImage: "info.circle")
                             }
-                            .tint(.blue)
+                            // A quiet gray, like Mail's More: the row, not the button, should catch the eye.
+                            .tint(Self.infoTint)
                         }
                     }
                 }
@@ -139,6 +140,9 @@ struct LibraryView: View {
             }
         }
     }
+
+    /// Dark: a gray a step lighter than the row. Light: the system gray.
+    private static let infoTint = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemGray3 : .systemGray })
 
     private enum AfterInfo {
         case open(Article, block: Int)
