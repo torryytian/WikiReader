@@ -11,6 +11,7 @@ struct LibraryView: View {
     @State private var downloader = AudioDownloader.shared
     @State private var path: [Article] = []
     @State private var isAddingArticle = false
+    @State private var importer = ArticleImportCoordinator()
     @State private var isShowingSettings = false
     @State private var isShowingStorage = false
     @State private var infoArticle: Article?
@@ -88,7 +89,7 @@ struct LibraryView: View {
                     ContentUnavailableView(
                         "No Articles",
                         systemImage: "books.vertical",
-                        description: Text("Tap + to add a Wikipedia article.")
+                        description: Text("Tap + to add an article from Wikipedia, or import your own text, PDF or photos.")
                     )
                 } else if shownArticles.isEmpty {
                     ContentUnavailableView.search(text: searchText)
@@ -122,6 +123,9 @@ struct LibraryView: View {
                 AddArticleView { article in
                     path = [article]
                 }
+            }
+            .articleImport(importer) { article in
+                path = [article]
             }
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView()
@@ -280,8 +284,13 @@ struct LibraryView: View {
 
     private var addMenu: some View {
         Menu {
-            Button("Add Article", systemImage: "plus") {
+            Button("Add from Wikipedia", systemImage: "plus") {
                 isAddingArticle = true
+            }
+            Section("Import") {
+                Button("File…", systemImage: "doc") { importer.isChoosingFile = true }
+                Button("Photos…", systemImage: "photo.on.rectangle") { importer.isChoosingPhotos = true }
+                Button("Paste Text", systemImage: "doc.on.clipboard") { importer.paste() }
             }
             Button("Select Articles", systemImage: "checkmark.circle") {
                 withAnimation { isSelecting = true }

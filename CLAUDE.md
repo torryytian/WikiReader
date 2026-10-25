@@ -7,6 +7,8 @@ WikiReader：iPhone 上的英语阅读 App，抓取 Wikipedia 正文、朗读、
 各阶段进度、开发中做出的决定和待办见 @PROGRESS.md（每完成一个阶段或做出重要决定后更新它）
 **接手（新会话、换电脑）先读 PROGRESS.md 第 0 节**；上一个长会话的完整过程记录在 `docs/SESSION-2026-10-07-08.md`（需要时读，不是自动加载）。
 
+**为 WikiReader 生成文章（任何会话里）必须遵循 `docs/ARTICLE-FORMAT.md`**：Markdown、一个 `# 标题`、`##` 章节、段落一行一段并空行分隔、不放表格/代码/图片/URL、正文纯英文。用户的文章大多是学英语用的，之后会要求 App 对这类文章做专门的朗读支持（现在没有）。
+
 ## 关于我
 
 - 我是基础设施方向的工程师（分布式系统、Linux），熟悉 git 和命令行，但没写过 Swift，也没做过 iOS 开发。
@@ -29,6 +31,7 @@ WikiReader/
   Models/       SwiftData 模型
   Services/     WikipediaClient、ArticleCleaner、SpeechEngine、DictionaryLookup、VoiceChoice
     Dictionary/ 离线词库（ECDICT）查询、Wiktionary 英文释义、真人发音
+    Import/     导入本地文章：文本/Markdown、PDF、图片（OCR）、粘贴 → 标题和段落
     OpenAI/     朗读（TTS）、聊天请求层、单词讲解、翻译、缓存
   Views/        Library、Reader（阅读页、词典、翻译面板）、Settings
 WikiReaderTests/

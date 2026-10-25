@@ -105,8 +105,13 @@ struct ArticleInfoView: View {
                 }
             }
             .padding(.vertical, 4)
-            Link(destination: article.sourceURL) {
-                Label("Open on Wikipedia", systemImage: "safari")
+            if article.isImported {
+                Label("Imported text", systemImage: "doc.text")
+                    .foregroundStyle(.secondary)
+            } else {
+                Link(destination: article.sourceURL) {
+                    Label("Open on Wikipedia", systemImage: "safari")
+                }
             }
         }
     }
