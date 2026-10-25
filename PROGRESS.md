@@ -248,6 +248,7 @@
 - 数据：`Article.origin`（`"wikipedia"` 默认 / `"imported"`），`sourceURL` 对导入文章是占位 `wikireader-import://local/<uuid>`；文章属性页对导入文章显示 "Imported text" 而不是 "Open on Wikipedia"。备份文件带 `origin`（旧备份没有，视为 Wikipedia）。
 - 解析规则（`Services/Import/`）：恰好一个 `#` → 文章标题；`##`+ → 章节（level ≥ 2）；空行分段，相邻行并成一段；列表项各成一段；表格、代码块丢弃；Markdown/HTML 装饰去掉（转义字符保留）。PDF 用字号/加粗判断标题、用行距/行尾标点判断段落、去掉页码和重复页眉页脚、还原断词连字符；扫描页走 OCR。
 - **生成文章的规范写在 `docs/ARTICLE-FORMAT.md`**（CLAUDE.md 和记忆里都有指针，别的会话生成文章要照它写）。其中第 6 节"英语学习类文章"的**专门朗读支持还没做**：词汇表/练习题/中文释义目前会被当普通段落读。用户说之后会提需求。
+- **也认 MediaWiki 格式**（`.wiki`/`.wikitext`/`.mediawiki`，或任何含 `== 标题 ==` 且没有 Markdown 标题的文本，包括粘贴）：`WikitextConverter` 先转成 Markdown 风格再解析——链接留文字、模板/注释/`<ref>`/分类/文件/表格去掉、`*`/`#` 列表转列表项、末尾 See also/References/Notes/External links 等小节丢掉（和 Wikipedia 文章一致）。起因：用户给的第一篇文章 `The_Paradox_of_Convenience.wiki` 就是这个格式；样本放在 `WikiReaderTests/Fixtures/` 里，有测试。文件选择器额外放行 `.data`（`.wiki` 系统不认识，否则选不了），不支持的类型选了会明确提示。
 - 测试：+约 45 个（解析器 19、行组装 10、文件读取 7、真实生成的 PDF 和图片 OCR 3、备份 origin 3）。
 - **未验证**：文件选择器、照片选择器、粘贴按钮（点击没法自动化）；真实手机拍的照片和真实 PDF（只用合成的 PDF/图片测过）；多栏 PDF、带公式的 PDF 效果一般（按行顺序读，不识别分栏）。预览页和导入后的阅读页只看过模拟器截图。
 

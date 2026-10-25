@@ -10,6 +10,8 @@
 - 文件名用英文标题，空格换成下划线，例如 `The_Tea_Trade.md`。文本里没有 `# 标题` 时，App 用文件名当文章标题。
 - 一个文件一篇文章。
 
+> **也接受 MediaWiki 格式（`.wiki`）**：`== 章节 ==`、`[[链接]]`、`''斜体''`、`{{模板}}`、`[[Category:…]]` 都能导入，App 会转成上面的 Markdown 规则再处理（链接留文字，模板/分类/脚注/表格去掉，末尾的 See also / References / External links 等小节不朗读）。wikitext 没有 `# 标题` 行，标题取文件名（`The_Paradox_of_Convenience.wiki` → "The Paradox of Convenience"）。**但优先写 Markdown**：规则更少，预览更准。
+
 ## 2. 结构
 
 ```markdown

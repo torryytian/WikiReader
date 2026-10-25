@@ -14,14 +14,19 @@ nonisolated struct ExtractedText: Equatable, Sendable {
 nonisolated enum FileTextExtractor {
     /// What the file picker offers.
     static var allowedTypes: [UTType] {
-        [.plainText, .text, .pdf, .image] + ["md", "markdown"].compactMap { UTType(filenameExtension: $0) }
+        // `.data` lets a file with a type the system doesn't know (such as `.wiki`) be chosen; `kind(of:)` then
+        // refuses what can't be read, with a message that says so.
+        [.plainText, .text, .pdf, .image, .data] + textExtensions.compactMap { UTType(filenameExtension: $0) }
     }
+
+    /// Text files: plain text, Markdown, and MediaWiki markup.
+    static let textExtensions = ["txt", "text", "md", "markdown", "wiki", "wikitext", "mediawiki"]
 
     enum Kind { case text, pdf, image }
 
     static func kind(of url: URL) -> Kind? {
         let ext = url.pathExtension.lowercased()
-        if ["txt", "text", "md", "markdown"].contains(ext) { return .text }
+        if textExtensions.contains(ext) { return .text }
         if ext == "pdf" { return .pdf }
         if let type = UTType(filenameExtension: ext) {
             if type.conforms(to: .image) { return .image }

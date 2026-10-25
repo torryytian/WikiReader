@@ -1,0 +1,29 @@
+{{Short description|Essay on how convenience can reduce satisfaction}}
+For most of human history, effort was an unavoidable feature of daily life. Food had to be grown, cooked, and preserved; messages took days or weeks to arrive; information was scarce and often expensive to obtain. Today, by contrast, a growing share of these burdens has been quietly absorbed by [[technology]]. Groceries appear at the door within hours, answers to almost any question are a few keystrokes away, and entire social lives can be conducted without leaving the sofa. It would seem reasonable to assume that such abundance would leave us more satisfied than any previous generation. Yet a substantial body of research suggests the opposite may be true.
+
+== Hedonic adaptation ==
+Part of the explanation lies in what psychologists call ''[[Hedonic treadmill|hedonic adaptation]]'': the tendency to return to a relatively stable level of happiness regardless of improvements in our circumstances. A new convenience delights us briefly, but it is soon taken for granted and, eventually, expected. What was once a luxury becomes a baseline, and its absence is experienced not as neutral but as a deprivation. In this sense, every gain in convenience quietly raises the threshold for frustration.
+
+== Effort as a source of meaning ==
+There is, however, a more subtle cost. Many of the activities that technology has made effortless were never merely obstacles to be removed; they were also sources of meaning. Cooking a meal from scratch, navigating an unfamiliar city with a paper map, or writing a letter by hand all demand attention, patience, and a degree of skill. These demands are precisely what make such experiences memorable. Economists have described a related phenomenon known as the ''[[IKEA effect]]'', whereby people place disproportionate value on objects they have assembled themselves, however imperfectly. The labour, it appears, is not incidental to the satisfaction but constitutive of it.
+
+== Convenience and time ==
+Convenience also reshapes our relationship with time. One might expect that eliminating tedious tasks would free up hours for reflection, creativity, or rest. In practice, the time saved is frequently filled with yet more stimulation, much of it delivered through the same devices that saved us the effort in the first place. The result is a curious form of busyness in which people feel perpetually occupied while struggling to identify what, exactly, has occupied them.
+
+== Trade-offs ==
+None of this is to romanticise hardship or to suggest that we should abandon the comforts of modern life. Few people would willingly return to washing clothes by hand or waiting a month for a reply from abroad. The point is rather that convenience is not a neutral good to be maximised without limit. It carries [[trade-off]]s that are easy to overlook precisely because they are gradual and largely invisible.
+
+== Deliberate friction ==
+A more deliberate approach might involve distinguishing between friction that merely wastes our time and friction that enriches it. The former is worth eliminating; the latter may be worth preserving, or even reintroducing on purpose. Choosing to walk rather than take a ride, to read a whole book rather than a summary, or to learn a skill rather than [[Outsourcing|outsource]] it are small acts of resistance against the assumption that easier is always better.
+
+== Conclusion ==
+Ultimately, the question is not whether technology should make life more convenient, but whether we remain conscious of what we exchange in return. Convenience, like any powerful tool, serves us best when we decide how to use it, rather than allowing it to decide for us.
+
+== See also ==
+* [[Hedonic treadmill]]
+* [[IKEA effect]]
+* [[Effort justification]]
+
+[[Category:Essays]]
+[[Category:Happiness]]
+[[Category:Technology and society]]

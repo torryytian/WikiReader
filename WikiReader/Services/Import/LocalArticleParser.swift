@@ -25,7 +25,9 @@ nonisolated enum LocalArticleParser {
     }
 
     static func parse(_ raw: String) -> ParsedLocalArticle {
-        let text = raw
+        // Wikipedia-style markup is converted first, so a `.wiki` file, a `.txt` of wikitext and pasted wikitext all work.
+        let source = WikitextConverter.looksLikeWikitext(raw) ? WikitextConverter.markdown(from: raw) : raw
+        let text = source
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .replacingOccurrences(of: "\u{FEFF}", with: "")
