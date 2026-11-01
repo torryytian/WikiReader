@@ -379,14 +379,18 @@ struct DriveAudioStoreTests {
     let access = AccessLog()
 
     final class NetworkState { var free = true }
-    final class AccessLog { var lost = 0 }
+    final class AccessLog {
+        var lost = 0
+        var awake: [Bool] = []
+    }
 
     private func makeStore(signedIn: Bool = true) -> DriveAudioStore {
         let drive = drive, network = network, access = access
         return DriveAudioStore(
             client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
             isSignedIn: { signedIn }, cache: cache, queueFile: queueFile, indexFile: indexFile,
-            retryDelay: .milliseconds(20), canUploadNow: { network.free }, onAccessLost: { access.lost += 1 }
+            retryDelay: .milliseconds(20), canUploadNow: { network.free }, onAccessLost: { access.lost += 1 },
+            keepAwake: { access.awake.append($0) }
         )
     }
 
@@ -467,6 +471,7 @@ struct DriveAudioStoreTests {
         #expect(await drive.file(named: name)?.data == Data("ID3 new".utf8))
         #expect(store.isOnDrive(SpeechAudioCache.key(for: made)) == true)
         #expect(store.uploadedCount == 1)
+        #expect(access.awake.first == true && access.awake.last == false)  // screen kept on only while uploading
 
         // A queue left on disk is picked up by the next launch.
         let other = request("Queued before quitting.")

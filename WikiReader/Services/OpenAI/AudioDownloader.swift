@@ -90,7 +90,7 @@ final class AudioDownloader {
         generations: SpeechGenerations = .shared,
         apiKey: @escaping () -> String? = { KeychainStore.openAIKey.read() },
         // Downloads stop when the app is suspended, which an auto-locking screen does after a minute or two.
-        keepAwake: @escaping (Bool) -> Void = { UIApplication.shared.isIdleTimerDisabled = $0 }
+        keepAwake: @escaping (Bool) -> Void = { ScreenAwake.set("audio download", $0) }
     ) {
         self.client = client
         self.cache = cache

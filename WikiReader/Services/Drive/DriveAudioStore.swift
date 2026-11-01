@@ -55,7 +55,10 @@ final class DriveAudioStore: RemoteAudioSource {
 
     /// Keys of audio generated here and not uploaded yet, oldest first. Kept on disk, so nothing is lost if the app quits.
     private(set) var pendingUploads: [String] = []
-    private(set) var isUploading = false
+    private(set) var isUploading = false {
+        // Uploads stop when the app is suspended, which a locking screen does after a minute or two.
+        didSet { if isUploading != oldValue { keepAwake(isUploading) } }
+    }
     /// Uploads are held because the connection costs money and the reader asked for Wi-Fi only.
     private(set) var isWaitingForFreeNetwork = false
     /// The last thing that went wrong talking to Drive, for Settings; cleared by the next success.
@@ -72,6 +75,7 @@ final class DriveAudioStore: RemoteAudioSource {
     @ObservationIgnored private let retryDelay: Duration
     @ObservationIgnored private let canUploadNow: () -> Bool
     @ObservationIgnored private let onAccessLost: () -> Void
+    @ObservationIgnored private let keepAwake: (Bool) -> Void
     @ObservationIgnored private var layoutTask: Task<Layout, Error>?
     @ObservationIgnored private var index: AudioIndex
     @ObservationIgnored private var lastSync: Date?
@@ -94,7 +98,8 @@ final class DriveAudioStore: RemoteAudioSource {
         canUploadNow: @escaping () -> Bool = {
             UserDefaults.standard.bool(forKey: SettingsKeys.driveUploadAnyNetwork) || !NetworkWatcher.shared.isExpensive
         },
-        onAccessLost: @escaping () -> Void = { GoogleAccount.shared.driveAccessMissing() }
+        onAccessLost: @escaping () -> Void = { GoogleAccount.shared.driveAccessMissing() },
+        keepAwake: @escaping (Bool) -> Void = { ScreenAwake.set("drive upload", $0) }
     ) {
         self.client = client
         self.isSignedIn = isSignedIn
@@ -104,6 +109,7 @@ final class DriveAudioStore: RemoteAudioSource {
         self.retryDelay = retryDelay
         self.canUploadNow = canUploadNow
         self.onAccessLost = onAccessLost
+        self.keepAwake = keepAwake
         pendingUploads = (try? JSONDecoder().decode([String].self, from: Data(contentsOf: queueFile))) ?? []
         index = (try? JSONDecoder().decode(AudioIndex.self, from: Data(contentsOf: indexFile))) ?? AudioIndex()
     }
