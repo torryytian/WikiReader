@@ -6,7 +6,7 @@
 
 ## 0. 接手须知（新会话先读这里）
 
-**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。444 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、文库与存储）、文章书签。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
+**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。470 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、文库与存储）、文章书签。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
 
 **先做这几件事**
 1. `git pull`，按 CLAUDE.md 编译并跑测试（见第 6 节的环境注意事项）。
@@ -32,7 +32,7 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：444 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：470 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
@@ -134,12 +134,19 @@
 - **响度**：量过模拟器里 10 段真实 OpenAI 音频（marin，24 kHz 单声道）：平均响度约 −21 dBFS（只算非静音部分），峰值约 −3 到 −8 dBFS，所以比普通 App 小一截，切过去会觉得突然变大。`AVAudioPlayer.volume` 最大 1.0 放不大，所以打开片段时放大音频本身（`LoudnessBoost`）：先测非静音部分的 RMS，加增益，再过一个**带预读的限幅器**（天花板 0.95，提前 1.5 ms 开始压、80 ms 放开，只压会冲过天花板的那几个最响的音节），输出 16 位 WAV 交给 `AVAudioPlayer(data:)`。**缓存里的 mp3 不动**，所以备份、缓存文件名、已下载的语音都不受影响；只放大不减小；处理在后台线程（`@concurrent`，Release 下 42 秒音频连写 WAV 约 125 ms，**Debug 下约 2 秒、57 秒的要近 4 秒，每段开头会有明显停顿——真机请装 Release**）。
 - **档位**（设置 → Voice，API Key 下面，键 `speechLoudness`，随备份迁移）：Normal（原样，约 −21 dBFS）、Louder（目标 −16，约 +5 dB）、**Loudest（默认，目标 −11，约 +10 dB，振幅约 3 倍）**。10-15 改过一次：第一版只用“99.9 百分位峰值不超过 0.9”卡增益（实际只到约 +6 dB，Loudest 和原音听感差别不大，用户反馈“作用不大”），改成限幅器之后平均响度可以抬得更高。因为限幅器会吃掉一部分增益，增益是迭代找的（割线法，最多 4 次，误差 0.25 dB 内）；增益上限 18 dB，且限幅器在一段里最响的那一下最多压 6 dB（`maxReduction`），超过就不再加增益，免得声音发扁，所以峰值很高的短片段（标题那种）到不了目标。实测 10 段：Loudest 后平均响度 −11.0 到 −13.0，限幅器平均只压 0.2–1.3 dB（大部分时间没动），最深压 6 dB。**Playback Log 里每段开头有一行 `clip ... opened chunk i/n loudness=loudest gain=+11.2dB rms -20.9→-11.1 limiter avg 0.5 max 6.0dB`，能看出到底有没有生效。**从下一段开始生效，试听按钮也走同一条路径。**只对 OpenAI 声音有效**；iPhone 系统声音的 `utterance.volume` 上限就是 1.0，无法放大。**未验证**：真机上的听感（压缩感、失真、和别的 App 的响度差）。
 
-### Google Drive 共享音频缓存：格式已和 Chrome 插件对齐，iOS 端未实现（2026-11-01）
+### Google Drive 共享音频缓存（2026-11-01）：格式和 Chrome 对齐；iOS 代码已写完，等 Client ID 做真机验证
 - 用户要求：TTS 音频缓存存到 Google Drive，和 Chrome 插件（`~/Desktop/claude/chrome_extension_reading`）共享同一份；调 OpenAI 前先查 Drive，有就从 Drive 拉。
 - **共享格式以 iOS 现有格式为准**（用户同意；iOS 已有付费音频，不能改 key/切块）：规范见 `docs/shared-tts-cache-format.md`。Chrome 那个会话评估后已按此实现并提交，清洗器移植成 TS，4 个 fixture（656 块）+ 5 篇实时文章与 iOS 逐字节一致。两端要用同一个声音 + 同一句 instructions 才共享：用户 iPhone 上实际选的是 alloy，Chrome 默认也改成了 alloy、instructions 用 iOS 那句（Chrome 还能自选声音和风格，选得不同就不共享）。
 - iOS 侧的护栏：`SharedCacheFormatTests`（key 向量、fixture 的块文本与 key、URL/urlHash 向量）和 `WikiReaderTests/Fixtures/shared/`。**改清洗器、切块、key、`ArticleInput.articleURL` 任何一处都会让这些测试失败——那是提醒要和 Chrome 同步，不是让你改期望值了事。** Chrome 仓库把 `Fixtures/shared/` 复制到了 `tests/fixtures/ios-shared/`，用 `tests/iosShared.test.ts` 从同样的 HTML 端到端对照（Chrome 提交 95ad19a，64 个测试全过）。约定（两边都记下了）：任何一方要改清洗、切块、key 或 URL 规则，先通知另一方；iOS 重新生成 `Fixtures/shared/` 后要告诉 Chrome 同步。
 - 用户 2026-11-01 说联网不设限制（已写进 CLAUDE.md）。
-- **待做（iOS 实现）**：`ASWebAuthenticationSession` + PKCE 登录 Google（`drive.file`，token 存 Keychain，iOS OAuth Client 建在 Chrome 用的同一个 GCP 项目里，需要用户在 GCP 控制台操作）；URLSession 调 Drive REST（找/建 `WikiReader Cache/`、校验 `format.json`、按名批量查 ≤50、下载、multipart 上传）；取音频顺序 本机 → Drive → OpenAI（打开文章时批量查一遍 Drive 记在内存里）；新音频后台上传队列（持久化重试）；上传时写/更新 `articles/<urlHash>.json`（全文所有块、可带 kind/level、complete）；清单优先（Drive 有清单且 model/voice/instructions 相同就用清单里的块）；批量下载的费用预估扣掉 Drive 已有的；一次性“把本机已有音频上传到 Drive”；设置页 Google Drive 区（登录/退出/状态/待上传数）。注意：GCP OAuth 应用停在“测试”状态时 refresh token 7 天过期。
+- **iOS 实现（已写，未连真 Drive 验证）**：
+  - `Services/Drive/GoogleOAuth.swift`（PKCE、登录地址、令牌请求和解析，纯函数）、`GoogleAccount.swift`（`ASWebAuthenticationSession` 登录、refresh token 存 Keychain、access token 内存缓存和自动续期；`invalid_grant` 时自动登出并提示）。Client ID 是设置项（`SettingsKeys.googleClientID`），不是密钥。
+  - `DriveClient.swift`：找/建文件夹（同名取最早建的）、按名批量查（每批 50）、下载、multipart 上传、PATCH 替换；401 用新令牌重试一次。
+  - `DriveAudioStore.swift`：首次用时找/建 `WikiReader Cache/{audio,articles}` 和 `format.json`（格式不对就拒绝）；内存里记哪些 key 在 Drive（"不在"的结论 10 分钟内有效）；持久化上传队列（`Application Support/DriveUploadQueue.json`，失败 60 秒后重试，App 启动时续传）；写清单（内容没变不重写，上传完后刷新 complete）；"上传本机已有语音"（文库所有文章、所有声音）。
+  - 接入点：`SpeechGenerations` 先问 `remote`（Drive）再调 OpenAI，OpenAI 生成后交给 Drive 上传——朗读、试听、批量下载都走这里。没有 OpenAI Key 时也能从 Drive 取。阅读页打开文章（OpenAI 声音 + 已登录）时 `noteArticle`；批量下载的确认弹窗把 Drive 上已有的算作免费，只对要生成的部分报价。
+  - 设置 → Google Drive：Client ID 输入框、登录/退出、待上传数、本次会话下载/上传数、最近的错误、"Upload Saved Audio"。截图看过（未登录状态）。
+  - 测试 26 个（`GoogleDriveTests.swift`）：OAuth（含 RFC 7636 的 PKCE 向量）、账号令牌续期和过期登出、Drive 客户端（转义、分批、401 重试、multipart）、用内存假 Drive 跑完整流程（建目录、复用、拒绝别的格式、下载、上传去重、队列重启续传、清单 complete）、Drive 优先于 OpenAI。测试抓到过一个真 bug：建文件只要 `fields=id`，解码却要求 name。
+  - **未验证（需要 Client ID 和真机/模拟器登录）**：真实的 Google 登录页和回调、真实 Drive 的查询语法和返回、和 Chrome 上传的文件互通、7 天后令牌过期的表现。
 
 ### 书签（2026-10-19）
 - 用户要求：文章加书签；点文章时如果有书签就列出来选从哪开始，没有就从上次位置开始；选择页还要有"从头开始"和"从上次位置继续"；加书签放在阅读页顶部那条栏里。用户说"你看着来搞，直接干活"。

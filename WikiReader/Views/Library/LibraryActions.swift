@@ -18,7 +18,18 @@ enum LibraryActions {
     static func downloadPrompt(for articles: [Article]) async -> AudioDownloadPrompt {
         guard hasOpenAIKey else { return .noKey }
         let sources = articles.map { AudioDownloader.Source(id: $0.persistentModelID, blocksData: $0.blocksData) }
-        let plan = await AudioDownloader.plan(for: sources, voice: openAIVoice)
+        var plan = await AudioDownloader.plan(for: sources, voice: openAIVoice)
+        let drive = DriveAudioStore.shared
+        if drive.isEnabled, !plan.isEmpty {
+            // What another device already made is free: only the rest is priced.
+            await drive.prepareIndex(keys: plan.items.map { SpeechAudioCache.key(for: $0.piece.request) })
+            plan.markOnDrive { drive.isOnDrive($0) == true }
+            for article in articles {
+                Task {
+                    await drive.noteArticle(title: article.title, url: article.sourceURL.absoluteString, blocks: article.blocks, voice: openAIVoice)
+                }
+            }
+        }
         return plan.isEmpty ? .nothingToDo : .confirm(plan)
     }
 
@@ -105,9 +116,19 @@ enum AudioDownloadPrompt: Identifiable {
         switch self {
         case .confirm(let plan):
             let articles = plan.articleCount == 1 ? "1 article" : "\(plan.articleCount) articles"
-            return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.capitalized) voice, "
-                + "roughly \(AudioFormat.cost(plan.dollars)) on your OpenAI account. Keep WikiReader open until it finishes; "
-                + "the screen stays on meanwhile."
+            let keepOpen = "Keep WikiReader open until it finishes; the screen stays on meanwhile."
+            let fromDrive = ArticleAudio.minutes(forCharacters: plan.driveCharacters)
+            guard plan.driveCharacters > 0 else {
+                return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.capitalized) voice, "
+                    + "roughly \(AudioFormat.cost(plan.dollars)) on your OpenAI account. " + keepOpen
+            }
+            guard plan.generatedCharacters > 0 else {
+                return "All \(AudioFormat.duration(minutes: fromDrive)) of audio for \(articles) is in your Google Drive, so it costs nothing. " + keepOpen
+            }
+            return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.capitalized) voice: "
+                + "\(AudioFormat.duration(minutes: fromDrive)) comes from your Google Drive for free, "
+                + "\(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: plan.generatedCharacters))) is generated, "
+                + "roughly \(AudioFormat.cost(plan.dollars)) on your OpenAI account. " + keepOpen
         case .nothingToDo:
             return "All the audio for the \(LibraryActions.openAIVoice.capitalized) voice is already on this iPhone."
         case .noKey:

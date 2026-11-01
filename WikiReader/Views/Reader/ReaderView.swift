@@ -444,6 +444,12 @@ private struct ArticleReader: View {
         }
         self.session = session
         nowPlaying = NowPlayingController(session: session, blocks: blocks, title: article.title)
+        // With an OpenAI voice and Google Drive, look the article's audio up on Drive at once (so each paragraph
+        // doesn't wait to ask) and list the article there for other devices.
+        if engineChoice == .openAI, DriveAudioStore.shared.isEnabled {
+            let (title, url, voice) = (article.title, article.sourceURL.absoluteString, openAIVoice)
+            Task { await DriveAudioStore.shared.noteArticle(title: title, url: url, blocks: blocks, voice: voice) }
+        }
         if startsPlaying { session.start(at: 0) }
     }
 

@@ -53,6 +53,11 @@ nonisolated struct DriveClient: Sendable {
         var name: String
     }
 
+    /// What creating or uploading answers with `fields=id`: only the new file's id.
+    private struct Created: Decodable {
+        var id: String
+    }
+
     /// The first folder with this name in `parent` ("root" is My Drive), oldest first, so two devices that each
     /// created one agree on which to use.
     func folder(named name: String, in parent: String) async throws(DriveError) -> String? {
@@ -65,7 +70,7 @@ nonisolated struct DriveClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json; charset=UTF-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["name": name, "mimeType": Self.folderType, "parents": [parent]])
-        return try decode(File.self, from: await send(request)).id
+        return try decode(Created.self, from: await send(request)).id
     }
 
     /// The files in `folder` with these names, by name. Asks in batches of `namesPerQuery`.
@@ -118,7 +123,7 @@ nonisolated struct DriveClient: Sendable {
             metadata: ["name": name, "parents": [folder]], data: data, mimeType: mimeType, boundary: boundary
         )
         request.timeoutInterval = 120
-        return try decode(File.self, from: await send(request)).id
+        return try decode(Created.self, from: await send(request)).id
     }
 
     /// Replaces a file's contents.

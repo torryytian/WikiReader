@@ -4,6 +4,7 @@ import SwiftUI
 /// Settings pages that can be pushed onto the settings navigation stack.
 private enum SettingsPage: Hashable {
     case voice
+    case googleDrive
     case backup
     case diagnostics
     case playbackLog
@@ -30,6 +31,7 @@ struct SettingsView: View {
             Form {
                 appearanceSection
                 voiceSection
+                googleDriveSection
                 dictionarySection
                 backupSection
                 diagnosticsSection
@@ -45,6 +47,8 @@ struct SettingsView: View {
                 switch page {
                 case .voice:
                     VoiceSettingsView()
+                case .googleDrive:
+                    GoogleDriveSettingsView()
                 case .backup:
                     LibraryBackupView()
                 case .diagnostics:
@@ -101,6 +105,22 @@ struct SettingsView: View {
             Text("Reading")
         } footer: {
             Text("Free iPhone voices work offline. OpenAI voices sound more natural and cost about $0.015 per minute.")
+        }
+    }
+
+    // MARK: - Google Drive
+
+    private var googleDriveSection: some View {
+        Section {
+            NavigationLink(value: SettingsPage.googleDrive) {
+                LabeledContent {
+                    Text(GoogleAccount.shared.isSignedIn ? "On" : "Off")
+                } label: {
+                    Label("Google Drive", systemImage: "externaldrive.badge.icloud")
+                }
+            }
+        } footer: {
+            Text("Share generated OpenAI audio with your other devices and the Chrome extension.")
         }
     }
 

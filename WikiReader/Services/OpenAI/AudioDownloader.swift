@@ -27,6 +27,8 @@ final class AudioDownloader {
         struct Item: Sendable {
             var article: PersistentIdentifier
             var piece: ArticleAudio.Piece
+            /// Already in Google Drive: downloading it costs nothing.
+            var isOnDrive = false
         }
 
         var voice: String
@@ -37,7 +39,18 @@ final class AudioDownloader {
 
         var characters: Int { items.reduce(0) { $0 + $1.piece.characters } }
         var minutes: Double { ArticleAudio.minutes(forCharacters: characters) }
-        var dollars: Double { ArticleAudio.dollars(forCharacters: characters) }
+        /// The part that comes from Google Drive, free.
+        var driveCharacters: Int { items.filter(\.isOnDrive).reduce(0) { $0 + $1.piece.characters } }
+        /// The part OpenAI generates, which is what costs money.
+        var generatedCharacters: Int { characters - driveCharacters }
+        var dollars: Double { ArticleAudio.dollars(forCharacters: generatedCharacters) }
+
+        /// Marks the items whose audio `isOnDrive` says is in Google Drive.
+        mutating func markOnDrive(_ isOnDrive: (String) -> Bool) {
+            for index in items.indices {
+                items[index].isOnDrive = isOnDrive(SpeechAudioCache.key(for: items[index].piece.request))
+            }
+        }
         var isEmpty: Bool { items.isEmpty }
     }
 
