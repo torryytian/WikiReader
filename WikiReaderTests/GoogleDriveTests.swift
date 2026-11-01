@@ -344,6 +344,12 @@ struct DriveAudioStoreTests {
         await #expect(throws: DriveError.self) { try await makeStore().layout() }
     }
 
+    @Test func aFormatFileWithoutTheKeyIsRefusedLikeChromeDoes() async throws {
+        let root = await drive.add(name: DriveAudioStore.rootName, parent: "root", mimeType: DriveClient.folderType)
+        _ = await drive.add(name: "format.json", parent: root, data: Data(#"{"formatVersion":1}"#.utf8))
+        await #expect(throws: DriveError.self) { try await makeStore().layout() }
+    }
+
     @Test func audioOnDriveIsDownloadedIntoTheCache() async throws {
         let store = makeStore()
         let audio = try await store.layout().audio

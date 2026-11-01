@@ -133,7 +133,8 @@ final class DriveAudioStore: RemoteAudioSource {
         let object = try? JSONSerialization.jsonObject(with: try await client.download(fileID: id)) as? [String: Any]
         let version = object?["formatVersion"] as? Int
         let key = object?["key"] as? String
-        guard version == 1, key == nil || key == "ios-v1" else {
+        // Exactly what the Chrome extension accepts too, so neither writes into a folder the other refuses.
+        guard version == 1, key == "ios-v1" else {
             throw DriveError.unsupportedFormat("formatVersion \(version.map(String.init) ?? "?"), key \(key ?? "?")")
         }
     }
