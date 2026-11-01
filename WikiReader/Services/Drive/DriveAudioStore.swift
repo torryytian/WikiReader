@@ -410,6 +410,48 @@ final class DriveAudioStore: RemoteAudioSource {
         }
     }
 
+    // MARK: - Per article
+
+    /// Keys known to be on Drive (from the local index).
+    var indexedKeys: Set<String> { Set(index.files.keys) }
+
+    /// How much of one article's audio is on Drive.
+    nonisolated struct ArticleOnDrive: Sendable, Equatable {
+        /// Pieces of the article in `voice`, and how many of them are on Drive.
+        var pieces = 0
+        var piecesOnDrive = 0
+        /// Their size, from the same files on this iPhone (Drive's copies are identical).
+        var bytesOnDrive: Int64 = 0
+        /// Pieces of the article on Drive in the other voices.
+        var otherVoicePieces = 0
+    }
+
+    /// Works out `ArticleOnDrive` for an article's blocks, off the main actor.
+    @concurrent
+    static func onDrive(
+        blocksData: Data, voice: String, indexed: Set<String>, cache: SpeechAudioCache = .standard
+    ) async -> ArticleOnDrive {
+        let blocks = Article.decodeBlocks(blocksData)
+        var result = ArticleOnDrive()
+        var counted = Set<String>()
+        for piece in ArticleAudio.pieces(of: blocks, voice: voice) {
+            let key = SpeechAudioCache.key(for: piece.request)
+            guard counted.insert(key).inserted else { continue }
+            result.pieces += 1
+            guard indexed.contains(key) else { continue }
+            result.piecesOnDrive += 1
+            let file = cache.fileURL(for: piece.request)
+            result.bytesOnDrive += Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+        for input in ArticleAudio.inputs(of: blocks) {
+            for other in OpenAISpeechEngine.voices where other != voice {
+                let key = SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: input, voice: other))
+                if indexed.contains(key), counted.insert(key).inserted { result.otherVoicePieces += 1 }
+            }
+        }
+        return result
+    }
+
     // MARK: - The library's audio
 
     /// Queues every piece of audio on this iPhone that belongs to the library (any voice) and isn't on Drive, and

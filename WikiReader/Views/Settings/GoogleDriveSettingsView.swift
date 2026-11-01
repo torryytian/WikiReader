@@ -14,6 +14,8 @@ struct GoogleDriveSettingsView: View {
     @State private var signInError: String?
     @State private var isQueueing = false
     @State private var queuedMessage: String?
+    /// Each article's audio on Drive, worked out when the page opens and as uploads finish.
+    @State private var byArticle: [PersistentIdentifier: DriveAudioStore.ArticleOnDrive] = [:]
 
     /// An empty field means the built-in client id.
     private var hasValidClientID: Bool { clientID.isEmpty || GoogleOAuth.Client(id: clientID) != nil }
@@ -21,11 +23,26 @@ struct GoogleDriveSettingsView: View {
     var body: some View {
         Form {
             accountSection
-            if account.isSignedIn { statusSection }
+            if account.isSignedIn {
+                statusSection
+                if !articles.isEmpty { byArticleSection }
+            }
             clientSection
         }
         .navigationTitle("Google Drive")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: BreakdownInput(signedIn: account.isSignedIn, uploaded: drive.uploadedCount, count: articles.count, voice: openAIVoice)) {
+            guard account.isSignedIn else { return }
+            await drive.syncIndex()
+            let indexed = drive.indexedKeys
+            var result: [PersistentIdentifier: DriveAudioStore.ArticleOnDrive] = [:]
+            for article in articles {
+                result[article.persistentModelID] = await DriveAudioStore.onDrive(
+                    blocksData: article.blocksData, voice: openAIVoice, indexed: indexed
+                )
+            }
+            byArticle = result
+        }
     }
 
     // MARK: - Account
@@ -133,6 +150,44 @@ struct GoogleDriveSettingsView: View {
             isQueueing = false
             queuedMessage = count == 0 ? "Everything is already in Drive." : "\(count) pieces queued for upload."
         }
+    }
+
+    // MARK: - By article
+
+    private struct BreakdownInput: Equatable {
+        var signedIn: Bool
+        var uploaded: Int
+        var count: Int
+        var voice: String
+    }
+
+    private var byArticleSection: some View {
+        Section {
+            ForEach(articles) { article in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(article.title)
+                        .lineLimit(1)
+                    Text(breakdownText(byArticle[article.persistentModelID]))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
+            }
+        } header: {
+            Text("By Article · \(openAIVoice.capitalized)")
+        } footer: {
+            Text("How much of each article's audio in the \(openAIVoice.capitalized) voice is in Google Drive, and its size; audio in other voices is counted separately. Sizes come from the same files on this iPhone.")
+        }
+    }
+
+    private func breakdownText(_ entry: DriveAudioStore.ArticleOnDrive?) -> String {
+        guard let entry else { return "Counting…" }
+        var text = entry.pieces > 0 && entry.piecesOnDrive == entry.pieces
+            ? "All \(entry.pieces) parts on Drive"
+            : "\(entry.piecesOnDrive) of \(entry.pieces) parts on Drive"
+        if entry.piecesOnDrive > 0 { text += " · " + AudioFormat.bytes(entry.bytesOnDrive) }
+        if entry.otherVoicePieces > 0 { text += " · +\(entry.otherVoicePieces) in other voices" }
+        return text
     }
 
     // MARK: - Client id

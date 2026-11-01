@@ -19,6 +19,8 @@ struct ArticleInfoView: View {
     @State private var blocks: [ContentBlock] = []
     @State private var outline = ArticleOutline(blocks: [])
     @State private var status: ArticleAudioStatus?
+    /// How much of this article's audio is in Google Drive; nil while not signed in or not worked out yet.
+    @State private var onDrive: DriveAudioStore.ArticleOnDrive?
     @State private var showsWholeSummary = false
     @State private var downloadPrompt: AudioDownloadPrompt?
     @State private var isConfirmingAudioDelete = false
@@ -57,6 +59,11 @@ struct ArticleInfoView: View {
                 }
             }
             .task(id: StatusInput(voice: openAIVoice, done: downloader.donePieces, version: audioVersion)) {
+                let drive = DriveAudioStore.shared
+                if drive.isEnabled {
+                    await drive.syncIndex()
+                    onDrive = await DriveAudioStore.onDrive(blocksData: article.blocksData, voice: openAIVoice, indexed: drive.indexedKeys)
+                }
                 status = await ArticleAudio.status(ofBlocksData: article.blocksData, voice: openAIVoice)
             }
             .audioDownloadPrompt($downloadPrompt)
@@ -232,6 +239,13 @@ struct ArticleInfoView: View {
 
                 if status.otherVoiceBytes > 0 {
                     LabeledContent("Other Voices", value: AudioFormat.bytes(status.otherVoiceBytes))
+                }
+                if let onDrive {
+                    LabeledContent("On Google Drive") {
+                        Text(onDrive.pieces > 0 && onDrive.piecesOnDrive == onDrive.pieces
+                             ? "All \(onDrive.pieces) parts · \(AudioFormat.bytes(onDrive.bytesOnDrive))"
+                             : "\(onDrive.piecesOnDrive) of \(onDrive.pieces) parts · \(AudioFormat.bytes(onDrive.bytesOnDrive))")
+                    }
                 }
                 Button("Delete This Article's Audio", systemImage: "speaker.slash", role: .destructive) {
                     isConfirmingAudioDelete = true

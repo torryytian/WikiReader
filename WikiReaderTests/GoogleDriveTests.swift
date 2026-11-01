@@ -593,6 +593,19 @@ struct DriveAudioStoreTests {
         #expect(await drive.count(named: SpeechAudioCache.key(for: made) + ".mp3") == 1)
     }
 
+    @Test func perArticleBreakdownCountsTheVoiceAndTheOthers() async throws {
+        let blocks: [ContentBlock] = [.heading("History", level: 2), .paragraph("First."), .paragraph("Second.")]
+        let data = try JSONEncoder().encode(blocks)
+        func key(_ text: String, _ voice: String) -> String { SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: text, voice: voice)) }
+        try cache.store(Data(count: 100), for: OpenAISpeechEngine.request(for: "History", voice: "alloy"))
+        try cache.store(Data(count: 250), for: OpenAISpeechEngine.request(for: "First.", voice: "alloy"))
+        let indexed: Set<String> = [key("History", "alloy"), key("First.", "alloy"), key("Second.", "marin"), key("Unrelated.", "alloy")]
+
+        let result = await DriveAudioStore.onDrive(blocksData: data, voice: "alloy", indexed: indexed, cache: cache)
+
+        #expect(result == DriveAudioStore.ArticleOnDrive(pieces: 3, piecesOnDrive: 2, bytesOnDrive: 350, otherVoicePieces: 1))
+    }
+
     @Test func audioFromOtherCachesIsNotShared() async throws {
         let store = makeStore()
         let elsewhere = SpeechAudioCache(directory: URL.temporaryDirectory.appending(path: "Elsewhere-\(UUID().uuidString)"))
