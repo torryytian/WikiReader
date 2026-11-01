@@ -13,7 +13,8 @@ nonisolated enum GoogleOAuth {
     static let revokeEndpoint = URL(string: "https://oauth2.googleapis.com/revoke")!
     /// Only files this app (or the Chrome extension, same Google Cloud project) created; plus the account's email,
     /// to show who is signed in.
-    static let scopes = ["https://www.googleapis.com/auth/drive.file", "openid", "email"]
+    static let driveScope = "https://www.googleapis.com/auth/drive.file"
+    static let scopes = [driveScope, "openid", "email"]
 
     /// An iOS OAuth client of a Google Cloud project, e.g. `123-abc.apps.googleusercontent.com`.
     struct Client: Equatable, Sendable {
@@ -127,12 +128,22 @@ nonisolated enum GoogleOAuth {
         /// Only on the first exchange; refreshing returns none and the old one stays valid.
         var refreshToken: String?
         var idToken: String?
+        /// The scopes actually granted, space separated. Google asks about each one separately (a tick box per
+        /// permission), so this can be less than was asked for.
+        var scope: String? = nil
 
         enum CodingKeys: String, CodingKey {
             case accessToken = "access_token"
             case expiresIn = "expires_in"
             case refreshToken = "refresh_token"
             case idToken = "id_token"
+            case scope
+        }
+
+        /// Whether the Google Drive box was ticked. A response that doesn't list its scopes is taken at its word.
+        var grantsDrive: Bool {
+            guard let scope else { return true }
+            return scope.split(separator: " ").contains { $0 == GoogleOAuth.driveScope }
         }
     }
 
@@ -177,9 +188,13 @@ nonisolated enum GoogleAuthError: Error, Equatable, Sendable {
     case rejected(String)
     case network(String)
     case badResponse
+    /// Signed in, but the Google Drive permission wasn't ticked on Google's page.
+    case driveNotGranted
 
     var message: String {
         switch self {
+        case .driveNotGranted:
+            "Google Drive access wasn't allowed. Sign in again and, on Google's page, tick the Google Drive box (“See, edit, create, and delete only the specific Google Drive files you use with this app”)."
         case .notConfigured: "Enter the iOS client ID from Google Cloud first."
         case .notSignedIn: "Not signed in to Google."
         case .cancelled: "Sign-in was cancelled."

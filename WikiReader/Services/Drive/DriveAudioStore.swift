@@ -71,6 +71,7 @@ final class DriveAudioStore: RemoteAudioSource {
     @ObservationIgnored private let indexFile: URL
     @ObservationIgnored private let retryDelay: Duration
     @ObservationIgnored private let canUploadNow: () -> Bool
+    @ObservationIgnored private let onAccessLost: () -> Void
     @ObservationIgnored private var layoutTask: Task<Layout, Error>?
     @ObservationIgnored private var index: AudioIndex
     @ObservationIgnored private var lastSync: Date?
@@ -92,7 +93,8 @@ final class DriveAudioStore: RemoteAudioSource {
         retryDelay: Duration = .seconds(2),
         canUploadNow: @escaping () -> Bool = {
             UserDefaults.standard.bool(forKey: SettingsKeys.driveUploadAnyNetwork) || !NetworkWatcher.shared.isExpensive
-        }
+        },
+        onAccessLost: @escaping () -> Void = { GoogleAccount.shared.driveAccessMissing() }
     ) {
         self.client = client
         self.isSignedIn = isSignedIn
@@ -101,6 +103,7 @@ final class DriveAudioStore: RemoteAudioSource {
         self.indexFile = indexFile
         self.retryDelay = retryDelay
         self.canUploadNow = canUploadNow
+        self.onAccessLost = onAccessLost
         pendingUploads = (try? JSONDecoder().decode([String].self, from: Data(contentsOf: queueFile))) ?? []
         index = (try? JSONDecoder().decode(AudioIndex.self, from: Data(contentsOf: indexFile))) ?? AudioIndex()
     }
@@ -296,6 +299,11 @@ final class DriveAudioStore: RemoteAudioSource {
         if isEnabled, let data = try? Data(contentsOf: file) {
             do {
                 let audio = try await layout().audio
+                // Know what is on Drive before adding to it, or a piece another device uploaded is uploaded again.
+                if lastSync == nil {
+                    await syncIndex()
+                    guard lastSync != nil else { throw DriveError.network("couldn't list the Drive folder") }
+                }
                 if index.files[key] == nil {
                     index.files[key] = try await client.upload(name: key + ".mp3", data: data, mimeType: "audio/mpeg", in: audio)
                     uploadedCount += 1
@@ -438,6 +446,7 @@ final class DriveAudioStore: RemoteAudioSource {
     private func note(_ error: Error, while doing: String) {
         let message = (error as? DriveError)?.message ?? (error as? GoogleAuthError)?.message ?? error.localizedDescription
         lastError = message
+        if (error as? DriveError) == .missingDriveAccess { onAccessLost() }
         Log.app.error("Drive: failed \(doing, privacy: .public): \(message, privacy: .public)")
     }
 }

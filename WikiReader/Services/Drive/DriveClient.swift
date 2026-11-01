@@ -3,6 +3,8 @@ import Foundation
 nonisolated enum DriveError: Error, Equatable, Sendable {
     case notSignedIn
     case unauthorized
+    /// The access token doesn't carry the Drive permission (403 "insufficient authentication scopes").
+    case missingDriveAccess
     case http(status: Int, detail: String?)
     case network(String)
     case badResponse
@@ -24,6 +26,7 @@ nonisolated enum DriveError: Error, Equatable, Sendable {
         switch self {
         case .notSignedIn: "Not signed in to Google."
         case .unauthorized: "Google Drive refused the sign-in. Sign in again."
+        case .missingDriveAccess: GoogleAuthError.driveNotGranted.message
         case .http(let status, let detail): "Google Drive answered HTTP \(status)\(detail.map { ": \($0)" } ?? "")."
         case .network(let detail): "Couldn't reach Google Drive: \(detail)"
         case .badResponse: "Google Drive returned an unexpected response."
@@ -187,7 +190,9 @@ nonisolated struct DriveClient: Sendable {
             if http.statusCode == 401, attempt == 0 { continue }
             guard (200..<300).contains(http.statusCode) else {
                 if http.statusCode == 401 { throw .unauthorized }
-                throw .http(status: http.statusCode, detail: Self.errorMessage(data))
+                let detail = Self.errorMessage(data)
+                if http.statusCode == 403, Self.isMissingScope(detail) { throw .missingDriveAccess }
+                throw .http(status: http.statusCode, detail: detail)
             }
             return data
         }
@@ -197,6 +202,12 @@ nonisolated struct DriveClient: Sendable {
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws(DriveError) -> T {
         guard let value = try? JSONDecoder().decode(type, from: data) else { throw .badResponse }
         return value
+    }
+
+    /// Google's wording when a token lacks the scope a request needs.
+    static func isMissingScope(_ detail: String?) -> Bool {
+        let text = (detail ?? "").lowercased()
+        return text.contains("insufficient authentication scopes") || text.contains("insufficient permission")
     }
 
     private static func errorMessage(_ data: Data) -> String? {

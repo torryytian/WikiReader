@@ -75,6 +75,22 @@ struct GoogleOAuthTests {
         }
     }
 
+    @Test func grantedScopesAreReadAndDriveMustBeAmongThem() throws {
+        let granted = try GoogleOAuth.tokenResponse(
+            data: Data(#"{"access_token":"a","expires_in":1,"scope":"openid https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email"}"#.utf8),
+            status: 200
+        )
+        #expect(granted.grantsDrive)
+        // The Drive box left unticked on Google's page: only the basic scopes come back.
+        let partial = try GoogleOAuth.tokenResponse(
+            data: Data(#"{"access_token":"a","expires_in":1,"scope":"openid https://www.googleapis.com/auth/userinfo.email"}"#.utf8),
+            status: 200
+        )
+        #expect(!partial.grantsDrive)
+        // A response without the field is taken at its word.
+        #expect(try GoogleOAuth.tokenResponse(data: Data(#"{"access_token":"a","expires_in":1}"#.utf8), status: 200).grantsDrive)
+    }
+
     @Test func emailComesFromTheIDToken() {
         let payload = GoogleOAuth.base64URL(Data(#"{"email":"someone@example.com","sub":"1"}"#.utf8))
         #expect(GoogleOAuth.email(fromIDToken: "eyJhbGciOiJSUzI1NiJ9.\(payload).sig") == "someone@example.com")
@@ -126,6 +142,26 @@ struct GoogleAccountTests {
         #expect(store.read() == nil)
     }
 
+    @Test func aSignInWithoutDriveIsRefusedWithTheReason() throws {
+        let (account, store, _) = makeAccount { _ in (200, "{}") }
+        defer { try? store.delete() }
+        #expect(throws: GoogleAuthError.driveNotGranted) {
+            try account.finishSignIn(.init(accessToken: "a1", expiresIn: 3600, refreshToken: "r1", idToken: nil, scope: "openid email"))
+        }
+        #expect(account.state == .signedOut)
+        #expect(account.problem == GoogleAuthError.driveNotGranted.message)
+        #expect(store.read() == nil)
+    }
+
+    @Test func driveRefusingTheTokenSignsOut() throws {
+        let (account, store, _) = makeAccount { _ in (200, "{}") }
+        defer { try? store.delete() }
+        try account.finishSignIn(.init(accessToken: "a1", expiresIn: 3600, refreshToken: "r1", idToken: nil))
+        account.driveAccessMissing()
+        #expect(account.state == .signedOut)
+        #expect(account.problem == GoogleAuthError.driveNotGranted.message)
+    }
+
     @Test func signOutForgetsEverything() throws {
         let (account, store, defaults) = makeAccount { _ in (200, "{}") }
         try account.finishSignIn(.init(accessToken: "a1", expiresIn: 3600, refreshToken: "r1", idToken: nil))
@@ -155,6 +191,10 @@ actor FakeDrive {
     private var nextID = 1
     /// Answer 401 to the next request, as for an expired access token.
     var rejectNext = false
+    /// Answer every request with 403 "insufficient authentication scopes", as for a token without Drive access.
+    var lacksScope = false
+
+    func setLacksScope(_ value: Bool) { lacksScope = value }
 
     func setRejectNext() { rejectNext = true }
 
@@ -188,6 +228,9 @@ actor FakeDrive {
         if rejectNext {
             rejectNext = false
             return reply(401, json(["error": ["message": "Invalid Credentials"]]))
+        }
+        if lacksScope {
+            return reply(403, json(["error": ["message": "Request had insufficient authentication scopes."]]))
         }
         let query = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []).map { ($0.name, $0.value ?? "") })
         let method = request.httpMethod ?? "GET"
@@ -295,6 +338,16 @@ struct DriveClientTests {
         #expect(await forced.values == [false, true])
     }
 
+    @Test func aTokenWithoutDriveAccessIsRecognized() async throws {
+        let drive = FakeDrive()
+        await drive.setLacksScope(true)
+        let client = DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" })
+        await #expect(throws: DriveError.missingDriveAccess) { try await client.files(named: ["x"], in: "p") }
+        #expect(!DriveError.missingDriveAccess.isTransient)
+        #expect(DriveClient.isMissingScope("Request had insufficient authentication scopes."))
+        #expect(!DriveClient.isMissingScope("User rate limit exceeded."))
+    }
+
     @Test func uploadIsMultipartWithMetadataFirst() async throws {
         let drive = FakeDrive()
         let client = DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" })
@@ -323,15 +376,17 @@ struct DriveAudioStoreTests {
     let queueFile = URL.temporaryDirectory.appending(path: "DriveQueue-\(UUID().uuidString).json")
     let indexFile = URL.temporaryDirectory.appending(path: "DriveIndex-\(UUID().uuidString).json")
     let network = NetworkState()
+    let access = AccessLog()
 
     final class NetworkState { var free = true }
+    final class AccessLog { var lost = 0 }
 
     private func makeStore(signedIn: Bool = true) -> DriveAudioStore {
-        let drive = drive, network = network
+        let drive = drive, network = network, access = access
         return DriveAudioStore(
             client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
             isSignedIn: { signedIn }, cache: cache, queueFile: queueFile, indexFile: indexFile,
-            retryDelay: .milliseconds(20), canUploadNow: { network.free }
+            retryDelay: .milliseconds(20), canUploadNow: { network.free }, onAccessLost: { access.lost += 1 }
         )
     }
 
@@ -498,6 +553,39 @@ struct DriveAudioStoreTests {
         #expect(DriveAudioStore.rfc3339(minus: 60, from: "2026-11-01T08:00:30.250Z") == "2026-11-01T07:59:30.250Z")
         #expect(DriveAudioStore.rfc3339(minus: 60, from: "2026-11-01T08:00:30Z") == "2026-11-01T07:59:30.000Z")
         #expect(DriveAudioStore.rfc3339(minus: 60, from: "nonsense") == nil)
+    }
+
+    @Test func aSignInWithoutDriveAccessIsReportedNotRetried() async throws {
+        let store = makeStore()
+        await drive.setLacksScope(true)
+        let made = request("Never sent.")
+        try cache.store(Data("ID3 n".utf8), for: made)
+
+        store.enqueue([SpeechAudioCache.key(for: made)])
+        try await waitFor { !store.isUploading }
+        try await Task.sleep(for: .milliseconds(100))  // longer than the retry delay: nothing may try again
+
+        #expect(access.lost >= 1)
+        #expect(store.lastError == DriveError.missingDriveAccess.message)
+        #expect(store.pendingUploads.count == 1)  // kept for after signing in again
+        #expect(await drive.uploadCount() == 0)
+    }
+
+    @Test func uploadsLookAtDriveFirstSoNothingIsUploadedTwice() async throws {
+        // Another device already uploaded this piece; this iPhone hasn't listed Drive yet.
+        let setup = makeStore()
+        let audio = try await setup.layout().audio
+        let made = request("Already there.")
+        _ = await drive.add(name: SpeechAudioCache.key(for: made) + ".mp3", parent: audio)
+        try cache.store(Data("ID3 a".utf8), for: made)
+        let before = await drive.uploadCount()
+
+        let store = makeStore()
+        store.enqueue([SpeechAudioCache.key(for: made)])
+        try await waitFor { store.pendingUploads.isEmpty && !store.isUploading }
+
+        #expect(await drive.uploadCount() == before)
+        #expect(await drive.count(named: SpeechAudioCache.key(for: made) + ".mp3") == 1)
     }
 
     @Test func audioFromOtherCachesIsNotShared() async throws {

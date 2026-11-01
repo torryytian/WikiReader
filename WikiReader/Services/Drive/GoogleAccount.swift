@@ -79,6 +79,13 @@ final class GoogleAccount {
 
     /// Keeps what the code exchange returned. Separate from the browser part so tests can drive it.
     func finishSignIn(_ response: GoogleOAuth.TokenResponse) throws(GoogleAuthError) {
+        // Without the Drive permission the sign-in is no use: say so now rather than fail on every Drive request.
+        guard response.grantsDrive else {
+            Log.app.error("Google sign-in without Drive access")
+            revoke(response.refreshToken ?? response.accessToken)
+            clear(problem: GoogleAuthError.driveNotGranted.message)
+            throw .driveNotGranted
+        }
         guard let refresh = response.refreshToken else { throw .rejected("no refresh token") }
         do {
             try refreshTokenStore.save(refresh)
@@ -95,13 +102,25 @@ final class GoogleAccount {
 
     /// Forgets the sign-in here and asks Google to revoke it (best effort: offline, it simply lapses).
     func signOut() {
-        if let token = refreshTokenStore.read() {
-            let request = GoogleOAuth.revokeRequest(token: token)
-            let transport = transport
-            Task { _ = try? await transport(request) }
-        }
+        if let token = refreshTokenStore.read() { revoke(token) }
         clear(problem: nil)
         Log.app.info("Signed out of Google")
+    }
+
+    /// Drive refused the token for lacking the Drive permission (a sign-in from before that was checked, or access
+    /// removed in the Google account since): sign out, with the reason for Settings to show.
+    func driveAccessMissing() {
+        guard isSignedIn else { return }
+        Log.app.error("Drive says the sign-in lacks Drive access; signed out")
+        if let token = refreshTokenStore.read() { revoke(token) }
+        clear(problem: GoogleAuthError.driveNotGranted.message)
+    }
+
+    /// Asks Google to forget a grant, so the next sign-in asks about every permission again.
+    private func revoke(_ token: String) {
+        let request = GoogleOAuth.revokeRequest(token: token)
+        let transport = transport
+        Task { _ = try? await transport(request) }
     }
 
     private func clear(problem: String?) {
