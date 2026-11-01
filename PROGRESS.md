@@ -147,7 +147,8 @@
   - 接入点：`SpeechGenerations` 先问 `remote`（Drive）再调 OpenAI，OpenAI 生成后交给 Drive 上传——朗读、试听、批量下载都走这里。没有 OpenAI Key 时也能从 Drive 取。阅读页打开文章（OpenAI 声音 + 已登录）时 `noteArticle`；批量下载的确认弹窗把 Drive 上已有的算作免费，只对要生成的部分报价。
   - 设置 → Google Drive：Client ID 输入框、登录/退出、待上传数、本次会话下载/上传数、最近的错误、"Upload Saved Audio"。截图看过（未登录状态）。
   - 测试 26 个（`GoogleDriveTests.swift`）：OAuth（含 RFC 7636 的 PKCE 向量）、账号令牌续期和过期登出、Drive 客户端（转义、分批、401 重试、multipart）、用内存假 Drive 跑完整流程（建目录、复用、拒绝别的格式、下载、上传去重、队列重启续传、清单 complete）、Drive 优先于 OpenAI。测试抓到过一个真 bug：建文件只要 `fields=id`，解码却要求 name。
-  - **未验证（需要 Client ID 和真机/模拟器登录）**：真实的 Google 登录页和回调、真实 Drive 的查询语法和返回、和 Chrome 上传的文件互通、7 天后令牌过期的表现。
+  - **真机验证（2026-11-01 18:00–18:14）**：Client ID 已内置（项目号 174740959205，Chrome 客户端在同一项目）。第一次登录时用户没勾 Google 授权页上的 Drive 项，所有请求 403 "insufficient authentication scopes"（用 `devicectl device capture screenshot` 截手机屏幕看到的）；已改为登录时检查返回的 `scope`，没有 drive.file 就拒绝并提示勾选，用的过程中收到这种 403 就自动登出并提示。重新登录勾选后，手机上 467 个已付费音频约 6 分钟全部传到 `WikiReader Cache/audio/`，无错误、无重复（监控方式：`devicectl device copy from` 读 App 容器里的 `DriveUploadQueue.json` / `DriveAudioIndex.json`）。另修：5G "允许更多数据" 时 iOS 不把 5G 标成 expensive，"只在 Wi-Fi 上传"改为按蜂窝接口判断；上传期间保持屏幕常亮（`ScreenAwake`，和批量下载共用）。
+  - **还未验证**：Chrome 读取 iOS 上传的文件和清单（已请 Chrome 会话核对）、从 Drive 下载播放（"0 from Drive"，手机本来就都有）、7 天后令牌过期的表现。
 
 ### 书签（2026-10-19）
 - 用户要求：文章加书签；点文章时如果有书签就列出来选从哪开始，没有就从上次位置开始；选择页还要有"从头开始"和"从上次位置继续"；加书签放在阅读页顶部那条栏里。用户说"你看着来搞，直接干活"。
