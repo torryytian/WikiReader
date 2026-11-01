@@ -51,8 +51,14 @@ final class GoogleAccount {
 
     var isSignedIn: Bool { state != .signedOut }
 
+    /// The iOS OAuth client of the user's "WikiReader" Google Cloud project, the one the Chrome extension's client is
+    /// in too (drive.file only shows files made by clients of the same project). Public by design.
+    static let defaultClientID = "174740959205-ha26vdrcfbsama9s4lcpqdmq777rri42.apps.googleusercontent.com"
+
+    /// The client id from Settings, or the built-in one when none was entered.
     var client: GoogleOAuth.Client? {
-        GoogleOAuth.Client(id: defaults.string(forKey: SettingsKeys.googleClientID) ?? "")
+        let entered = defaults.string(forKey: SettingsKeys.googleClientID) ?? ""
+        return GoogleOAuth.Client(id: entered.isEmpty ? Self.defaultClientID : entered)
     }
 
     // MARK: - Signing in and out

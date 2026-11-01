@@ -14,7 +14,8 @@ struct GoogleDriveSettingsView: View {
     @State private var isQueueing = false
     @State private var queuedMessage: String?
 
-    private var hasValidClientID: Bool { GoogleOAuth.Client(id: clientID) != nil }
+    /// An empty field means the built-in client id.
+    private var hasValidClientID: Bool { clientID.isEmpty || GoogleOAuth.Client(id: clientID) != nil }
 
     var body: some View {
         Form {
@@ -128,7 +129,7 @@ struct GoogleDriveSettingsView: View {
 
     private var clientSection: some View {
         Section {
-            TextField("123456-abc.apps.googleusercontent.com", text: $clientID)
+            TextField(GoogleAccount.defaultClientID, text: $clientID)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.callout.monospaced())
@@ -139,9 +140,9 @@ struct GoogleDriveSettingsView: View {
                     .foregroundStyle(.red)
             }
         } header: {
-            Text("iOS Client ID")
+            Text("iOS Client ID (Advanced)")
         } footer: {
-            Text("From Google Cloud Console → APIs & Services → Credentials, the iOS OAuth client in the same project as the Chrome extension. It identifies the app and isn't a secret. Sign out to change it.")
+            Text("Leave empty to use the built-in one, the iOS OAuth client of the WikiReader Google Cloud project (the same project as the Chrome extension's). It identifies the app and isn't a secret. Sign out to change it.")
         }
     }
 }
