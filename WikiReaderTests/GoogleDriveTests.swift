@@ -147,6 +147,7 @@ actor FakeDrive {
         var parent: String
         var mimeType: String
         var data: Data
+        var createdTime: String
     }
 
     private(set) var files: [File] = []
@@ -157,12 +158,22 @@ actor FakeDrive {
 
     func setRejectNext() { rejectNext = true }
 
+    /// Status codes to answer the next uploads with, before behaving normally again.
+    private var uploadFailures: [Int] = []
+    func failNextUploads(_ statuses: [Int]) { uploadFailures = statuses }
+
     func add(name: String, parent: String, mimeType: String = "application/octet-stream", data: Data = Data()) -> String {
         let id = "f\(nextID)"
+        // Creation times one second apart, in Drive's RFC 3339 format.
+        let created = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_800_000_000 + Double(nextID)))
         nextID += 1
-        files.append(File(id: id, name: name, parent: parent, mimeType: mimeType, data: data))
+        files.append(File(id: id, name: name, parent: parent, mimeType: mimeType, data: data, createdTime: created))
         return id
     }
+
+    func remove(named name: String) { files.removeAll { $0.name == name } }
+    func listCount() -> Int { requests.count { $0 == "GET /drive/v3/files" } }
+    func uploadCount() -> Int { requests.count { $0 == "POST /upload/drive/v3/files" } }
 
     func file(named name: String) -> File? { files.first { $0.name == name } }
     func count(named name: String) -> Int { files.count { $0.name == name } }
@@ -186,11 +197,13 @@ actor FakeDrive {
             let parent = q.firstMatch(of: #/'([^']*)' in parents/#).map { String($0.1) }
             let names = Set(q.matches(of: #/name = '([^']*)'/#).map { String($0.1) })
             let foldersOnly = q.contains("mimeType = 'application/vnd.google-apps.folder'")
+            let after = q.firstMatch(of: #/createdTime > '([^']*)'/#).flatMap { Self.date(String($0.1)) }
             let found = files.filter {
                 (parent == nil || $0.parent == parent) && (names.isEmpty || names.contains($0.name))
                     && (!foldersOnly || $0.mimeType == DriveClient.folderType)
+                    && (after == nil || Self.date($0.createdTime)! > after!)
             }
-            return reply(200, json(["files": found.map { ["id": $0.id, "name": $0.name] }]))
+            return reply(200, json(["files": found.map { ["id": $0.id, "name": $0.name, "createdTime": $0.createdTime] }]))
         }
         if method == "POST", url.path == "/drive/v3/files" {
             let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
@@ -198,6 +211,10 @@ actor FakeDrive {
             return reply(200, json(["id": id]))
         }
         if method == "POST", url.path == "/upload/drive/v3/files" {
+            if !uploadFailures.isEmpty {
+                let status = uploadFailures.removeFirst()
+                return reply(status, json(["error": ["message": status == 403 ? "User rate limit exceeded." : "Backend Error"]]))
+            }
             let (metadata, data, mime) = Self.parseMultipart(request)
             let id = add(name: metadata["name"] as! String, parent: (metadata["parents"] as! [String])[0], mimeType: mime, data: data)
             return reply(200, json(["id": id]))
@@ -213,6 +230,12 @@ actor FakeDrive {
             return reply(200, file.data)
         }
         return reply(400, Data())
+    }
+
+    static func date(_ string: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: string) ?? ISO8601DateFormatter().date(from: string)
     }
 
     static func parseMultipart(_ request: URLRequest) -> ([String: Any], Data, String) {
@@ -298,12 +321,17 @@ struct DriveAudioStoreTests {
     let drive = FakeDrive()
     let cache = SpeechAudioCache(directory: URL.temporaryDirectory.appending(path: "DriveStoreTests-\(UUID().uuidString)"))
     let queueFile = URL.temporaryDirectory.appending(path: "DriveQueue-\(UUID().uuidString).json")
+    let indexFile = URL.temporaryDirectory.appending(path: "DriveIndex-\(UUID().uuidString).json")
+    let network = NetworkState()
+
+    final class NetworkState { var free = true }
 
     private func makeStore(signedIn: Bool = true) -> DriveAudioStore {
-        let drive = drive
+        let drive = drive, network = network
         return DriveAudioStore(
             client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
-            isSignedIn: { signedIn }, cache: cache, queueFile: queueFile, retryDelay: .milliseconds(20)
+            isSignedIn: { signedIn }, cache: cache, queueFile: queueFile, indexFile: indexFile,
+            retryDelay: .milliseconds(20), canUploadNow: { network.free }
         )
     }
 
@@ -394,6 +422,82 @@ struct DriveAudioStoreTests {
         restarted.pumpUploads()
         try await waitFor { restarted.pendingUploads.isEmpty && !restarted.isUploading }
         #expect(await drive.count(named: SpeechAudioCache.key(for: other) + ".mp3") == 1)
+    }
+
+    @Test func theIndexIsListedOnceThenOnlyWhatIsNew() async throws {
+        let store = makeStore()
+        let audio = try await store.layout().audio
+        for text in ["One.", "Two.", "Three."] {
+            _ = await drive.add(name: SpeechAudioCache.key(for: request(text)) + ".mp3", parent: audio)
+        }
+        await store.syncIndex()
+        #expect(store.isOnDrive(SpeechAudioCache.key(for: request("Two."))) == true)
+        #expect(store.isOnDrive(SpeechAudioCache.key(for: request("Four."))) == false)
+
+        // Another device uploads one more: a forced sync lists only that (and a minute's overlap).
+        _ = await drive.add(name: SpeechAudioCache.key(for: request("Four.")) + ".mp3", parent: audio)
+        let before = await drive.listCount()
+        await store.syncIndex(force: true)
+        #expect(await drive.listCount() == before + 1)
+        #expect(store.isOnDrive(SpeechAudioCache.key(for: request("Four."))) == true)
+
+        // The index survives a restart; a recent answer needs no request at all.
+        let restarted = makeStore()
+        #expect(restarted.isOnDrive(SpeechAudioCache.key(for: request("One."))) == true)
+        await store.syncIndex()
+        #expect(await drive.listCount() == before + 1)
+    }
+
+    @Test func aPieceDeletedOnDriveIsForgottenWhenItCantBeDownloaded() async throws {
+        let store = makeStore()
+        let audio = try await store.layout().audio
+        let wanted = request("Gone.")
+        let name = SpeechAudioCache.key(for: wanted) + ".mp3"
+        _ = await drive.add(name: name, parent: audio)
+        await store.syncIndex()
+        await drive.remove(named: name)
+        #expect(await store.fetch(wanted, into: cache) == nil)
+        #expect(store.isOnDrive(SpeechAudioCache.key(for: wanted)) != true)
+    }
+
+    @Test func rateLimitedUploadsBackOffAndThenFinish() async throws {
+        let store = makeStore()
+        _ = try await store.layout()
+        let before = await drive.uploadCount()  // format.json
+        await drive.failNextUploads([429, 403])
+        let texts = (1...5).map { "Paragraph \($0)." }
+        for text in texts { try cache.store(Data("ID3 \(text)".utf8), for: request(text)) }
+
+        store.enqueue(texts.map { SpeechAudioCache.key(for: request($0)) })
+        try await waitFor { store.pendingUploads.isEmpty && !store.isUploading }
+
+        #expect(store.pendingUploads.isEmpty)
+        for text in texts { #expect(await drive.count(named: SpeechAudioCache.key(for: request(text)) + ".mp3") == 1) }
+        #expect(await drive.uploadCount() - before == 7)  // 5 files, 2 refused once
+    }
+
+    @Test func uploadsWaitForAFreeConnection() async throws {
+        let store = makeStore()
+        _ = try await store.layout()
+        let before = await drive.uploadCount()  // format.json
+        network.free = false
+        let made = request("Wait for Wi-Fi.")
+        try cache.store(Data("ID3 w".utf8), for: made)
+        store.enqueue([SpeechAudioCache.key(for: made)])
+        #expect(store.isWaitingForFreeNetwork)
+        #expect(await drive.uploadCount() == before)
+
+        network.free = true
+        store.pumpUploads()
+        try await waitFor { store.pendingUploads.isEmpty && !store.isUploading }
+        #expect(!store.isWaitingForFreeNetwork)
+        #expect(await drive.uploadCount() - before == 1)
+    }
+
+    @Test func driveTimesAreMovedBackForTheOverlap() {
+        #expect(DriveAudioStore.rfc3339(minus: 60, from: "2026-11-01T08:00:30.250Z") == "2026-11-01T07:59:30.250Z")
+        #expect(DriveAudioStore.rfc3339(minus: 60, from: "2026-11-01T08:00:30Z") == "2026-11-01T07:59:30.000Z")
+        #expect(DriveAudioStore.rfc3339(minus: 60, from: "nonsense") == nil)
     }
 
     @Test func audioFromOtherCachesIsNotShared() async throws {

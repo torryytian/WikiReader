@@ -32,6 +32,8 @@ nonisolated enum SettingsKeys {
     static let googleClientID = "googleClientID"
     /// The signed-in Google account's address, shown in Settings only.
     static let googleAccountEmail = "googleAccountEmail"
+    /// Upload to Google Drive over cellular and Low Data Mode too; off (the default) waits for Wi-Fi.
+    static let driveUploadAnyNetwork = "driveUploadAnyNetwork"
 }
 
 /// Whether the whole app is light, dark, or follows the iPhone's setting. The reader's own theme

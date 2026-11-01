@@ -28,8 +28,10 @@ private struct RootView: View {
             .preferredColorScheme(appearance.colorScheme)
             .onAppear {
                 appearance.apply()
-                // Audio generated while offline or before quitting is uploaded now.
+                // Audio generated while offline or before quitting is uploaded now, and again whenever the
+                // connection changes (uploads may be waiting for Wi-Fi).
                 DriveAudioStore.shared.pumpUploads()
+                NetworkWatcher.shared.onChange = { DriveAudioStore.shared.pumpUploads() }
             }
             .onChange(of: appearance) { _, new in new.apply() }
     }

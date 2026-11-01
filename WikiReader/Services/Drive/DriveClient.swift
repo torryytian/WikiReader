@@ -9,6 +9,17 @@ nonisolated enum DriveError: Error, Equatable, Sendable {
     /// The shared folder holds a format this version doesn't know (see docs/shared-tts-cache-format.md).
     case unsupportedFormat(String)
 
+    /// Worth trying again after a pause: Google is rate limiting (429, or 403 "rate limit exceeded"), had a
+    /// server error, or the connection dropped.
+    var isTransient: Bool {
+        switch self {
+        case .network: true
+        case .http(let status, let detail):
+            status == 429 || status >= 500 || (status == 403 && (detail ?? "").lowercased().contains("rate limit"))
+        default: false
+        }
+    }
+
     var message: String {
         switch self {
         case .notSignedIn: "Not signed in to Google."
@@ -89,16 +100,35 @@ nonisolated struct DriveClient: Sendable {
         return found
     }
 
+    /// A file as listed with its creation time (RFC 3339, as Drive writes it).
+    struct ListedFile: Decodable, Equatable, Sendable {
+        var id: String
+        var name: String
+        var createdTime: String?
+    }
+
+    /// Everything in `folder`, or only what was created after `createdAfter` (an RFC 3339 time), oldest first,
+    /// 1000 per request. How the whole audio folder is mirrored into a local index, then kept up to date cheaply.
+    func listFolder(_ folder: String, createdAfter: String? = nil) async throws(DriveError) -> [ListedFile] {
+        var query = "\(Self.quoted(folder)) in parents and trashed = false"
+        if let createdAfter { query += " and createdTime > \(Self.quoted(createdAfter))" }
+        return try await list(query: query, orderBy: "createdTime", fields: "id,name,createdTime")
+    }
+
     private func list(query: String, orderBy: String) async throws(DriveError) -> [File] {
+        try await list(query: query, orderBy: orderBy, fields: "id,name").map { File(id: $0.id, name: $0.name) }
+    }
+
+    private func list(query: String, orderBy: String, fields: String) async throws(DriveError) -> [ListedFile] {
         struct Page: Decodable {
-            var files: [File]
+            var files: [ListedFile]
             var nextPageToken: String?
         }
-        var files: [File] = []
+        var files: [ListedFile] = []
         var pageToken: String?
         repeat {
             var parameters = [
-                "q": query, "fields": "nextPageToken,files(id,name)", "pageSize": "1000",
+                "q": query, "fields": "nextPageToken,files(\(fields))", "pageSize": "1000",
                 "orderBy": orderBy, "spaces": "drive",
             ]
             if let pageToken { parameters["pageToken"] = pageToken }

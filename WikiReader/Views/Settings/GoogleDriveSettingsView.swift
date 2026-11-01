@@ -7,6 +7,7 @@ struct GoogleDriveSettingsView: View {
     @Query(sort: \Article.addedAt, order: .reverse) private var articles: [Article]
     @AppStorage(SettingsKeys.googleClientID) private var clientID = ""
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
+    @AppStorage(SettingsKeys.driveUploadAnyNetwork) private var uploadAnyNetwork = false
     @State private var account = GoogleAccount.shared
     @State private var drive = DriveAudioStore.shared
     @State private var isSigningIn = false
@@ -83,7 +84,9 @@ struct GoogleDriveSettingsView: View {
 
     private var statusSection: some View {
         Section {
-            LabeledContent("Waiting to Upload", value: drive.isUploading ? "\(drive.pendingUploads.count) · uploading…" : "\(drive.pendingUploads.count)")
+            LabeledContent("Waiting to Upload", value: uploadStatus)
+            Toggle("Upload over Cellular", isOn: $uploadAnyNetwork)
+                .onChange(of: uploadAnyNetwork) { drive.pumpUploads() }
             LabeledContent("This Session", value: "\(drive.downloadedCount) from Drive · \(drive.uploadedCount) uploaded")
             if let error = drive.lastError {
                 Label(error, systemImage: "exclamationmark.triangle")
@@ -110,8 +113,15 @@ struct GoogleDriveSettingsView: View {
         } header: {
             Text("Status")
         } footer: {
-            Text("Upload Saved Audio sends the audio already on this iPhone for your saved articles (any voice) that isn't in Drive yet, and lists the articles there. Uploads continue in the background while WikiReader is open.")
+            Text("Upload Saved Audio sends the audio already on this iPhone for your saved articles (any voice) that isn't in Drive yet, and lists the articles there. Uploads continue in the background while WikiReader is open, on Wi-Fi only unless Upload over Cellular is on (a long article is about 80 MB). Audio is always taken from Drive when needed, on any connection: that's what saves generating it again.")
         }
+    }
+
+    private var uploadStatus: String {
+        let count = drive.pendingUploads.count
+        if drive.isUploading { return "\(count) · uploading…" }
+        if drive.isWaitingForFreeNetwork { return "\(count) · waiting for Wi-Fi" }
+        return "\(count)"
     }
 
     private func uploadSavedAudio() {

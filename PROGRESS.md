@@ -6,7 +6,7 @@
 
 ## 0. 接手须知（新会话先读这里）
 
-**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。470 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、文库与存储）、文章书签。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
+**一句话现状**：阶段 0–5 的核心功能都做完了（抓取清洗、阅读、点词查词典、系统/OpenAI 朗读、文章库、设置），10-07/08 又加了：App 图标、词典界面的发音按钮和 AI 讲解按钮、Voice 合并页、沉浸式阅读页（上下边缘菜单、排版面板、多选翻译、段末翻译）。476 个单元测试全过。10-13 又换成了自己的词典页（离线 ECDICT + 在线 Wiktionary + 真人发音）、改成解析 HTML 抓文章、加了播放日志和 OpenAI 声音响度。10-19 文库加了文章属性页（左滑 Info）、+ 菜单（批量选择、文库与存储）、文章书签。**但阅读页的触摸操作和词典页上的按钮我这边都没法点，真机上的表现要用户验证。**
 
 **先做这几件事**
 1. `git pull`，按 CLAUDE.md 编译并跑测试（见第 6 节的环境注意事项）。
@@ -32,7 +32,7 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：470 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：476 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
@@ -143,6 +143,7 @@
   - `Services/Drive/GoogleOAuth.swift`（PKCE、登录地址、令牌请求和解析，纯函数）、`GoogleAccount.swift`（`ASWebAuthenticationSession` 登录、refresh token 存 Keychain、access token 内存缓存和自动续期；`invalid_grant` 时自动登出并提示）。Client ID 是设置项（`SettingsKeys.googleClientID`），不是密钥。
   - `DriveClient.swift`：找/建文件夹（同名取最早建的）、按名批量查（每批 50）、下载、multipart 上传、PATCH 替换；401 用新令牌重试一次。
   - `DriveAudioStore.swift`：首次用时找/建 `WikiReader Cache/{audio,articles}` 和 `format.json`（格式不对就拒绝）；内存里记哪些 key 在 Drive（"不在"的结论 10 分钟内有效）；持久化上传队列（`Application Support/DriveUploadQueue.json`，失败 60 秒后重试，App 启动时续传）；写清单（内容没变不重写，上传完后刷新 complete）；"上传本机已有语音"（文库所有文章、所有声音）。
+  - **小文件优化（2026-11-01，用户问 Drive 对大量小文件的限制）**：查过官方限制（每用户每分钟 32.5 万配额单位、每文件夹 50 万项、每天 1 TB；旧指南建议持续写入不超过约 3 次/秒/账号），按我们的量（一篇长文约 200 个文件、约 80 MB）都碰不到，实际上限是 15 GB 免费空间（约 180 篇长文）。真正要省的是请求次数（每个文件一次往返）：①Drive 上有哪些音频改成本机索引 `Application Support/DriveAudioIndex.json`，首次整目录列一遍（每 1000 个一次请求），之后只列"上次之后新建的"（createdTime 大于上次最新时间减 60 秒），2 分钟内的结论直接用；下载 404 就从索引删掉。②上传 2 路并行，429 / 403 rate limit / 5xx / 断网按 2 秒起翻倍退避到 5 分钟。③默认只在非计费网络上传（NWPathMonitor 的 isExpensive/isConstrained；设置里 "Upload over Cellular" 可打开），下载不受限。不做：按文章打包（破坏按段去重、要改格式）、Drive batch 接口（不支持传文件内容）、按 key 前缀分目录（离 50 万很远，要做得和 Chrome 一起升格式）。
   - 接入点：`SpeechGenerations` 先问 `remote`（Drive）再调 OpenAI，OpenAI 生成后交给 Drive 上传——朗读、试听、批量下载都走这里。没有 OpenAI Key 时也能从 Drive 取。阅读页打开文章（OpenAI 声音 + 已登录）时 `noteArticle`；批量下载的确认弹窗把 Drive 上已有的算作免费，只对要生成的部分报价。
   - 设置 → Google Drive：Client ID 输入框、登录/退出、待上传数、本次会话下载/上传数、最近的错误、"Upload Saved Audio"。截图看过（未登录状态）。
   - 测试 26 个（`GoogleDriveTests.swift`）：OAuth（含 RFC 7636 的 PKCE 向量）、账号令牌续期和过期登出、Drive 客户端（转义、分批、401 重试、multipart）、用内存假 Drive 跑完整流程（建目录、复用、拒绝别的格式、下载、上传去重、队列重启续传、清单 complete）、Drive 优先于 OpenAI。测试抓到过一个真 bug：建文件只要 `fields=id`，解码却要求 name。
