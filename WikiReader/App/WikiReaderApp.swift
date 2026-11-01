@@ -26,7 +26,11 @@ private struct RootView: View {
     var body: some View {
         LibraryView()
             .preferredColorScheme(appearance.colorScheme)
-            .onAppear { appearance.apply() }
+            .onAppear {
+                appearance.apply()
+                // Audio generated while offline or before quitting is uploaded now.
+                DriveAudioStore.shared.pumpUploads()
+            }
             .onChange(of: appearance) { _, new in new.apply() }
     }
 }

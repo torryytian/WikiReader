@@ -196,8 +196,8 @@ final class AudioDownloader {
 
     private func fetch(_ request: OpenAISpeechRequest) async -> Result<URL, OpenAITTSError> {
         if let url = cache.cachedFile(for: request) { return .success(url) }
-        guard let key = apiKey(), !key.isEmpty else { return .failure(.missingKey) }
-        return await generations.generate(request, apiKey: key, client: client, cache: cache).value
+        // Without a key, Google Drive may still have it; `generate` fails with missingKey otherwise.
+        return await generations.generate(request, apiKey: apiKey(), client: client, cache: cache).value
     }
 
     private func finish() {

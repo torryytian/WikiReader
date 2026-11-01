@@ -6,20 +6,42 @@ import OSLog
 ///
 /// Keyed by the file the audio will be stored in, which names the cache as well as the request: two caches (as in
 /// tests) never share a generation.
+///
+/// A generation first asks `remote` (Google Drive) for audio another device made, and only then OpenAI; audio from
+/// OpenAI is handed back to `remote` to share.
 final class SpeechGenerations {
     typealias Generation = Task<Result<URL, OpenAITTSError>, Never>
 
-    static let shared = SpeechGenerations()
+    static let shared = SpeechGenerations(remote: DriveAudioStore.shared)
 
     private var running: [URL: Generation] = [:]
+    /// Where audio is looked for before OpenAI; nil looks nowhere else.
+    var remote: RemoteAudioSource?
+
+    init(remote: RemoteAudioSource? = nil) {
+        self.remote = remote
+    }
+
+    /// Whether audio can be had without an OpenAI key (from `remote`).
+    var canWorkWithoutKey: Bool { remote?.isEnabled ?? false }
 
     /// The generation of `request`'s audio: the one already running, or a new one. It is never cancelled by its
-    /// callers going away: the audio is paid for, so it is allowed to reach the cache.
-    func generate(_ request: OpenAISpeechRequest, apiKey: String, client: OpenAITTSClient, cache: SpeechAudioCache) -> Generation {
+    /// callers going away: the audio is paid for, so it is allowed to reach the cache. Without an `apiKey` only
+    /// `remote` is asked.
+    func generate(_ request: OpenAISpeechRequest, apiKey: String?, client: OpenAITTSClient, cache: SpeechAudioCache) -> Generation {
         let file = cache.fileURL(for: request)
         if let pending = running[file] { return pending }
-        Log.speech.info("Generating OpenAI audio for \(request.input.utf16.count) characters")
-        let task = Task { await Self.run(request, apiKey: apiKey, client: client, cache: cache) }
+        let remote = remote
+        let task = Task { () -> Result<URL, OpenAITTSError> in
+            if let remote, remote.isEnabled, let url = await remote.fetch(request, into: cache) {
+                return .success(url)
+            }
+            guard let apiKey, !apiKey.isEmpty else { return .failure(.missingKey) }
+            Log.speech.info("Generating OpenAI audio for \(request.input.utf16.count) characters")
+            let result = await Self.run(request, apiKey: apiKey, client: client, cache: cache)
+            if case .success = result { remote?.didGenerate(request, in: cache) }
+            return result
+        }
         running[file] = task
         Task {
             _ = await task.value

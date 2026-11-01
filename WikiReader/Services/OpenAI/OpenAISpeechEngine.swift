@@ -154,7 +154,9 @@ final class OpenAISpeechEngine: SpeechEngine {
 
     /// Starts queued generations while fewer than `maxConcurrentPrefetch` of them are running.
     private func pumpPrefetch() {
-        guard let key = apiKey(), !key.isEmpty else {
+        let key = apiKey()
+        // Without a key, audio can still come from Google Drive.
+        guard !(key ?? "").isEmpty || generations.canWorkWithoutKey else {
             queued = []
             return
         }
@@ -333,7 +335,8 @@ final class OpenAISpeechEngine: SpeechEngine {
         if let url = cache.cachedFile(for: request) {
             return Task { .success(url) }
         }
-        guard let apiKey = apiKey(), !apiKey.isEmpty else {
+        let apiKey = apiKey()
+        guard !(apiKey ?? "").isEmpty || generations.canWorkWithoutKey else {
             return Task { .failure(.missingKey) }
         }
         queued.removeAll { $0.key == key }
@@ -341,7 +344,7 @@ final class OpenAISpeechEngine: SpeechEngine {
     }
 
     /// Joins a generation of the same text already running elsewhere (say, the batch download) rather than paying twice.
-    private func startGeneration(_ request: OpenAISpeechRequest, key: String, apiKey: String) -> Task<Result<URL, OpenAITTSError>, Never> {
+    private func startGeneration(_ request: OpenAISpeechRequest, key: String, apiKey: String?) -> Task<Result<URL, OpenAITTSError>, Never> {
         let task = generations.generate(request, apiKey: apiKey, client: client, cache: cache)
         inFlight[key] = task
         Task {

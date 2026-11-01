@@ -28,6 +28,10 @@ nonisolated enum SettingsKeys {
     static let readerMargins = "readerMargins"
     static let readerTheme = "readerTheme"
     static let readerDarkLevel = "readerDarkLevel"
+    /// The Google Cloud project's iOS OAuth client id (public, not a secret), for sharing audio through Google Drive.
+    static let googleClientID = "googleClientID"
+    /// The signed-in Google account's address, shown in Settings only.
+    static let googleAccountEmail = "googleAccountEmail"
 }
 
 /// Whether the whole app is light, dark, or follows the iPhone's setting. The reader's own theme
