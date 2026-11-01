@@ -1,0 +1,2577 @@
+{
+  "blocks" : [
+    {
+      "chunks" : [
+        {
+          "key" : "02d535b781b06df9331856ee0392cabd37c97a62d6747093ee3d86901c94b07a",
+          "text" : "In mathematics, the Pythagorean theorem or Pythagoras's theorem is a fundamental relation in Euclidean geometry between the three sides of a right triangle. It states that the area of the square whose side is the hypotenuse (the side opposite the right angle) is equal to the sum of the areas of the squares on the other two sides."
+        }
+      ],
+      "i" : 0,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In mathematics, the Pythagorean theorem or Pythagoras's theorem is a fundamental relation in Euclidean geometry between the three sides of a right triangle. It states that the area of the square whose side is the hypotenuse (the side opposite the right angle) is equal to the sum of the areas of the squares on the other two sides."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "bba97afaca0524ccaf715a81ba27074da124becf9a4cbb1e814c3a154a0bcfab",
+          "text" : "The theorem can be written as an equation relating the lengths of the sides a, b and the hypotenuse c, sometimes called the Pythagorean equation:"
+        }
+      ],
+      "i" : 1,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The theorem can be written as an equation relating the lengths of the sides a, b and the hypotenuse c, sometimes called the Pythagorean equation:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "cc3b2fadc959677955d90cfd048d5d621eecb076704e718223df4a98741d44dc",
+          "text" : "The theorem is named for the Greek philosopher Pythagoras, born around 570 BC. The theorem has been proved numerous times by many different methods – possibly the most for any mathematical theorem. The proofs are diverse, including both geometric proofs and algebraic proofs, with some dating back thousands of years."
+        }
+      ],
+      "i" : 2,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The theorem is named for the Greek philosopher Pythagoras, born around 570 BC. The theorem has been proved numerous times by many different methods – possibly the most for any mathematical theorem. The proofs are diverse, including both geometric proofs and algebraic proofs, with some dating back thousands of years."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "29a1e567a9238af128ec966246afec7b3055d8957edaa8dede5f7a548b2cae93",
+          "text" : "When Euclidean space is represented by a Cartesian coordinate system in analytic geometry, Euclidean distance satisfies the Pythagorean relation: the squared distance between two points equals the sum of squares of the difference in each coordinate between the points."
+        }
+      ],
+      "i" : 3,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "When Euclidean space is represented by a Cartesian coordinate system in analytic geometry, Euclidean distance satisfies the Pythagorean relation: the squared distance between two points equals the sum of squares of the difference in each coordinate between the points."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "fc7eac7c27fc47ee41299c541f9c1b2376e685f96b57df963fb542df98b91271",
+          "text" : "The theorem can be generalized in various ways: to higher-dimensional spaces, to spaces that are not Euclidean, to objects that are not right triangles, and to objects that are not triangles at all but n-dimensional solids."
+        }
+      ],
+      "i" : 4,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The theorem can be generalized in various ways: to higher-dimensional spaces, to spaces that are not Euclidean, to objects that are not right triangles, and to objects that are not triangles at all but n-dimensional solids."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c38d77d2cd3a52901c7456918124df580153bd59e6dad5b0f7750cf38d469c99",
+          "text" : "History"
+        }
+      ],
+      "i" : 5,
+      "kind" : "heading",
+      "level" : 2,
+      "text" : "History"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b4a80c8afd175be72beb10b783af0a5ed09f46b598bcd725f15fa07823af0290",
+          "text" : "Forms of the Pythagorean theorem have appeared in many ancient cultures, and the date of first discovery is uncertain, as is the date of the first proof. The history of the development of the theorem involves multiple aspects, including calculations regarding specific right triangles, knowledge of Pythagorean triples, understanding the relationship among the sides of a right triangle, and proofs of the theorem within some deductive system."
+        }
+      ],
+      "i" : 6,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Forms of the Pythagorean theorem have appeared in many ancient cultures, and the date of first discovery is uncertain, as is the date of the first proof. The history of the development of the theorem involves multiple aspects, including calculations regarding specific right triangles, knowledge of Pythagorean triples, understanding the relationship among the sides of a right triangle, and proofs of the theorem within some deductive system."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "12a43e0d4e8242a85b889a35cf690b3961b73e9c0737f8050a254930d1e1aa15",
+          "text" : "Written c. 1800 BC, the Egyptian Middle Kingdom Berlin Papyrus 6619 includes a problem involving two squares whose areas sum to a third square, whose solution is the Pythagorean triple 6:8:10, but the problem does not mention a triangle. According to Plutarch, writing many centuries later, the ancient Egyptians did know about the 3:4:5 right triangle, identifying its sides with Osiris, Isis, and Horus respectively."
+        }
+      ],
+      "i" : 7,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Written c. 1800 BC, the Egyptian Middle Kingdom Berlin Papyrus 6619 includes a problem involving two squares whose areas sum to a third square, whose solution is the Pythagorean triple 6:8:10, but the problem does not mention a triangle. According to Plutarch, writing many centuries later, the ancient Egyptians did know about the 3:4:5 right triangle, identifying its sides with Osiris, Isis, and Horus respectively."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0ce3fe3700c27f28419f76bc8d4196e0f1d0228123469ce3bbaaf1487a206f08",
+          "text" : "Historians of Mesopotamian mathematics have concluded that the Pythagorean rule was in widespread use during the Old Babylonian period (20th to 16th centuries BC), over a thousand years before Pythagoras was born. The Mesopotamian tablet Plimpton 322, written near Larsa also c. 1800 BC, contains entries that can be interpreted as the sides and diagonals of 15 different Pythagorean triples. Another tablet from a similar time, YBC 7289, calculates the diagonal of a square or, equivalently, of an isosceles right triangle."
+        }
+      ],
+      "i" : 8,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Historians of Mesopotamian mathematics have concluded that the Pythagorean rule was in widespread use during the Old Babylonian period (20th to 16th centuries BC), over a thousand years before Pythagoras was born. The Mesopotamian tablet Plimpton 322, written near Larsa also c. 1800 BC, contains entries that can be interpreted as the sides and diagonals of 15 different Pythagorean triples. Another tablet from a similar time, YBC 7289, calculates the diagonal of a square or, equivalently, of an isosceles right triangle."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d4cac011e87004750500f3a23b178712c3ca556bda46b293d62de70fb9599fbf",
+          "text" : "In India, the Baudhayana Shulba Sutra, the dates of which are given variously as between the 8th and 5th century BC, contains a list of Pythagorean triples and a statement of the Pythagorean theorem, both in the special case of the isosceles right triangle and in the general case, as does the Apastamba Shulba Sutra (c. 600 BC)."
+        }
+      ],
+      "i" : 9,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In India, the Baudhayana Shulba Sutra, the dates of which are given variously as between the 8th and 5th century BC, contains a list of Pythagorean triples and a statement of the Pythagorean theorem, both in the special case of the isosceles right triangle and in the general case, as does the Apastamba Shulba Sutra (c. 600 BC)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "e3570bc8faf0a1e34c4c5dfc1fd7ed45f8d8c6d95f1247b9237791874f6cbd60",
+          "text" : "Byzantine Neoplatonic philosopher and mathematician Proclus, writing in the fifth century AD, states two arithmetic rules, \"one of them attributed to Plato, the other to Pythagoras\", for generating special Pythagorean triples. The rule attributed to Pythagoras (c. 570 – c. 495 BC) starts from an odd number and produces a triple with leg and hypotenuse differing by one unit; the rule attributed to Plato (428/427 or 424/423 – 348/347 BC) starts from an even number and produces a triple with leg and hypotenuse differing by two units. According to Thomas L. Heath (1861–1940), no specific attribution of the theorem to Pythagoras exists in the surviving Greek literature from the five centuries after Pythagoras lived. However, when authors such as Plutarch and Cicero attributed the theorem to Pythagoras, they did so in a way which suggests that the attribution was widely known and undoubted. Classicist Kurt von Fritz wrote, \"Whether this formula is rightly attributed to Pythagoras personally... one can safely assume that it belongs to the very oldest period of Pythagorean mathematics.\" Around 300 BC, in Euclid's Elements, the oldest extant axiomatic proof of the theorem is presented, along with Euclid's formula for generating all primitive Pythagorean triples."
+        }
+      ],
+      "i" : 10,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Byzantine Neoplatonic philosopher and mathematician Proclus, writing in the fifth century AD, states two arithmetic rules, \"one of them attributed to Plato, the other to Pythagoras\", for generating special Pythagorean triples. The rule attributed to Pythagoras (c. 570 – c. 495 BC) starts from an odd number and produces a triple with leg and hypotenuse differing by one unit; the rule attributed to Plato (428/427 or 424/423 – 348/347 BC) starts from an even number and produces a triple with leg and hypotenuse differing by two units. According to Thomas L. Heath (1861–1940), no specific attribution of the theorem to Pythagoras exists in the surviving Greek literature from the five centuries after Pythagoras lived. However, when authors such as Plutarch and Cicero attributed the theorem to Pythagoras, they did so in a way which suggests that the attribution was widely known and undoubted. Classicist Kurt von Fritz wrote, \"Whether this formula is rightly attributed to Pythagoras personally... one can safely assume that it belongs to the very oldest period of Pythagorean mathematics.\" Around 300 BC, in Euclid's Elements, the oldest extant axiomatic proof of the theorem is presented, along with Euclid's formula for generating all primitive Pythagorean triples."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "865f33508c7136f02b5361d67232f658066575c429a6bf4845a22203fea4d289",
+          "text" : "With contents known much earlier, but in surviving texts dating from roughly the 1st century BC, the Chinese text Zhoubi Suanjing (周髀算经), (The Arithmetical Classic of the Gnomon and the Circular Paths of Heaven) gives a reasoning for the Pythagorean theorem for the (3, 4, 5) triangle — in China it is called the \"Gougu theorem\" (勾股定理). During the Han Dynasty (202 BC to 220 AD), Pythagorean triples appear in The Nine Chapters on the Mathematical Art, together with a mention of right triangles. Some believe the theorem arose first in China in the 11th century BC, where it is alternatively known as the \"Shang Gao theorem\" (商高定理), named after the Duke of Zhou's astronomer and mathematician, whose reasoning composed most of what was in the Zhoubi Suanjing."
+        }
+      ],
+      "i" : 11,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "With contents known much earlier, but in surviving texts dating from roughly the 1st century BC, the Chinese text Zhoubi Suanjing (周髀算经), (The Arithmetical Classic of the Gnomon and the Circular Paths of Heaven) gives a reasoning for the Pythagorean theorem for the (3, 4, 5) triangle — in China it is called the \"Gougu theorem\" (勾股定理). During the Han Dynasty (202 BC to 220 AD), Pythagorean triples appear in The Nine Chapters on the Mathematical Art, together with a mention of right triangles. Some believe the theorem arose first in China in the 11th century BC, where it is alternatively known as the \"Shang Gao theorem\" (商高定理), named after the Duke of Zhou's astronomer and mathematician, whose reasoning composed most of what was in the Zhoubi Suanjing."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "9145ba85bcefd49549ebdb7dd768fbb6753a2aab140b858b5021a7440b10c0bc",
+          "text" : "Proofs using constructed squares"
+        }
+      ],
+      "i" : 12,
+      "kind" : "heading",
+      "level" : 2,
+      "text" : "Proofs using constructed squares"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b04fcf9451b4dfb449b34251ce2eaaa9295c8d2b12a762c0d97d9fdd235666b6",
+          "text" : "Rearrangement proofs"
+        }
+      ],
+      "i" : 13,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Rearrangement proofs"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "5bd2fc153d6113d31be986f9963979f2180fa5f4ec8d8b4471e0b5d5ba247c12",
+          "text" : "In one rearrangement proof, two squares are used whose sides have a measure of and which contain four right triangles whose sides are a, b and c, with the hypotenuse being c. In the square on the right side, the triangles are placed such that the corners of the square correspond to the corners of the right angle in the triangles, forming a square in the center whose sides are length c. Each outer square has an area of (a + b)2 as well as 2ab + c2, with 2ab representing the total area of the four triangles. Within the big square on the left side, the four triangles are moved to form two similar rectangles with sides of length a and b. These rectangles in their new position have now delineated two new squares, one having side length a is formed in the bottom-left corner, and another square of side length b formed in the top-right corner. In this new position, this left side now has a square of area (a + b)2 as well as 2ab + a2 + b2. Since both squares have the area of (a + b)2 it follows that the other measure of the square area also equal each other such that 2ab + c2 = 2ab + a2 + b2. With the area of the four triangles removed from both side of the equation what remains is a2 + b2 = c2."
+        }
+      ],
+      "i" : 14,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In one rearrangement proof, two squares are used whose sides have a measure of and which contain four right triangles whose sides are a, b and c, with the hypotenuse being c. In the square on the right side, the triangles are placed such that the corners of the square correspond to the corners of the right angle in the triangles, forming a square in the center whose sides are length c. Each outer square has an area of (a + b)2 as well as 2ab + c2, with 2ab representing the total area of the four triangles. Within the big square on the left side, the four triangles are moved to form two similar rectangles with sides of length a and b. These rectangles in their new position have now delineated two new squares, one having side length a is formed in the bottom-left corner, and another square of side length b formed in the top-right corner. In this new position, this left side now has a square of area (a + b)2 as well as 2ab + a2 + b2. Since both squares have the area of (a + b)2 it follows that the other measure of the square area also equal each other such that 2ab + c2 = 2ab + a2 + b2. With the area of the four triangles removed from both side of the equation what remains is a2 + b2 = c2."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "299016169bbd80a1419d65e3123579fdfadb50d5022c6630706db53c44385dd9",
+          "text" : "In another proof rectangles in the second box can also be placed such that both have one corner that correspond to consecutive corners of the square. In this way they also form two boxes, this time in consecutive corners, with areas a2 and b2 which will again lead to a second square of with the area 2ab + a2 + b2."
+        }
+      ],
+      "i" : 15,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In another proof rectangles in the second box can also be placed such that both have one corner that correspond to consecutive corners of the square. In this way they also form two boxes, this time in consecutive corners, with areas a2 and b2 which will again lead to a second square of with the area 2ab + a2 + b2."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "a3de356ddfa94ad18d044f813313b453aa745e2d64242588a3c95255d15fcb3e",
+          "text" : "English mathematician Sir Thomas Heath gives this proof in his commentary on Proposition I.47 in Euclid's Elements, and mentions the proposals of German mathematicians Carl Anton Bretschneider and Hermann Hankel that Pythagoras may have known this proof. Heath himself favors a different proposal for a Pythagorean proof, but acknowledges from the outset of his discussion \"that the Greek literature which we possess belonging to the first five centuries after Pythagoras contains no statement specifying this or any other particular great geometric discovery to him.\" Recent scholarship has cast increasing doubt on any sort of role for Pythagoras as a creator of mathematics, although debate about this continues."
+        }
+      ],
+      "i" : 16,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "English mathematician Sir Thomas Heath gives this proof in his commentary on Proposition I.47 in Euclid's Elements, and mentions the proposals of German mathematicians Carl Anton Bretschneider and Hermann Hankel that Pythagoras may have known this proof. Heath himself favors a different proposal for a Pythagorean proof, but acknowledges from the outset of his discussion \"that the Greek literature which we possess belonging to the first five centuries after Pythagoras contains no statement specifying this or any other particular great geometric discovery to him.\" Recent scholarship has cast increasing doubt on any sort of role for Pythagoras as a creator of mathematics, although debate about this continues."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4fc51966296855a36e185737288b488c0d4d31d9c974a0240ee1d959df9a9abb",
+          "text" : "Algebraic proofs"
+        }
+      ],
+      "i" : 17,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Algebraic proofs"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4a8a44d384714c161315d497c2dc57f38e169e571c13638228a429ab28d25b69",
+          "text" : "The theorem can be proved algebraically using four copies of the same triangle arranged symmetrically around a square with side c, as shown in the lower part of the diagram. This results in a larger square, with side a + b and area (a + b)2. The four triangles and the square side c must have the same area as the larger square,"
+        }
+      ],
+      "i" : 18,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The theorem can be proved algebraically using four copies of the same triangle arranged symmetrically around a square with side c, as shown in the lower part of the diagram. This results in a larger square, with side a + b and area (a + b)2. The four triangles and the square side c must have the same area as the larger square,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "a9e49fe6efd6260d7bd044704d949f8cc439211004aa500488f51ccce90b3f47",
+          "text" : "giving"
+        }
+      ],
+      "i" : 19,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "giving"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c4355cc0f8e5edf773224bf6cf52aa56e607e730e8940827cf50d819a0747bd9",
+          "text" : "A similar proof uses four copies of a right triangle with sides a, b and c, arranged inside a square with side c as in the top half of the diagram. The triangles are similar with area 1/2ab, while the small square has side b − a and area (b − a)2. The area of the large square is therefore"
+        }
+      ],
+      "i" : 20,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A similar proof uses four copies of a right triangle with sides a, b and c, arranged inside a square with side c as in the top half of the diagram. The triangles are similar with area 1/2ab, while the small square has side b − a and area (b − a)2. The area of the large square is therefore"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "2e7f5ff77f24ac0331278843e57ccc642fa59a70e8e2e374fec973ab4cc38fa5",
+          "text" : "But this is a square with side c and area c2, so"
+        }
+      ],
+      "i" : 21,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "But this is a square with side c and area c2, so"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "70f2477d8560c073d0de902f282e96ebc22ba7117ce898b26ffac1e25c318d42",
+          "text" : "Other proofs of the theorem"
+        }
+      ],
+      "i" : 22,
+      "kind" : "heading",
+      "level" : 2,
+      "text" : "Other proofs of the theorem"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b7b27e5ea79ee24f192702f16d58479e2d073757af637da02d810a72f776ebbf",
+          "text" : "This theorem may have more known proofs than any other (the law of quadratic reciprocity being another contender for that distinction); the book The Pythagorean Proposition contains 370 proofs."
+        }
+      ],
+      "i" : 23,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This theorem may have more known proofs than any other (the law of quadratic reciprocity being another contender for that distinction); the book The Pythagorean Proposition contains 370 proofs."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ddd3e0c460b66ec211cd2cd26ca5f3411502c73f1801d46379d22dbc3081ffc2",
+          "text" : "Proof using similar triangles"
+        }
+      ],
+      "i" : 24,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Proof using similar triangles"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "151dfb3e993dd5d48b23fbab42f1feb3ae4c55d0b177f658ce0c8e3dbd0b13b0",
+          "text" : "This proof is based on the proportionality of the sides of three similar triangles, that is, upon the fact that the ratio of any two corresponding sides of similar triangles is the same regardless of the size of the triangles."
+        }
+      ],
+      "i" : 25,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This proof is based on the proportionality of the sides of three similar triangles, that is, upon the fact that the ratio of any two corresponding sides of similar triangles is the same regardless of the size of the triangles."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c5a0d5f9552db77761e17a4d80909d9e58df85b3813077c226ef9f80f83a1fe1",
+          "text" : "Let ABC represent a right triangle, with the right angle located at C, as shown on the figure. Draw the altitude from point C, and call H its intersection with the side AB. Point H divides the length of the hypotenuse c into parts d and e. The new triangle, ACH, is similar to triangle ABC, because they both have a right angle (by definition of the altitude), and they share the angle at A, meaning that the third angle will be the same in both triangles as well, marked as θ in the figure. By a similar reasoning, the triangle CBH is also similar to ABC. The proof of similarity of the triangles requires the triangle postulate: The sum of the angles in a triangle is two right angles, and is equivalent to the parallel postulate. Similarity of the triangles leads to the equality of ratios of corresponding sides:"
+        }
+      ],
+      "i" : 26,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Let ABC represent a right triangle, with the right angle located at C, as shown on the figure. Draw the altitude from point C, and call H its intersection with the side AB. Point H divides the length of the hypotenuse c into parts d and e. The new triangle, ACH, is similar to triangle ABC, because they both have a right angle (by definition of the altitude), and they share the angle at A, meaning that the third angle will be the same in both triangles as well, marked as θ in the figure. By a similar reasoning, the triangle CBH is also similar to ABC. The proof of similarity of the triangles requires the triangle postulate: The sum of the angles in a triangle is two right angles, and is equivalent to the parallel postulate. Similarity of the triangles leads to the equality of ratios of corresponding sides:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "449219b8bf3e9f693c25885a95cd61b392a54b830acac2b676f3262013d5ef1f",
+          "text" : "The first result equates the cosines of the angles θ, whereas the second result equates their sines."
+        }
+      ],
+      "i" : 27,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The first result equates the cosines of the angles θ, whereas the second result equates their sines."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ce307e6e92c668c535f4df44dceadc38c65a2da0666a7e8ce16801fbc0860d4a",
+          "text" : "These ratios can be written as"
+        }
+      ],
+      "i" : 28,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "These ratios can be written as"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4e159f6be1487615eeeb796a2f4f46d2a2c7c420991d96e96a885f507dcdecd4",
+          "text" : "Summing these two equalities results in"
+        }
+      ],
+      "i" : 29,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Summing these two equalities results in"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1007002b3bac17fd548f9b261a02527ff89b6838fbc55277b0b235ef8b920ff8",
+          "text" : "which, after simplification, demonstrates the Pythagorean theorem:"
+        }
+      ],
+      "i" : 30,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "which, after simplification, demonstrates the Pythagorean theorem:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "76b2740e215867f6902e02c993ae3c745c8fc632ee59cf620275ab40949a1e62",
+          "text" : "The role of this proof in history is the subject of much speculation. The underlying question is why Euclid did not use this proof, but invented another. One conjecture is that the proof by similar triangles involved a theory of proportions, a topic not discussed until later in the Elements, and that the theory of proportions needed further development at that time."
+        }
+      ],
+      "i" : 31,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The role of this proof in history is the subject of much speculation. The underlying question is why Euclid did not use this proof, but invented another. One conjecture is that the proof by similar triangles involved a theory of proportions, a topic not discussed until later in the Elements, and that the theory of proportions needed further development at that time."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "fb5fc40b96b65aeecc8d566270c533d7257952f3445c7de50479d107e4d9e7b4",
+          "text" : "Proof by dissection and scaling"
+        }
+      ],
+      "i" : 32,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Proof by dissection and scaling"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "64e7dba6fc3acf32b128476d618a9c2cdceeddcbcf3d1fc4beacec384b44741c",
+          "text" : "In one proof by dissection, sometimes attributed to Albert Einstein, the pieces do not need to be moved. The dissection consists of dropping a perpendicular from the vertex of the right angle of the triangle to the hypotenuse, thus splitting the whole triangle into two parts. Those two parts have the same shape as the original right triangle, and have the legs of the original triangle as their hypotenuses, and the sum of their areas is that of the original triangle. Because the ratio of the area of a right triangle to the square of its hypotenuse is the same for similar triangles, the relationship between the areas of the three triangles holds for the squares of the sides of the large triangle as well. In other words, because the area of the original triangle is the sum of the areas of the two smaller triangles, and because scaling a triangle changes the area by the square of the scaling factor, the square of the original hypotenuse is the sum of the squares of the shorter hypotenuses."
+        }
+      ],
+      "i" : 33,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In one proof by dissection, sometimes attributed to Albert Einstein, the pieces do not need to be moved. The dissection consists of dropping a perpendicular from the vertex of the right angle of the triangle to the hypotenuse, thus splitting the whole triangle into two parts. Those two parts have the same shape as the original right triangle, and have the legs of the original triangle as their hypotenuses, and the sum of their areas is that of the original triangle. Because the ratio of the area of a right triangle to the square of its hypotenuse is the same for similar triangles, the relationship between the areas of the three triangles holds for the squares of the sides of the large triangle as well. In other words, because the area of the original triangle is the sum of the areas of the two smaller triangles, and because scaling a triangle changes the area by the square of the scaling factor, the square of the original hypotenuse is the sum of the squares of the shorter hypotenuses."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "54585bc008431bd4aaf1158a4f307bc29123e98aa88144ea7e2255a60ed3ecff",
+          "text" : "Euclid's proof"
+        }
+      ],
+      "i" : 34,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Euclid's proof"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0abee512c0fc4bb3f74e8667c8b88594be10baa1ef6de0061fe9460cb28a31d3",
+          "text" : "In outline, here is how the proof in Euclid's Elements (Proposition 47 of Book I) proceeds. The large square is divided into a left and right rectangle. A triangle is constructed that has half the area of the left rectangle. Then another triangle is constructed that has half the area of the square on the left-most side. These two triangles are shown to be congruent, proving this square has the same area as the left rectangle. This argument is followed by a similar version for the right rectangle and the remaining square. Putting the two rectangles together to reform the square on the hypotenuse, its area is the same as the sum of the area of the other two squares. The details follow."
+        }
+      ],
+      "i" : 35,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In outline, here is how the proof in Euclid's Elements (Proposition 47 of Book I) proceeds. The large square is divided into a left and right rectangle. A triangle is constructed that has half the area of the left rectangle. Then another triangle is constructed that has half the area of the square on the left-most side. These two triangles are shown to be congruent, proving this square has the same area as the left rectangle. This argument is followed by a similar version for the right rectangle and the remaining square. Putting the two rectangles together to reform the square on the hypotenuse, its area is the same as the sum of the area of the other two squares. The details follow."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "e3f6c7bbb9fc0c27e408e42aec957ba87076283509b802e3aedfd5f68e4570eb",
+          "text" : "Let A, B, C be the vertices of a right triangle, with a right angle at A. Drop a perpendicular from A to the side opposite the hypotenuse in the square on the hypotenuse. That line divides the square on the hypotenuse into two rectangles, each having the same area as one of the two squares on the legs."
+        }
+      ],
+      "i" : 36,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Let A, B, C be the vertices of a right triangle, with a right angle at A. Drop a perpendicular from A to the side opposite the hypotenuse in the square on the hypotenuse. That line divides the square on the hypotenuse into two rectangles, each having the same area as one of the two squares on the legs."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "983c21374860c5334c1a0ccfe8e59dddba73cd9671372161efced2493569a8fb",
+          "text" : "For the formal proof, we require four elementary lemmata:"
+        }
+      ],
+      "i" : 37,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For the formal proof, we require four elementary lemmata:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3e1224cee7187ee37f5291d552399da0439cc8f56c02abb5e9ff490b63f6c2fa",
+          "text" : "If two triangles have two sides of the one equal to two sides of the other, each to each, and the angles included by those sides equal, then the triangles are congruent (side-angle-side)."
+        }
+      ],
+      "i" : 38,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If two triangles have two sides of the one equal to two sides of the other, each to each, and the angles included by those sides equal, then the triangles are congruent (side-angle-side)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3840530fdd06de024a3aacdb371e3b25dbf49484780419ed87e81489d0349be8",
+          "text" : "The area of a triangle is half the area of any parallelogram on the same base and having the same altitude."
+        }
+      ],
+      "i" : 39,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The area of a triangle is half the area of any parallelogram on the same base and having the same altitude."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b8dab3b0c9d2a222a837ca3c24ab88fa74ddee35116020c685fb4e90de9e1ef9",
+          "text" : "The area of a rectangle is equal to the product of two adjacent sides."
+        }
+      ],
+      "i" : 40,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The area of a rectangle is equal to the product of two adjacent sides."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "2120edc087073f7b012633bf8f2feba1649a1bc99255126970895a319e0f1770",
+          "text" : "The area of a square is equal to the product of two of its sides (follows from 3)."
+        }
+      ],
+      "i" : 41,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The area of a square is equal to the product of two of its sides (follows from 3)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d54a9d2302c6e72c97d71d0605fbe9891378284f511f2806f7143ef1048c8e01",
+          "text" : "Next, each top square is related to a triangle congruent with another triangle related in turn to one of two rectangles making up the lower square."
+        }
+      ],
+      "i" : 42,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Next, each top square is related to a triangle congruent with another triangle related in turn to one of two rectangles making up the lower square."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "757ed1ccaadf01f26e45c785d873aec479c8140f84db0157219712777c603bb6",
+          "text" : "The proof is as follows:"
+        }
+      ],
+      "i" : 43,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The proof is as follows:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f151f4f7a06e50b35f6d367b29e91ebed851a0b72dbcfd808a30f09f2f1d4b87",
+          "text" : "Let ACB be a right-angled triangle with right angle CAB."
+        }
+      ],
+      "i" : 44,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Let ACB be a right-angled triangle with right angle CAB."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1f621ff1dbd8690079bbc08923328f71ef2fa000536f04820b315b40e46fe100",
+          "text" : "On each of the sides BC, AB, and CA, squares are drawn, CBDE, BAGF, and ACIH, in that order. The construction of squares requires the immediately preceding theorems in Euclid, and depends upon the parallel postulate."
+        }
+      ],
+      "i" : 45,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "On each of the sides BC, AB, and CA, squares are drawn, CBDE, BAGF, and ACIH, in that order. The construction of squares requires the immediately preceding theorems in Euclid, and depends upon the parallel postulate."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "cbf73f7969b56140d842ebd92ba0785f25f679997ae20e3f6357f312b7879cb5",
+          "text" : "From A, draw a line parallel to BD and CE. It will perpendicularly intersect BC and DE at K and L, respectively."
+        }
+      ],
+      "i" : 46,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "From A, draw a line parallel to BD and CE. It will perpendicularly intersect BC and DE at K and L, respectively."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "7132cac62416a6951645af398e2e6382575c0ac64668fbe91bcaa51ef608935a",
+          "text" : "Join CF and AD, to form the triangles BCF and BDA."
+        }
+      ],
+      "i" : 47,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Join CF and AD, to form the triangles BCF and BDA."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6de9548ab82a512e07d3cfbc7fc1aaade68f8d48af0f82abfaf24b7b8ab581e0",
+          "text" : "Angles CAB and BAG are both right angles; therefore C, A, and G are collinear."
+        }
+      ],
+      "i" : 48,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Angles CAB and BAG are both right angles; therefore C, A, and G are collinear."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "5b88f5359cb2dc76867caa4d42bfeb1f24f7cc2371ec2642f8c64e9f5481cc72",
+          "text" : "Angles CBD and FBA are both right angles; therefore angle ABD equals angle FBC, since both are the sum of a right angle and angle ABC."
+        }
+      ],
+      "i" : 49,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Angles CBD and FBA are both right angles; therefore angle ABD equals angle FBC, since both are the sum of a right angle and angle ABC."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "13133dcc0b937438c43eec65b349cad4ed7522a734d70ed0ac7fccee91211d4b",
+          "text" : "Since AB is equal to FB, BD is equal to BC and angle ABD equals angle FBC, triangle ABD must be congruent to triangle FBC."
+        }
+      ],
+      "i" : 50,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Since AB is equal to FB, BD is equal to BC and angle ABD equals angle FBC, triangle ABD must be congruent to triangle FBC."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "85f2e4823048080f7e2a72d40ad70fc21b4b388f9932cebe3ea0337e5d16547b",
+          "text" : "Since A-K-L is a straight line, parallel to BD, then rectangle BDLK has twice the area of triangle ABD because they share the base BD and have the same altitude BK, i.e., a line normal to their common base, connecting the parallel lines BD and AL. (lemma 2)"
+        }
+      ],
+      "i" : 51,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Since A-K-L is a straight line, parallel to BD, then rectangle BDLK has twice the area of triangle ABD because they share the base BD and have the same altitude BK, i.e., a line normal to their common base, connecting the parallel lines BD and AL. (lemma 2)"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "222bd44adf162ff13b5e24e00b64b9afd785b7b27acf6ac6bc68decb7bbee967",
+          "text" : "Since C is collinear with A and G, and this line is parallel to FB, then square BAGF must be twice in area to triangle FBC."
+        }
+      ],
+      "i" : 52,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Since C is collinear with A and G, and this line is parallel to FB, then square BAGF must be twice in area to triangle FBC."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c97767e9f6530eb9f4a1cbab6b5197c0720a1a740cee031a0a587d430909aed5",
+          "text" : "Therefore, rectangle BDLK must have the same area as square BAGF = AB2."
+        }
+      ],
+      "i" : 53,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Therefore, rectangle BDLK must have the same area as square BAGF = AB2."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b11ce80d2433e2fe04747b0093f84615530e9253aaf5c7f69b51e61c463c4198",
+          "text" : "By applying steps 3 to 10 to the other side of the figure, it can be similarly shown that rectangle CKLE must have the same area as square ACIH = AC2."
+        }
+      ],
+      "i" : 54,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "By applying steps 3 to 10 to the other side of the figure, it can be similarly shown that rectangle CKLE must have the same area as square ACIH = AC2."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "2e498c7745671c28d8d2bda66d32187f2ba731b1297b66c4338fe9a358aebc97",
+          "text" : "Adding these two results, AB2 + AC2 = BD × BK + KL × KC"
+        }
+      ],
+      "i" : 55,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Adding these two results, AB2 + AC2 = BD × BK + KL × KC"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "a8bf58f895b44d4b86e1d0b5d1d48e4dbc6082c555edc658a56a853872bab621",
+          "text" : "Since BD = KL, BD × BK + KL × KC = BD(BK + KC) = BD × BC"
+        }
+      ],
+      "i" : 56,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Since BD = KL, BD × BK + KL × KC = BD(BK + KC) = BD × BC"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "8c51331591cf597e8a0ed71b6aacdb1659f7a57e842537ee80b2d18b100fe0a5",
+          "text" : "Therefore, AB2 + AC2 = BC2, since CBDE is a square (BD × BC = BC2)."
+        }
+      ],
+      "i" : 57,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Therefore, AB2 + AC2 = BC2, since CBDE is a square (BD × BC = BC2)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "630991e41a03a652581c7be6f8dc1ee25b23f0a205442712b652706a95406bf1",
+          "text" : "This proof, which appears in Euclid's Elements as that of Proposition 47 in Book 1, demonstrates that the area of the square on the hypotenuse is the sum of the areas of the other two squares. This is quite distinct from the proof by similarity of triangles, which is conjectured to be the proof that Pythagoras used."
+        }
+      ],
+      "i" : 58,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This proof, which appears in Euclid's Elements as that of Proposition 47 in Book 1, demonstrates that the area of the square on the hypotenuse is the sum of the areas of the other two squares. This is quite distinct from the proof by similarity of triangles, which is conjectured to be the proof that Pythagoras used."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ae3dcb8026bb984f89e46ea109548c7e88ca44a3ee1b8b9bdf511d53481e3e7d",
+          "text" : "Proofs by dissection and rearrangement"
+        }
+      ],
+      "i" : 59,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Proofs by dissection and rearrangement"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "5db9cec912b9cde25803fcb7d1c75cd0cffd974762877dc6015ebe9aeee6ba9a",
+          "text" : "Another by rearrangement is given by the middle animation. A large square is formed with area c2, from four identical right triangles with sides a, b and c, fitted around a small central square. Then two rectangles are formed with sides a and b by moving the triangles. Combining the smaller square with these rectangles produces two squares of areas a2 and b2, which must have the same area as the initial large square."
+        }
+      ],
+      "i" : 60,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Another by rearrangement is given by the middle animation. A large square is formed with area c2, from four identical right triangles with sides a, b and c, fitted around a small central square. Then two rectangles are formed with sides a and b by moving the triangles. Combining the smaller square with these rectangles produces two squares of areas a2 and b2, which must have the same area as the initial large square."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "41ccc2e8f49585315f3e26a23e042c0ec39c38ee4538cf54327011161afe0e36",
+          "text" : "The third, rightmost image also gives a proof. The upper two squares are divided as shown by the blue and green shading, into pieces that when rearranged can be made to fit in the lower square on the hypotenuse – or conversely the large square can be divided as shown into pieces that fill the other two. This way of cutting one figure into pieces and rearranging them to get another figure is called dissection. This shows the area of the large square equals that of the two smaller ones."
+        }
+      ],
+      "i" : 61,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The third, rightmost image also gives a proof. The upper two squares are divided as shown by the blue and green shading, into pieces that when rearranged can be made to fit in the lower square on the hypotenuse – or conversely the large square can be divided as shown into pieces that fill the other two. This way of cutting one figure into pieces and rearranging them to get another figure is called dissection. This shows the area of the large square equals that of the two smaller ones."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "88bbf148af00dd562d91133e276c794a48909b4f1b794e058e5a189ba08993d3",
+          "text" : "Proof by area-preserving shearing"
+        }
+      ],
+      "i" : 62,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Proof by area-preserving shearing"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6573a5a497dc52e728ad52a2836537a18eec2dd04d312f4cd20edfdb0c0f2bf1",
+          "text" : "As shown in the accompanying animation, area-preserving shear mappings and translations can transform the squares on the sides adjacent to the right-angle onto the square on the hypotenuse, together covering it exactly. Each shear leaves the base and height unchanged, thus leaving the area unchanged too. The translations also leave the area unchanged, as they do not alter the shapes at all. Each square is first sheared into a parallelogram, and then into a rectangle which can be translated onto one section of the square on the hypotenuse."
+        }
+      ],
+      "i" : 63,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "As shown in the accompanying animation, area-preserving shear mappings and translations can transform the squares on the sides adjacent to the right-angle onto the square on the hypotenuse, together covering it exactly. Each shear leaves the base and height unchanged, thus leaving the area unchanged too. The translations also leave the area unchanged, as they do not alter the shapes at all. Each square is first sheared into a parallelogram, and then into a rectangle which can be translated onto one section of the square on the hypotenuse."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0188633eec72f8b9d6e62017f1b44ab866c954e98c39f08c2a1d01bdbc5e87a6",
+          "text" : "Other algebraic proofs"
+        }
+      ],
+      "i" : 64,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Other algebraic proofs"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0df471b27377d5cae0e70486ca58eb3ac48e13253ad51be911f87bdb26c5ee6a",
+          "text" : "A related proof by U.S. president James A. Garfield was published before he was elected president; while he was a U.S. representative. Instead of a square it uses a trapezoid, which can be constructed from the square in the second of the above proofs by bisecting along a diagonal of the inner square, to give the trapezoid as shown in the diagram. The area of the trapezoid can be calculated to be half the area of the square, that is"
+        }
+      ],
+      "i" : 65,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A related proof by U.S. president James A. Garfield was published before he was elected president; while he was a U.S. representative. Instead of a square it uses a trapezoid, which can be constructed from the square in the second of the above proofs by bisecting along a diagonal of the inner square, to give the trapezoid as shown in the diagram. The area of the trapezoid can be calculated to be half the area of the square, that is"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d2c9e69e799fe600454045e6a389ab78f6309411e3b1849389d1f0e8481780f6",
+          "text" : "The inner square is similarly halved, and there are only two triangles so the proof proceeds as above except for a factor of, which is removed by multiplying by two to give the result."
+        }
+      ],
+      "i" : 66,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The inner square is similarly halved, and there are only two triangles so the proof proceeds as above except for a factor of, which is removed by multiplying by two to give the result."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ed6f39ac67be35df2952c81a8306d62d799fd21b09e0ff1c9592ea0a5e0b81b2",
+          "text" : "Proof using differentials"
+        }
+      ],
+      "i" : 67,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Proof using differentials"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6427343584013c1ead2d0c775691c49b8fe1e623eb739f513ac3fab83e7e6ad4",
+          "text" : "One can arrive at the Pythagorean theorem by studying how changes in a side produce a change in the hypotenuse and employing calculus."
+        }
+      ],
+      "i" : 68,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "One can arrive at the Pythagorean theorem by studying how changes in a side produce a change in the hypotenuse and employing calculus."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "edceeddc47bdd34ecae1d765ac6700b8e0b5ac4fa8e6f3609a14c41aedaaffe8",
+          "text" : "The triangle ABC is a right triangle, as shown in the upper part of the diagram, with BC the hypotenuse. At the same time the triangle lengths are measured as shown, with the hypotenuse of length y, the side AC of length x and the side AB of length a, as seen in the lower diagram part."
+        }
+      ],
+      "i" : 69,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The triangle ABC is a right triangle, as shown in the upper part of the diagram, with BC the hypotenuse. At the same time the triangle lengths are measured as shown, with the hypotenuse of length y, the side AC of length x and the side AB of length a, as seen in the lower diagram part."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "15a7049a1ab57af3415480cca0675afb44e6b6711a901c61e3cca9e90a5ffa3b",
+          "text" : "If x is increased by a small amount dx by extending the side AC slightly to D, then y also increases by dy. These form two sides of a triangle, CDE, which (with E chosen so CE is perpendicular to the hypotenuse) is a right triangle approximately similar to ABC. Therefore, the ratios of their sides must be the same, that is:"
+        }
+      ],
+      "i" : 70,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If x is increased by a small amount dx by extending the side AC slightly to D, then y also increases by dy. These form two sides of a triangle, CDE, which (with E chosen so CE is perpendicular to the hypotenuse) is a right triangle approximately similar to ABC. Therefore, the ratios of their sides must be the same, that is:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "83cda44a4c6806426a934465652ff5c95f10b560c70465d1fd9f7f6812be99a7",
+          "text" : "This can be rewritten as y dy = x dx, which is a differential equation that can be solved by direct integration:"
+        }
+      ],
+      "i" : 71,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This can be rewritten as y dy = x dx, which is a differential equation that can be solved by direct integration:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "a9e49fe6efd6260d7bd044704d949f8cc439211004aa500488f51ccce90b3f47",
+          "text" : "giving"
+        }
+      ],
+      "i" : 72,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "giving"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "8ce6967d5c6107652f40f61aee8eae275ab4a5076fd6daa47cac29effe526b17",
+          "text" : "The constant can be deduced from x = 0, y = a to give the equation"
+        }
+      ],
+      "i" : 73,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The constant can be deduced from x = 0, y = a to give the equation"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "142e279f0d51ac5437d5bda10621e5ab88f44333956092708d74e294b7c65fd1",
+          "text" : "This is more of an intuitive proof than a formal one: it can be made more rigorous if proper limits are used in place of dx and dy."
+        }
+      ],
+      "i" : 74,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This is more of an intuitive proof than a formal one: it can be made more rigorous if proper limits are used in place of dx and dy."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "2dd962813889382bc5be1d2f860e3f194731f6754ebcece0d26e509c21c07c01",
+          "text" : "Converse"
+        }
+      ],
+      "i" : 75,
+      "kind" : "heading",
+      "level" : 2,
+      "text" : "Converse"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "02583f432077ffb6d96583aa1367ef932f649adba2e6dcebd1a8f7797673afbc",
+          "text" : "The converse of the theorem is also true:"
+        }
+      ],
+      "i" : 76,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The converse of the theorem is also true:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4b0d23014b368f94a2e7730cb4394975f5b2cd36c2c594bfbec7ad3763c1a5a7",
+          "text" : "For any three positive real numbers a, b, and c such that a2 + b2 = c2, there exists a triangle with sides a, b and c as a consequence of the converse of the triangle inequality."
+        }
+      ],
+      "i" : 77,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For any three positive real numbers a, b, and c such that a2 + b2 = c2, there exists a triangle with sides a, b and c as a consequence of the converse of the triangle inequality."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "844ba31d1864ba4a1dde62f4a00c18a374e3cd22273453bee60b091bf85edd47",
+          "text" : "This converse appears in Euclid's Elements (Book I, Proposition 48): \"If in a triangle the square on one of the sides equals the sum of the squares on the remaining two sides of the triangle, then the angle contained by the remaining two sides of the triangle is right.\""
+        }
+      ],
+      "i" : 78,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This converse appears in Euclid's Elements (Book I, Proposition 48): \"If in a triangle the square on one of the sides equals the sum of the squares on the remaining two sides of the triangle, then the angle contained by the remaining two sides of the triangle is right.\""
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d06c8fcd6d39ba1f9db6617f8b6edb4ee3f2f9a81d027abc4dba3e5b77a99631",
+          "text" : "It can be proved using the law of cosines or as follows:"
+        }
+      ],
+      "i" : 79,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "It can be proved using the law of cosines or as follows:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "9d98a1ec7e43e41b1c732c73201ead1caa9a4f0f2b40e6d00e0136c507068ddf",
+          "text" : "Let ABC be a triangle with side lengths a, b, and c, with a2 + b2 = c2. Construct a second triangle with sides of length a and b containing a right angle. By the Pythagorean theorem, it follows that the hypotenuse of this triangle has length, the same as the hypotenuse of the first triangle. Since both triangles' sides are the same lengths a, b and c, the triangles are congruent and must have the same angles. Therefore, the angle between the side of lengths a and b in the original triangle is a right angle."
+        }
+      ],
+      "i" : 80,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Let ABC be a triangle with side lengths a, b, and c, with a2 + b2 = c2. Construct a second triangle with sides of length a and b containing a right angle. By the Pythagorean theorem, it follows that the hypotenuse of this triangle has length, the same as the hypotenuse of the first triangle. Since both triangles' sides are the same lengths a, b and c, the triangles are congruent and must have the same angles. Therefore, the angle between the side of lengths a and b in the original triangle is a right angle."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "546270e06e0245c2a6a1e97ec797d03f9f65eae178ea90f15295d6e7848a9dc2",
+          "text" : "The above proof of the converse makes use of the Pythagorean theorem itself. The converse can also be proved without assuming the Pythagorean theorem."
+        }
+      ],
+      "i" : 81,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The above proof of the converse makes use of the Pythagorean theorem itself. The converse can also be proved without assuming the Pythagorean theorem."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "9ce83c3d2440c6fd1640e6b56c957ecb3d46118f0ec2dcf9bd9f5d00947d1cdc",
+          "text" : "A corollary of the Pythagorean theorem's converse is a simple means of determining whether a triangle is right, obtuse, or acute, as follows. Let c be chosen to be the longest of the three sides and a + b > c (otherwise there is no triangle according to the triangle inequality). The following statements apply:"
+        }
+      ],
+      "i" : 82,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A corollary of the Pythagorean theorem's converse is a simple means of determining whether a triangle is right, obtuse, or acute, as follows. Let c be chosen to be the longest of the three sides and a + b > c (otherwise there is no triangle according to the triangle inequality). The following statements apply:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4842ed7b10d72e226dc9432c86bcd90b7b30bfa4ef102238f0c135f52cc34127",
+          "text" : "If a2 + b2 = c2, then the triangle is right."
+        }
+      ],
+      "i" : 83,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If a2 + b2 = c2, then the triangle is right."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "77de050da88a841e49fae470da11ff9e8b00794d60a2f09770463b1da95259d8",
+          "text" : "If a2 + b2 > c2, then the triangle is acute."
+        }
+      ],
+      "i" : 84,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If a2 + b2 > c2, then the triangle is acute."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1e8e21b86aa99255cddb50663313b5307095b8844b515542fb3d6776be0d7af4",
+          "text" : "If a2 + b2 < c2, then the triangle is obtuse."
+        }
+      ],
+      "i" : 85,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If a2 + b2 < c2, then the triangle is obtuse."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0f1b6ea1f0afa5cff7c4906aa89cb1afc7a58ab0e049bd4bd386932647798c83",
+          "text" : "Edsger W. Dijkstra has stated this proposition about acute, right, and obtuse triangles in this language:"
+        }
+      ],
+      "i" : 86,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Edsger W. Dijkstra has stated this proposition about acute, right, and obtuse triangles in this language:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "31c66bf189358c439c03cff139a3edc0dacf9dfbffe93a50e13295c08140fd39",
+          "text" : "where α is the angle opposite to side a, β is the angle opposite to side b, γ is the angle opposite to side c, and sgn is the sign function."
+        }
+      ],
+      "i" : 87,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where α is the angle opposite to side a, β is the angle opposite to side b, γ is the angle opposite to side c, and sgn is the sign function."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6d11ade63728fc1c2fdf3a8c5b14538dcb829af8589a6d99b7c7dd6ce312c6cc",
+          "text" : "Consequences and uses of the theorem"
+        }
+      ],
+      "i" : 88,
+      "kind" : "heading",
+      "level" : 2,
+      "text" : "Consequences and uses of the theorem"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "a3fd60ff055a577046beb5b912ae13d534bed635eb070f83921f2350d7a0e5d4",
+          "text" : "Pythagorean triples"
+        }
+      ],
+      "i" : 89,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Pythagorean triples"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "a49048dc1bdb38a2c5c1da3424a0f56865bf04ba80cea8b2169cbe922db6b2e3",
+          "text" : "A Pythagorean triple has three positive integers a, b, and c, such that a2 + b2 = c2. In other words, a Pythagorean triple represents the lengths of the sides of a right triangle where all three sides have integer lengths. Such a triple is commonly written (a, b, c). Some well-known examples are (3, 4, 5) and (5, 12, 13)."
+        }
+      ],
+      "i" : 90,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A Pythagorean triple has three positive integers a, b, and c, such that a2 + b2 = c2. In other words, a Pythagorean triple represents the lengths of the sides of a right triangle where all three sides have integer lengths. Such a triple is commonly written (a, b, c). Some well-known examples are (3, 4, 5) and (5, 12, 13)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "51fa0aba28fdc0044d356e75d63d043352f5c16e9caacd82555043d9a55b640b",
+          "text" : "A primitive Pythagorean triple is one in which a, b and c are coprime (the greatest common divisor of a, b, and c is 1)."
+        }
+      ],
+      "i" : 91,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A primitive Pythagorean triple is one in which a, b and c are coprime (the greatest common divisor of a, b, and c is 1)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ddf8c03578fe8004b743e98544cf8d66e7dac7103e5945df29bcb5f113720628",
+          "text" : "The following is a list of primitive Pythagorean triples with values less than 100:"
+        }
+      ],
+      "i" : 92,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The following is a list of primitive Pythagorean triples with values less than 100:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "62e0ae6e1f7fdb3de9141863e35b6d5be18645c2430b36c9c28be6d22288a812",
+          "text" : "(3, 4, 5), (5, 12, 13), (7, 24, 25), (8, 15, 17), (9, 40, 41), (11, 60, 61), (12, 35, 37), (13, 84, 85), (16, 63, 65), (20, 21, 29), (28, 45, 53), (33, 56, 65), (36, 77, 85), (39, 80, 89), (48, 55, 73), (65, 72, 97)"
+        }
+      ],
+      "i" : 93,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "(3, 4, 5), (5, 12, 13), (7, 24, 25), (8, 15, 17), (9, 40, 41), (11, 60, 61), (12, 35, 37), (13, 84, 85), (16, 63, 65), (20, 21, 29), (28, 45, 53), (33, 56, 65), (36, 77, 85), (39, 80, 89), (48, 55, 73), (65, 72, 97)"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6f9fa5172bcd8a3258d39aa2235339961f6aacaad79d2f7f9abbe9ab9c0afdd8",
+          "text" : "There are many formulas for generating Pythagorean triples. Of these, Euclid's formula is the most well-known: given arbitrary positive integers m and n, the formula states that the integers"
+        }
+      ],
+      "i" : 94,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "There are many formulas for generating Pythagorean triples. Of these, Euclid's formula is the most well-known: given arbitrary positive integers m and n, the formula states that the integers"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d610b0efc7d3c36521b31212c37f7686d879dd7f028c2c387de70e120e838478",
+          "text" : "forms a Pythagorean triple."
+        }
+      ],
+      "i" : 95,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "forms a Pythagorean triple."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "95651f021766b154288a9b97c9b54974cdd31470d5a7388b6cb2b5069ff0c688",
+          "text" : "Inverse Pythagorean theorem"
+        }
+      ],
+      "i" : 96,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Inverse Pythagorean theorem"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "55e3834fb166c62783658250efba07a3b88c872748db09e1afa3efb71dca1111",
+          "text" : "Given a right triangle with sides and altitude d (a line from the right angle and perpendicular to the hypotenuse c). The Pythagorean theorem has,"
+        }
+      ],
+      "i" : 97,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Given a right triangle with sides and altitude d (a line from the right angle and perpendicular to the hypotenuse c). The Pythagorean theorem has,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0901b662cf3bbf8cfa150252f8bdb475be2155a4e154e307e34e7e10635b5891",
+          "text" : "while the inverse Pythagorean theorem relates the two legs a, b to the altitude d,"
+        }
+      ],
+      "i" : 98,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "while the inverse Pythagorean theorem relates the two legs a, b to the altitude d,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3290157dae65aa563b1a35a5c1dfe2aba4d13237f9fd177a43c5705e104205b8",
+          "text" : "The equation can be transformed to:"
+        }
+      ],
+      "i" : 99,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The equation can be transformed to:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "9c4cea64a194a30b2fd9bf55479917fe13d7b5390645be6ba219882e133eb28c",
+          "text" : "where x2 + y2 = z2 for any non-zero real x, y, z. If the a, b, d are to be integers, the smallest solution a > b > d is then"
+        }
+      ],
+      "i" : 100,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where x2 + y2 = z2 for any non-zero real x, y, z. If the a, b, d are to be integers, the smallest solution a > b > d is then"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b210e1dfe842c994287197c07c008a62e24a962257c88da086f714763f46cfcf",
+          "text" : "using the smallest Pythagorean triple 3, 4, 5. The reciprocal Pythagorean theorem is a special case of the optic equation"
+        }
+      ],
+      "i" : 101,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "using the smallest Pythagorean triple 3, 4, 5. The reciprocal Pythagorean theorem is a special case of the optic equation"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "e760dea6a0fa74790f48f31fe9ba3c5552c82ee121b1907de7df8cf49b418218",
+          "text" : "where the denominators are squares and also for a heptagonal triangle whose sides p, q, r are square numbers."
+        }
+      ],
+      "i" : 102,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where the denominators are squares and also for a heptagonal triangle whose sides p, q, r are square numbers."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "712a4139347a23c05fce27f376c591bdfca25573c78703989c216adb5fcbaa3d",
+          "text" : "Incommensurable lengths"
+        }
+      ],
+      "i" : 103,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Incommensurable lengths"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d77af6d36f6ae74860b10a3365258cf7dbf57f715c648d4ce721257ed02bfa41",
+          "text" : "One of the consequences of the Pythagorean theorem is that line segments whose lengths are incommensurable (so the ratio of which is not a rational number) can be constructed using a straightedge and compass. Pythagoras's theorem enables construction of incommensurable lengths because the hypotenuse of a triangle is related to the sides by the square root operation."
+        }
+      ],
+      "i" : 104,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "One of the consequences of the Pythagorean theorem is that line segments whose lengths are incommensurable (so the ratio of which is not a rational number) can be constructed using a straightedge and compass. Pythagoras's theorem enables construction of incommensurable lengths because the hypotenuse of a triangle is related to the sides by the square root operation."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "fd785484b91d17959c5b5cd672efa50f98beb11e5115b9ca682a179db9ed4597",
+          "text" : "The figure on the right shows how to construct line segments whose lengths are in the ratio of the square root of any positive integer. Each triangle has a side (labeled \"1\") that is the chosen unit for measurement. In each right triangle, Pythagoras's theorem establishes the length of the hypotenuse in terms of this unit. If a hypotenuse is related to the unit by the square root of a positive integer that is not a perfect square, it is a realization of a length incommensurable with the unit, such as. For more detail, see Quadratic irrational."
+        }
+      ],
+      "i" : 105,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The figure on the right shows how to construct line segments whose lengths are in the ratio of the square root of any positive integer. Each triangle has a side (labeled \"1\") that is the chosen unit for measurement. In each right triangle, Pythagoras's theorem establishes the length of the hypotenuse in terms of this unit. If a hypotenuse is related to the unit by the square root of a positive integer that is not a perfect square, it is a realization of a length incommensurable with the unit, such as. For more detail, see Quadratic irrational."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "7d92230885f24aa5500845308ad27df66367f296298d97278a3d87cdcef384b7",
+          "text" : "Incommensurable lengths conflicted with the Pythagorean school's concept of numbers as only whole numbers. The Pythagorean school dealt with proportions by comparison of integer multiples of a common subunit. According to one legend, Hippasus of Metapontum (c. 470 BC) was drowned at sea for making known the existence of the irrational or incommensurable. Kurt von Fritz wrote a careful discussion of Hippasus's contributions."
+        }
+      ],
+      "i" : 106,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Incommensurable lengths conflicted with the Pythagorean school's concept of numbers as only whole numbers. The Pythagorean school dealt with proportions by comparison of integer multiples of a common subunit. According to one legend, Hippasus of Metapontum (c. 470 BC) was drowned at sea for making known the existence of the irrational or incommensurable. Kurt von Fritz wrote a careful discussion of Hippasus's contributions."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4e0336b837ed2ebc677a5d5cbbaf285f25ad849957a3bfd9d2c126bb38bef39f",
+          "text" : "Complex numbers"
+        }
+      ],
+      "i" : 107,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Complex numbers"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c9580dd25e0c942078b7938239cd1b120f58e61a8cc63491e318c4b2bda3b918",
+          "text" : "For any complex number"
+        }
+      ],
+      "i" : 108,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For any complex number"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "cbc8f5dd92c3b1b830d26e946f90d9a174349833cdb5a2cc172c375c3174c4a1",
+          "text" : "the absolute value or modulus is given by"
+        }
+      ],
+      "i" : 109,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "the absolute value or modulus is given by"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ce91df5e5525d4c08668b6fc1084e1a177e26bcf01e5be9a48136518352b3df7",
+          "text" : "So the three quantities, r, x and y are related by the Pythagorean equation,"
+        }
+      ],
+      "i" : 110,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "So the three quantities, r, x and y are related by the Pythagorean equation,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "5f3d61d4c876f27d3ecf6cef427e682e876c483801a67e55b53c3a97666efa4e",
+          "text" : "Note that r is defined to be a positive number or zero but x and y can be negative as well as positive. Geometrically r is the distance of the z from zero or the origin O in the complex plane."
+        }
+      ],
+      "i" : 111,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Note that r is defined to be a positive number or zero but x and y can be negative as well as positive. Geometrically r is the distance of the z from zero or the origin O in the complex plane."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "191fd5f9933935a02adad9c8edd19f947491fd496259eeb81dbe085e2c6a52cd",
+          "text" : "This can be generalised to find the distance between two points, z1 and z2 say. The required distance is given by"
+        }
+      ],
+      "i" : 112,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This can be generalised to find the distance between two points, z1 and z2 say. The required distance is given by"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "84ef0ca7c968d44e1c4723f1220d60338af3cca3c2595f9a64ab104612dab23b",
+          "text" : "so again they are related by a version of the Pythagorean equation,"
+        }
+      ],
+      "i" : 113,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "so again they are related by a version of the Pythagorean equation,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "06c129a28a94538fdeadd42c5fa846bf58b32011eb39bd411d2cc9d23ef46bfd",
+          "text" : "Euclidean distance"
+        }
+      ],
+      "i" : 114,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Euclidean distance"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1abdb244e79932bab5eadfa6c9454b487870904795bc39be4e6315398cf6a345",
+          "text" : "The distance formula in Cartesian coordinates is derived from the Pythagorean theorem. If (x1, y1) and (x2, y2) are points in the plane, then the distance between them, also called the Euclidean distance, is given by"
+        }
+      ],
+      "i" : 115,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The distance formula in Cartesian coordinates is derived from the Pythagorean theorem. If (x1, y1) and (x2, y2) are points in the plane, then the distance between them, also called the Euclidean distance, is given by"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "fad1d2af08c549ebc67be9b843bc1dfd05aed9ed8ef813d91285aed531b5bf1c",
+          "text" : "More generally, in Euclidean n-space, the Euclidean distance between two points, and, is defined, by generalization of the Pythagorean theorem, as:"
+        }
+      ],
+      "i" : 116,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "More generally, in Euclidean n-space, the Euclidean distance between two points, and, is defined, by generalization of the Pythagorean theorem, as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ee33c733ecc142dac00061ea364b4c15a9c87a3d685b6a47b500c0940919664e",
+          "text" : "If instead of Euclidean distance, the square of this value (the squared Euclidean distance, or SED) is used, the resulting equation avoids square roots and is simply a sum of the SED of the coordinates:"
+        }
+      ],
+      "i" : 117,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If instead of Euclidean distance, the square of this value (the squared Euclidean distance, or SED) is used, the resulting equation avoids square roots and is simply a sum of the SED of the coordinates:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "9ab4491acc9e50c7372feba0fa646e37324cbcf0e488c4c1ce1ba1e5a846ed20",
+          "text" : "The squared form is a smooth, convex function of both points, and is widely used in optimization theory and statistics, forming the basis of least squares."
+        }
+      ],
+      "i" : 118,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The squared form is a smooth, convex function of both points, and is widely used in optimization theory and statistics, forming the basis of least squares."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6dd0b033d9fc5dca627321cc4f58dad780ec8ab4ed244c2928794e9e274c7417",
+          "text" : "Euclidean distance in other coordinate systems"
+        }
+      ],
+      "i" : 119,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Euclidean distance in other coordinate systems"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "df9706efa28ff2452c57752fb1391a372255b9b0ad47745577dd5c51bc3cad94",
+          "text" : "If Cartesian coordinates are not used, for example, if polar coordinates are used in two dimensions or, in more general terms, if curvilinear coordinates are used, the formulas expressing the Euclidean distance are more complicated than the Pythagorean theorem, but can be derived from it. A typical example where the straight-line distance between two points is converted to curvilinear coordinates can be found in the applications of Legendre polynomials in physics. The formulas can be discovered by using Pythagoras's theorem with the equations relating the curvilinear coordinates to Cartesian coordinates. For example, the polar coordinates (r, θ) can be introduced as:"
+        }
+      ],
+      "i" : 120,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If Cartesian coordinates are not used, for example, if polar coordinates are used in two dimensions or, in more general terms, if curvilinear coordinates are used, the formulas expressing the Euclidean distance are more complicated than the Pythagorean theorem, but can be derived from it. A typical example where the straight-line distance between two points is converted to curvilinear coordinates can be found in the applications of Legendre polynomials in physics. The formulas can be discovered by using Pythagoras's theorem with the equations relating the curvilinear coordinates to Cartesian coordinates. For example, the polar coordinates (r, θ) can be introduced as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "de2e85be92a06ab89c1128a715912c0913348974a47374cd7d8687b429494897",
+          "text" : "Then two points with locations (r1, θ1) and (r2, θ2) are separated by a distance s:"
+        }
+      ],
+      "i" : 121,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Then two points with locations (r1, θ1) and (r2, θ2) are separated by a distance s:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "594da14e7bd139fa24e041b4a2ed36e23e648a58028d60937305fbf4e67283f5",
+          "text" : "Performing the squares and combining terms, the Pythagorean formula for distance in Cartesian coordinates produces the separation in polar coordinates as:"
+        }
+      ],
+      "i" : 122,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Performing the squares and combining terms, the Pythagorean formula for distance in Cartesian coordinates produces the separation in polar coordinates as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3849e37b747d3835d0b3baa46b6b56c8eb4e5ffe7668fed242951e73aadd9cf5",
+          "text" : "using the trigonometric product-to-sum formulas. This formula is the law of cosines, sometimes called the generalized Pythagorean theorem. From this result, for the case where the radii to the two locations are at right angles, the enclosed angle Δθ = π/2, and the form corresponding to Pythagoras's theorem is regained: The Pythagorean theorem, valid for right triangles, therefore is a special case of the more general law of cosines, valid for arbitrary triangles."
+        }
+      ],
+      "i" : 123,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "using the trigonometric product-to-sum formulas. This formula is the law of cosines, sometimes called the generalized Pythagorean theorem. From this result, for the case where the radii to the two locations are at right angles, the enclosed angle Δθ = π/2, and the form corresponding to Pythagoras's theorem is regained: The Pythagorean theorem, valid for right triangles, therefore is a special case of the more general law of cosines, valid for arbitrary triangles."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "cee380f006be913a80c9a53760fd54ad422f2b3c1b2830bbcc2e5ef1bf07b09a",
+          "text" : "Pythagorean trigonometric identity"
+        }
+      ],
+      "i" : 124,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Pythagorean trigonometric identity"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "20e1ff55b25048a678e4269f0a0454ef77b62649b46ac8a451d2144495a4dd50",
+          "text" : "In a right triangle with sides a, b and hypotenuse c, trigonometry determines the sine and cosine of the angle θ between side a and the hypotenuse as:"
+        }
+      ],
+      "i" : 125,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In a right triangle with sides a, b and hypotenuse c, trigonometry determines the sine and cosine of the angle θ between side a and the hypotenuse as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4f8ae7aefbbe3dca80634f94ac20476c97b7c5622d51c200a6cecbffff8c664f",
+          "text" : "From that it follows:"
+        }
+      ],
+      "i" : 126,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "From that it follows:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "183edf1c2db7178cedbccc4e22df93b6e495c431d4e773547fa4776d16f442ae",
+          "text" : "where the last step applies Pythagoras's theorem. This relation between sine and cosine is sometimes called the fundamental Pythagorean trigonometric identity. In similar triangles, the ratios of the sides are the same regardless of the size of the triangles, and depend upon the angles. Consequently, in the figure, the triangle with hypotenuse of unit size has opposite side of size sin θ and adjacent side of size cos θ in units of the hypotenuse."
+        }
+      ],
+      "i" : 127,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where the last step applies Pythagoras's theorem. This relation between sine and cosine is sometimes called the fundamental Pythagorean trigonometric identity. In similar triangles, the ratios of the sides are the same regardless of the size of the triangles, and depend upon the angles. Consequently, in the figure, the triangle with hypotenuse of unit size has opposite side of size sin θ and adjacent side of size cos θ in units of the hypotenuse."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3058e74c8f0f84138f3d56b027ae16c5cbc5fddd79cba5a9892088b72ee0fcd5",
+          "text" : "Relation to the cross product"
+        }
+      ],
+      "i" : 128,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Relation to the cross product"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f1524dd2f7b535cb36fe29aaf8f388404fa8694a8da28673c41fa0e24cbc212d",
+          "text" : "The Pythagorean theorem relates the cross product and dot product in a similar way:"
+        }
+      ],
+      "i" : 129,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean theorem relates the cross product and dot product in a similar way:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "e8d97dad848362165feb6ec4896e552a64b02eeefbed417c5c8347112dbe80b5",
+          "text" : "This can be seen from the definitions of the cross product and dot product, as"
+        }
+      ],
+      "i" : 130,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This can be seen from the definitions of the cross product and dot product, as"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "af15fa42f9d2a5557ac124cdfcd301b690c675e942b37647afade1b479246fdc",
+          "text" : "with n a unit vector normal to both a and b. The relationship follows from these definitions and the Pythagorean trigonometric identity."
+        }
+      ],
+      "i" : 131,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "with n a unit vector normal to both a and b. The relationship follows from these definitions and the Pythagorean trigonometric identity."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "67712cb130d00eab97a1fa5d63ab6472b06c59e07c6e7970572909b77c7dd77c",
+          "text" : "This can also be used to define the cross product. By rearranging the following equation is obtained"
+        }
+      ],
+      "i" : 132,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This can also be used to define the cross product. By rearranging the following equation is obtained"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3cf862a9abd3087e47c5403e94828be1992e570e23474f764794ba35c3f4aba9",
+          "text" : "This can be considered as a condition on the cross product and so part of its definition, for example in seven dimensions."
+        }
+      ],
+      "i" : 133,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This can be considered as a condition on the cross product and so part of its definition, for example in seven dimensions."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4dacee1d2ef1f78d091f815f23a09459d33af6d83b546268c128220674610972",
+          "text" : "As an axiom"
+        }
+      ],
+      "i" : 134,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "As an axiom"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f0b3fac729091b893cd46234cc7e3beeca1e78ff7371bd903f430f4e4b11e1f5",
+          "text" : "If the first four of the Euclidean geometry axioms are assumed to be true then the Pythagorean theorem is equivalent to the fifth. That is, Euclid's fifth postulate implies the Pythagorean theorem and vice-versa."
+        }
+      ],
+      "i" : 135,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "If the first four of the Euclidean geometry axioms are assumed to be true then the Pythagorean theorem is equivalent to the fifth. That is, Euclid's fifth postulate implies the Pythagorean theorem and vice-versa."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "657db5425937eeb35087a1d73efbb713620b2ce58fd42766308e2f44cf0b09c2",
+          "text" : "Generalizations"
+        }
+      ],
+      "i" : 136,
+      "kind" : "heading",
+      "level" : 2,
+      "text" : "Generalizations"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "5d84fad7ecb56afaada25c2e2bc495c5e69dead443a2acbc61142c8045cdfd2b",
+          "text" : "Similar figures on the three sides"
+        }
+      ],
+      "i" : 137,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Similar figures on the three sides"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f64e91aa578e716c03ccd177d3a75af85e63af821e7aeb40ce248be96cde1af3",
+          "text" : "The Pythagorean theorem generalizes beyond the areas of squares on the three sides to any similar figures. This was known by Hippocrates of Chios in the 5th century BC, and was included by Euclid in his Elements:"
+        }
+      ],
+      "i" : 138,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean theorem generalizes beyond the areas of squares on the three sides to any similar figures. This was known by Hippocrates of Chios in the 5th century BC, and was included by Euclid in his Elements:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0cebf7bec3d296b7dbaa76a3e01d81f727f16c7ce6147a895b24dbfb3336ae29",
+          "text" : "This extension assumes that the sides of the original triangle are the corresponding sides of the three congruent figures (so the common ratios of sides between the similar figures are a: b: c). While Euclid's proof only applied to convex polygons, the theorem also applies to concave polygons and even to similar figures that have curved boundaries (but still with part of a figure's boundary being the side of the original triangle)."
+        }
+      ],
+      "i" : 139,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This extension assumes that the sides of the original triangle are the corresponding sides of the three congruent figures (so the common ratios of sides between the similar figures are a: b: c). While Euclid's proof only applied to convex polygons, the theorem also applies to concave polygons and even to similar figures that have curved boundaries (but still with part of a figure's boundary being the side of the original triangle)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3f428b0b5c846f59e460f42605a895277d41a19321fababe0e7ced97baf6ef01",
+          "text" : "The basic idea behind this generalization is that the area of a plane figure is proportional to the square of any linear dimension, and in particular is proportional to the square of the length of any side. Thus, if similar figures with areas A, B and C are erected on sides with corresponding lengths a, b and c then:"
+        }
+      ],
+      "i" : 140,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The basic idea behind this generalization is that the area of a plane figure is proportional to the square of any linear dimension, and in particular is proportional to the square of the length of any side. Thus, if similar figures with areas A, B and C are erected on sides with corresponding lengths a, b and c then:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f81ab5e7ed5abd6d9a5e8d54b924e16babe9f3b100f735f1e1eb14bda2c4cb22",
+          "text" : "But, by the Pythagorean theorem, a2 + b2 = c2, so A + B = C."
+        }
+      ],
+      "i" : 141,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "But, by the Pythagorean theorem, a2 + b2 = c2, so A + B = C."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "30628c1ac5be2b76608963cf7444fca4bee563fa4ee612eadbf5814541963b83",
+          "text" : "Conversely, if we can prove that A + B = C for three similar figures without using the Pythagorean theorem, then we can work backwards to construct a proof of the theorem. For example, the starting center triangle can be replicated and used as a triangle C on its hypotenuse, and two similar right triangles (A and B) constructed on the other two sides, formed by dividing the central triangle by its altitude. The sum of the areas of the two smaller triangles therefore is that of the third, thus A + B = C and reversing the above logic leads to the Pythagorean theorem a2 + b2 = c2. (See also § Proof by dissection and scaling)"
+        }
+      ],
+      "i" : 142,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Conversely, if we can prove that A + B = C for three similar figures without using the Pythagorean theorem, then we can work backwards to construct a proof of the theorem. For example, the starting center triangle can be replicated and used as a triangle C on its hypotenuse, and two similar right triangles (A and B) constructed on the other two sides, formed by dividing the central triangle by its altitude. The sum of the areas of the two smaller triangles therefore is that of the third, thus A + B = C and reversing the above logic leads to the Pythagorean theorem a2 + b2 = c2. (See also § Proof by dissection and scaling)"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b6303b318e752ad45fd06cd53c414867906fc3b5f09c2e584fca3cfdc97e2e3d",
+          "text" : "Law of cosines"
+        }
+      ],
+      "i" : 143,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Law of cosines"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ca9912b3c2b7c6033b2ae826338d396be5ed966f93d3d389b19fd3d381be6eae",
+          "text" : "The Pythagorean theorem is a special case of the more general theorem relating the lengths of sides in any triangle, the law of cosines, which states that"
+        }
+      ],
+      "i" : 144,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean theorem is a special case of the more general theorem relating the lengths of sides in any triangle, the law of cosines, which states that"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "38e1699a12ed4c604df2fe89c57ddabd5bf79af72f2488b68f30ed031dcd1ece",
+          "text" : "where is the angle between sides and."
+        }
+      ],
+      "i" : 145,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where is the angle between sides and."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f1de563e52336bafc4dbc75a4e7e2496ae771ef55d09a5640cfac77ea6987db8",
+          "text" : "When is radians or 90°, then, and the formula reduces to the usual Pythagorean theorem."
+        }
+      ],
+      "i" : 146,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "When is radians or 90°, then, and the formula reduces to the usual Pythagorean theorem."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "281ae652fea1c34835f67cc8e64614bbeec2b5f18898c5c8a6144a68c2a5fb9e",
+          "text" : "Arbitrary triangle"
+        }
+      ],
+      "i" : 147,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Arbitrary triangle"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "31f827c1ea517951ec314bb8601f169fe7c027f0377ad85119d529cca594518c",
+          "text" : "At any selected angle of a general triangle of sides a, b, c, inscribe an isosceles triangle such that the equal angles at its base θ are the same as the selected angle. Suppose the selected angle θ is opposite the side labeled c. Inscribing the isosceles triangle forms triangle CAD with angle θ opposite side b and with side r along c. A second triangle is formed with angle θ opposite side a and a side with length s along c, as shown in the figure. Thābit ibn Qurra stated that the sides of the three triangles were related as:"
+        }
+      ],
+      "i" : 148,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "At any selected angle of a general triangle of sides a, b, c, inscribe an isosceles triangle such that the equal angles at its base θ are the same as the selected angle. Suppose the selected angle θ is opposite the side labeled c. Inscribing the isosceles triangle forms triangle CAD with angle θ opposite side b and with side r along c. A second triangle is formed with angle θ opposite side a and a side with length s along c, as shown in the figure. Thābit ibn Qurra stated that the sides of the three triangles were related as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "106e04e45a5f73c30cee5eea8187053f26fb9e693864fbe7935ee6a556fc9626",
+          "text" : "As the angle θ approaches π/2, the base of the isosceles triangle narrows, and lengths r and s overlap less and less. When θ = π/2, ADB becomes a right triangle, r + s = c, and the original Pythagorean theorem is regained."
+        }
+      ],
+      "i" : 149,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "As the angle θ approaches π/2, the base of the isosceles triangle narrows, and lengths r and s overlap less and less. When θ = π/2, ADB becomes a right triangle, r + s = c, and the original Pythagorean theorem is regained."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d087c90036bb7e5b20c66807962a54fb33614e7f3f18a906dedfad07daf61173",
+          "text" : "One proof observes that triangle ABC has the same angles as triangle CAD, but in opposite order. (The two triangles share the angle at vertex A, both contain the angle θ, and so also have the same third angle by the triangle postulate.) Consequently, ABC is similar to the reflection of CAD, the triangle DAC in the lower panel. Taking the ratio of sides opposite and adjacent to θ,"
+        }
+      ],
+      "i" : 150,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "One proof observes that triangle ABC has the same angles as triangle CAD, but in opposite order. (The two triangles share the angle at vertex A, both contain the angle θ, and so also have the same third angle by the triangle postulate.) Consequently, ABC is similar to the reflection of CAD, the triangle DAC in the lower panel. Taking the ratio of sides opposite and adjacent to θ,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d884a86e68e8d21002066809a25dd886c23b39632cc339887cf247a86e87aff7",
+          "text" : "Likewise, for the reflection of the other triangle,"
+        }
+      ],
+      "i" : 151,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Likewise, for the reflection of the other triangle,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "bad9bf77db4ad8ba9babc1bbfd627fa3e569ff6512dd96d491995a0451602ae5",
+          "text" : "Clearing fractions and adding these two relations:"
+        }
+      ],
+      "i" : 152,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Clearing fractions and adding these two relations:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "dc5e8a41b62ca6acd53dbd3e0eeb7c54560bea802da024ef447b973c43725ddf",
+          "text" : "the required result."
+        }
+      ],
+      "i" : 153,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "the required result."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "89ae1259bf6762ee4e33de1bc7cec50c3b06a1d463e51b12da812859fe04f318",
+          "text" : "The theorem remains valid if the angle θ is obtuse so the lengths r and s are non-overlapping."
+        }
+      ],
+      "i" : 154,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The theorem remains valid if the angle θ is obtuse so the lengths r and s are non-overlapping."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f09d4d99a1eeeb0ab4c48bed804fbea566fba37e07a99f6840e8e5e4f94ac23e",
+          "text" : "General triangles using parallelograms"
+        }
+      ],
+      "i" : 155,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "General triangles using parallelograms"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0048ce7cf52548c741ed2dff4fab53580b50740c9bcb84282007ff21b077a817",
+          "text" : "Pappus's area theorem is a further generalization, that applies to triangles that are not right triangles, using parallelograms on the three sides in place of squares (squares are a special case, of course). The upper figure shows that for a scalene triangle, the area of the parallelogram on the longest side is the sum of the areas of the parallelograms on the other two sides, provided the parallelogram on the long side is constructed as indicated (the dimensions labeled with arrows are the same, and determine the sides of the bottom parallelogram). This replacement of squares with parallelograms bears a clear resemblance to the original Pythagoras's theorem, and was considered a generalization by Pappus of Alexandria in 4 AD."
+        }
+      ],
+      "i" : 156,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Pappus's area theorem is a further generalization, that applies to triangles that are not right triangles, using parallelograms on the three sides in place of squares (squares are a special case, of course). The upper figure shows that for a scalene triangle, the area of the parallelogram on the longest side is the sum of the areas of the parallelograms on the other two sides, provided the parallelogram on the long side is constructed as indicated (the dimensions labeled with arrows are the same, and determine the sides of the bottom parallelogram). This replacement of squares with parallelograms bears a clear resemblance to the original Pythagoras's theorem, and was considered a generalization by Pappus of Alexandria in 4 AD."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "fa87cc95344bc2b62dcdd20496a1fe20b4f951df5e646a6b32ea71134e71f9e4",
+          "text" : "The lower figure shows the elements of the proof. Focus on the left side of the figure. The left green parallelogram has the same area as the left, blue portion of the bottom parallelogram because both have the same base b and height h. However, the left green parallelogram also has the same area as the left green parallelogram of the upper figure, because they have the same base (the upper left side of the triangle) and the same height normal to that side of the triangle. Repeating the argument for the right side of the figure, the bottom parallelogram has the same area as the sum of the two green parallelograms."
+        }
+      ],
+      "i" : 157,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The lower figure shows the elements of the proof. Focus on the left side of the figure. The left green parallelogram has the same area as the left, blue portion of the bottom parallelogram because both have the same base b and height h. However, the left green parallelogram also has the same area as the left green parallelogram of the upper figure, because they have the same base (the upper left side of the triangle) and the same height normal to that side of the triangle. Repeating the argument for the right side of the figure, the bottom parallelogram has the same area as the sum of the two green parallelograms."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b8a081a4a95fafc986a569e73802b12d362d4c984ff91fa545b040050fdf5f8a",
+          "text" : "Ptolemy's theorem"
+        }
+      ],
+      "i" : 158,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Ptolemy's theorem"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "8cb53fe9dbd47b59ec216ca5d807bac997c1b121ac293fdd41d40e4bd40dc481",
+          "text" : "Ptolemy's theorem states that when a quadrilateral can be inscribed in a circle (i.e., when it is a cyclic quadrilateral), the product of the lengths of one pair of opposite sides plus the product of the lengths of the other pair of opposite sides equals the product of the lengths of the diagonals. This reduces to the Pythagorean theorem when the quadrilateral is a rectangle. Ptolemy's theorem can also be used to prove the law of cosines."
+        }
+      ],
+      "i" : 159,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Ptolemy's theorem states that when a quadrilateral can be inscribed in a circle (i.e., when it is a cyclic quadrilateral), the product of the lengths of one pair of opposite sides plus the product of the lengths of the other pair of opposite sides equals the product of the lengths of the diagonals. This reduces to the Pythagorean theorem when the quadrilateral is a rectangle. Ptolemy's theorem can also be used to prove the law of cosines."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "8bc13bfbc6f7683454bc769a43094e7aa357240ae95e49f3b7e279928ddf56d2",
+          "text" : "Solid geometry"
+        }
+      ],
+      "i" : 160,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Solid geometry"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b028ba925e39124c5f136ac5736cf714b79affd0834ec518137788f528eb4724",
+          "text" : "In terms of solid geometry, Pythagoras's theorem can be applied to three dimensions as follows. Consider the cuboid shown in the figure. The length of face diagonal AC is found from Pythagoras's theorem as:"
+        }
+      ],
+      "i" : 161,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In terms of solid geometry, Pythagoras's theorem can be applied to three dimensions as follows. Consider the cuboid shown in the figure. The length of face diagonal AC is found from Pythagoras's theorem as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0bb76ea3676c60fc9e743fb4c781c7be190ef264a80bfc9e0496eb0ac0d32b07",
+          "text" : "where these three sides form a right triangle. Using diagonal AC and the horizontal edge CD, the length of body diagonal AD then is found by a second application of Pythagoras's theorem as:"
+        }
+      ],
+      "i" : 162,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where these three sides form a right triangle. Using diagonal AC and the horizontal edge CD, the length of body diagonal AD then is found by a second application of Pythagoras's theorem as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c55256820635cfe1935f4eb3ddefad2680895c69f5bd1d0517b11f0c84284a03",
+          "text" : "or, doing it all in one step:"
+        }
+      ],
+      "i" : 163,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "or, doing it all in one step:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "4e2e6e704841cb3490f6c5088e0ab668c09d21724d174ce0f700b8678af9d168",
+          "text" : "This result is the three-dimensional expression for the magnitude of a vector v (the diagonal AD) in terms of its orthogonal components {vk} (the three mutually perpendicular sides):"
+        }
+      ],
+      "i" : 164,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This result is the three-dimensional expression for the magnitude of a vector v (the diagonal AD) in terms of its orthogonal components {vk} (the three mutually perpendicular sides):"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "04f926ed4af0e327e34f1e9e59463ead28e426d2bee9c197eff5e0e93c63bc92",
+          "text" : "This one-step formulation may be viewed as a generalization of Pythagoras's theorem to higher dimensions. However, this result is really just the repeated application of the original Pythagoras's theorem to a succession of right triangles in a sequence of orthogonal planes."
+        }
+      ],
+      "i" : 165,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This one-step formulation may be viewed as a generalization of Pythagoras's theorem to higher dimensions. However, this result is really just the repeated application of the original Pythagoras's theorem to a succession of right triangles in a sequence of orthogonal planes."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f7dcf605c39acdf8e573df8e969c6d1beab6cd081ac1fa128a713ef5e5de1e71",
+          "text" : "A substantial generalization of the Pythagorean theorem to three dimensions is de Gua's theorem, named for Jean Paul de Gua de Malves: If a tetrahedron has a right angle corner (like a corner of a cube), then the square of the area of the face opposite the right angle corner is the sum of the squares of the areas of the other three faces. This result can be generalized as in the \"n-dimensional Pythagorean theorem\":"
+        }
+      ],
+      "i" : 166,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A substantial generalization of the Pythagorean theorem to three dimensions is de Gua's theorem, named for Jean Paul de Gua de Malves: If a tetrahedron has a right angle corner (like a corner of a cube), then the square of the area of the face opposite the right angle corner is the sum of the squares of the areas of the other three faces. This result can be generalized as in the \"n-dimensional Pythagorean theorem\":"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3eeb1c0a4656b5e49139eead0bf45569de4269773299bfec982d5516d6aca6e7",
+          "text" : "This statement is illustrated in three dimensions by the tetrahedron in the figure. The \"hypotenuse\" is the base of the tetrahedron at the back of the figure, and the \"legs\" are the three sides emanating from the vertex in the foreground. As the depth of the base from the vertex increases, the area of the \"legs\" increases, while that of the base is fixed. The theorem suggests that when this depth is at the value creating a right vertex, the generalization of Pythagoras's theorem applies. In a different wording:"
+        }
+      ],
+      "i" : 167,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This statement is illustrated in three dimensions by the tetrahedron in the figure. The \"hypotenuse\" is the base of the tetrahedron at the back of the figure, and the \"legs\" are the three sides emanating from the vertex in the foreground. As the depth of the base from the vertex increases, the area of the \"legs\" increases, while that of the base is fixed. The theorem suggests that when this depth is at the value creating a right vertex, the generalization of Pythagoras's theorem applies. In a different wording:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0545c0b4feba729b8e30d71c29eb7751c3825ec4eba9521e9ccde9c2a08a13a4",
+          "text" : "Inner product spaces"
+        }
+      ],
+      "i" : 168,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Inner product spaces"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1f1151bfb12af02579fb3e0f0cc16562ab4d0febdb2c809b0babd665413feb05",
+          "text" : "The Pythagorean theorem can be generalized to inner product spaces, which are generalizations of the familiar 2-dimensional and 3-dimensional Euclidean spaces. For example, a function may be considered as a vector with infinitely many components in an inner product space, as in functional analysis."
+        }
+      ],
+      "i" : 169,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean theorem can be generalized to inner product spaces, which are generalizations of the familiar 2-dimensional and 3-dimensional Euclidean spaces. For example, a function may be considered as a vector with infinitely many components in an inner product space, as in functional analysis."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6032698d337a4d203f05ee4417bce65e85d0b796e4bf2d92f702313693f1a537",
+          "text" : "In an inner product space, the concept of perpendicularity is replaced by the concept of orthogonality: two vectors v and w are orthogonal if their inner product is zero. The inner product is a generalization of the dot product of vectors. The dot product is called the standard inner product or the Euclidean inner product. However, other inner products are possible."
+        }
+      ],
+      "i" : 170,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In an inner product space, the concept of perpendicularity is replaced by the concept of orthogonality: two vectors v and w are orthogonal if their inner product is zero. The inner product is a generalization of the dot product of vectors. The dot product is called the standard inner product or the Euclidean inner product. However, other inner products are possible."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "88ebac035ec324147343d915dc46a304f47a6c4c9fec1665feba97fcb9792c28",
+          "text" : "The concept of length is replaced by the concept of the norm ‖v‖ of a vector v, defined as:"
+        }
+      ],
+      "i" : 171,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The concept of length is replaced by the concept of the norm ‖v‖ of a vector v, defined as:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "63417961c67a733fb3e017af2b4cf3ac2f9fa4cc03e8e95e90225ad392e2f2ec",
+          "text" : "In an inner-product space, the Pythagorean theorem states that for any two orthogonal vectors v and w we have"
+        }
+      ],
+      "i" : 172,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In an inner-product space, the Pythagorean theorem states that for any two orthogonal vectors v and w we have"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "31ad9707848a9cc60fb89ba463e981b93364e26cb763dcb090d146796632188a",
+          "text" : "Here the vectors v and w are akin to the sides of a right triangle with hypotenuse given by the vector sum v + w. This form of the Pythagorean theorem is a consequence of the properties of the inner product:"
+        }
+      ],
+      "i" : 173,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Here the vectors v and w are akin to the sides of a right triangle with hypotenuse given by the vector sum v + w. This form of the Pythagorean theorem is a consequence of the properties of the inner product:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6b4e4239f728f538f466e1019df1a0d2e1761dad51a47f4903bd370e23af18b4",
+          "text" : "where because of orthogonality."
+        }
+      ],
+      "i" : 174,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where because of orthogonality."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "0ca9cc63026fe21915f0f01e9cfe27c7bd40ea401fc392b2ca19e709038371b6",
+          "text" : "A further generalization of the Pythagorean theorem in an inner product space to non-orthogonal vectors is the parallelogram law:"
+        }
+      ],
+      "i" : 175,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "A further generalization of the Pythagorean theorem in an inner product space to non-orthogonal vectors is the parallelogram law:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "d8fd9bf5d3bffada0e0291fed64de8c7a12af3535bee74cdae697f785e6c4a22",
+          "text" : "which says that twice the sum of the squares of the lengths of the sides of a parallelogram is the sum of the squares of the lengths of the diagonals. Any norm that satisfies this equality is ipso facto a norm corresponding to an inner product."
+        }
+      ],
+      "i" : 176,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "which says that twice the sum of the squares of the lengths of the sides of a parallelogram is the sum of the squares of the lengths of the diagonals. Any norm that satisfies this equality is ipso facto a norm corresponding to an inner product."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "761dd2b77d6a426b4556539f10be3cbf8f4dfa84a8398ee149146295e0946d83",
+          "text" : "The Pythagorean identity can be extended to sums of more than two orthogonal vectors. If v1, v2..., vn are pairwise-orthogonal vectors in an inner-product space, then application of the Pythagorean theorem to successive pairs of these vectors (as described for 3-dimensions in the section on solid geometry) results in the equation"
+        }
+      ],
+      "i" : 177,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean identity can be extended to sums of more than two orthogonal vectors. If v1, v2..., vn are pairwise-orthogonal vectors in an inner-product space, then application of the Pythagorean theorem to successive pairs of these vectors (as described for 3-dimensions in the section on solid geometry) results in the equation"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "122fb1f34516491154166fe9cd7e6d7fb8986f3900922421b202660d4f2d5caf",
+          "text" : "Sets of m-dimensional objects in n-dimensional space"
+        }
+      ],
+      "i" : 178,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Sets of m-dimensional objects in n-dimensional space"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "88e2094250dcaa61389632cceceb70dcf9f057dcc318880f636d24a50bf50d7c",
+          "text" : "Another generalization of the Pythagorean theorem applies to Lebesgue-measurable sets of objects in any number of dimensions. Specifically, the square of the measure of an m-dimensional set of objects in one or more parallel m-dimensional flats in n-dimensional Euclidean space is equal to the sum of the squares of the measures of the orthogonal projections of the object(s) onto all m-dimensional coordinate subspaces."
+        }
+      ],
+      "i" : 179,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Another generalization of the Pythagorean theorem applies to Lebesgue-measurable sets of objects in any number of dimensions. Specifically, the square of the measure of an m-dimensional set of objects in one or more parallel m-dimensional flats in n-dimensional Euclidean space is equal to the sum of the squares of the measures of the orthogonal projections of the object(s) onto all m-dimensional coordinate subspaces."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "8a9bad71b541ef70c6e181037a85fd76f2d9d5fd6ce72bf444709db00569218f",
+          "text" : "In mathematical terms:"
+        }
+      ],
+      "i" : 180,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In mathematical terms:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "7e4796a2d194b7d6debd087ca02f8db50484c5b9e7d6d0475d02c4637edba41d",
+          "text" : "where:"
+        }
+      ],
+      "i" : 181,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "87ca3f4360ed5c76e4316a0842922578a5c8537744323aa72fe0e944409ba79e",
+          "text" : "is a measure in m-dimensions (a length in one dimension, an area in two dimensions, a volume in three dimensions, etc.)."
+        }
+      ],
+      "i" : 182,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "is a measure in m-dimensions (a length in one dimension, an area in two dimensions, a volume in three dimensions, etc.)."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "e7a65d556d03361fc6b233277a6db0bc2b44c996305b38e739ad0eac4bdd6d8a",
+          "text" : "is a set of one or more non-overlapping m-dimensional objects in one or more parallel m-dimensional flats in n-dimensional Euclidean space."
+        }
+      ],
+      "i" : 183,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "is a set of one or more non-overlapping m-dimensional objects in one or more parallel m-dimensional flats in n-dimensional Euclidean space."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "aed753f82d1a361e59ffacc779f04e6cae3a868b4544bcda23cfb1f93e073a27",
+          "text" : "is the total measure (sum) of the set of m-dimensional objects."
+        }
+      ],
+      "i" : 184,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "is the total measure (sum) of the set of m-dimensional objects."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "814d916b89ff462ba78b9e61e30217b9be446eef95a6d4d7d93cd7556ede9997",
+          "text" : "represents an m-dimensional projection of the original set onto an orthogonal coordinate subspace."
+        }
+      ],
+      "i" : 185,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "represents an m-dimensional projection of the original set onto an orthogonal coordinate subspace."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "863f55a0af6a7948fb82a706631cae8908f7f3e6d2a93be758c99492c0edea3a",
+          "text" : "is the measure of the m-dimensional set projection onto m-dimensional coordinate subspace i. Because object projections can overlap on a coordinate subspace, the measure of each object projection in the set must be calculated individually, then measures of all projections added together to provide the total measure for the set of projections on the given coordinate subspace."
+        }
+      ],
+      "i" : 186,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "is the measure of the m-dimensional set projection onto m-dimensional coordinate subspace i. Because object projections can overlap on a coordinate subspace, the measure of each object projection in the set must be calculated individually, then measures of all projections added together to provide the total measure for the set of projections on the given coordinate subspace."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "59758304d5fa943fca91670592666603d715af441cb0af5ba4ba089057a55a66",
+          "text" : "is the number of orthogonal, m-dimensional coordinate subspaces in n-dimensional space (Rn) onto which the m-dimensional objects are projected (m ≤ n):"
+        }
+      ],
+      "i" : 187,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "is the number of orthogonal, m-dimensional coordinate subspaces in n-dimensional space (Rn) onto which the m-dimensional objects are projected (m ≤ n):"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "dc0a0407880f9a4fae92210b302cb013a092ebba9a27b8b3fd043190fbd865bd",
+          "text" : "Non-Euclidean geometry"
+        }
+      ],
+      "i" : 188,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Non-Euclidean geometry"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "44b67cbee123153b2fc0908c92d85184d06b8ae2f36c26491747c488faef5e25",
+          "text" : "The Pythagorean theorem is derived from the axioms of Euclidean geometry, and in fact, were the Pythagorean theorem to fail for some right triangle, then the plane in which this triangle is contained cannot be Euclidean. More precisely, the Pythagorean theorem implies, and is implied by, Euclid's Parallel (Fifth) Postulate. Thus, right triangles in a non-Euclidean geometry do not satisfy the Pythagorean theorem. For example, in spherical geometry, all three sides of the right triangle (say a, b, and c) bounding an octant of the unit sphere have length equal to π/2, and all its angles are right angles, which violates the Pythagorean theorem because a2 + b2 = 2c2 > c2."
+        }
+      ],
+      "i" : 189,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean theorem is derived from the axioms of Euclidean geometry, and in fact, were the Pythagorean theorem to fail for some right triangle, then the plane in which this triangle is contained cannot be Euclidean. More precisely, the Pythagorean theorem implies, and is implied by, Euclid's Parallel (Fifth) Postulate. Thus, right triangles in a non-Euclidean geometry do not satisfy the Pythagorean theorem. For example, in spherical geometry, all three sides of the right triangle (say a, b, and c) bounding an octant of the unit sphere have length equal to π/2, and all its angles are right angles, which violates the Pythagorean theorem because a2 + b2 = 2c2 > c2."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "331eb3dd2f4eaf3f18c120a98c0d17760c737c1eb9c49b9d96dee2628594d6bd",
+          "text" : "Here two cases of non-Euclidean geometry are considered—spherical geometry and hyperbolic plane geometry; in each case, as in the Euclidean case for non-right triangles, the result replacing the Pythagorean theorem follows from the appropriate law of cosines."
+        }
+      ],
+      "i" : 190,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Here two cases of non-Euclidean geometry are considered—spherical geometry and hyperbolic plane geometry; in each case, as in the Euclidean case for non-right triangles, the result replacing the Pythagorean theorem follows from the appropriate law of cosines."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "29746911b9c4c4767836a430d265d6fe3f0424c38e74d895fa17b3769d5b2e11",
+          "text" : "However, the Pythagorean theorem remains true in hyperbolic geometry and elliptic geometry if the condition that the triangle be right is replaced with the condition that two of the angles sum to the third, say A + B = C. The sides are then related as follows: the sum of the areas of the circles with diameters a and b equals the area of the circle with diameter c."
+        }
+      ],
+      "i" : 191,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "However, the Pythagorean theorem remains true in hyperbolic geometry and elliptic geometry if the condition that the triangle be right is replaced with the condition that two of the angles sum to the third, say A + B = C. The sides are then related as follows: the sum of the areas of the circles with diameters a and b equals the area of the circle with diameter c."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "005f545bfaf953c97cb93d8c07540ed7797dc2cfed534dd6729e4dc56ff28a12",
+          "text" : "Spherical geometry"
+        }
+      ],
+      "i" : 192,
+      "kind" : "heading",
+      "level" : 4,
+      "text" : "Spherical geometry"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6628004cb18044988600610c3e9c45c8f71f9287096e61a9f2814dee7d3662a7",
+          "text" : "For any right triangle on a sphere of radius R (for example, if γ in the figure is a right angle), with sides a, b, and c, the relation between the sides takes the form:"
+        }
+      ],
+      "i" : 193,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For any right triangle on a sphere of radius R (for example, if γ in the figure is a right angle), with sides a, b, and c, the relation between the sides takes the form:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "12f191a1b489a58e8570688d701f28ea274e18c178d3e1905719e8e7910819cf",
+          "text" : "This equation can be derived as a special case of the spherical law of cosines that applies to all spherical triangles:"
+        }
+      ],
+      "i" : 194,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "This equation can be derived as a special case of the spherical law of cosines that applies to all spherical triangles:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "3f3a7765ee9a2b829d2a83a7e40eec07cff787a4d01f80f63f2f791c1ee41fa1",
+          "text" : "For infinitesimal triangles on the sphere (or equivalently, for finite spherical triangles on a sphere of infinite radius), the spherical relation between the sides of a right triangle reduces to the Euclidean form of the Pythagorean theorem. To see how, assume we have a spherical triangle of fixed side lengths a, b, and c on a sphere with expanding radius R. As R approaches infinity the quantities a/R, b/R, and c/R tend to zero and the spherical Pythagorean identity reduces to 1 = 1, so we must look at its asymptotic expansion."
+        }
+      ],
+      "i" : 195,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For infinitesimal triangles on the sphere (or equivalently, for finite spherical triangles on a sphere of infinite radius), the spherical relation between the sides of a right triangle reduces to the Euclidean form of the Pythagorean theorem. To see how, assume we have a spherical triangle of fixed side lengths a, b, and c on a sphere with expanding radius R. As R approaches infinity the quantities a/R, b/R, and c/R tend to zero and the spherical Pythagorean identity reduces to 1 = 1, so we must look at its asymptotic expansion."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "bb04e913d38f2ecdd1a3fa1de716dd5450f6e1de02b4c4bcfe011c6f58ece2e8",
+          "text" : "The Maclaurin series for the cosine function can be written as with the remainder term in big O notation. Letting be a side of the triangle, and treating the expression as an asymptotic expansion in terms of R for a fixed c,"
+        }
+      ],
+      "i" : 196,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Maclaurin series for the cosine function can be written as with the remainder term in big O notation. Letting be a side of the triangle, and treating the expression as an asymptotic expansion in terms of R for a fixed c,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b543e5dd8702146091c22e0da8fc16ae4afdc2a6c8ffcc6e7a9e0594d07b3534",
+          "text" : "and likewise for a and b. Substituting the asymptotic expansion for each of the cosines into the spherical relation for a right triangle yields"
+        }
+      ],
+      "i" : 197,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "and likewise for a and b. Substituting the asymptotic expansion for each of the cosines into the spherical relation for a right triangle yields"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1e613fcc86c4289751cfe7332a7899b6139fba9daa1a649fd82cdaf659958b30",
+          "text" : "Subtracting 1 and then negating each side,"
+        }
+      ],
+      "i" : 198,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Subtracting 1 and then negating each side,"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "96a263d7fab463301b03d13ff7f7a4aa3b7290a439ed3e38dd299daa3e0087d9",
+          "text" : "Multiplying through by 2R2, the asymptotic expansion for c in terms of fixed a, b and variable R is"
+        }
+      ],
+      "i" : 199,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "Multiplying through by 2R2, the asymptotic expansion for c in terms of fixed a, b and variable R is"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "f10590949be058cc788a64c12a7e97e9d50d64c59e4951b2b55f394b55d0bd1c",
+          "text" : "The Euclidean Pythagorean relationship is recovered in the limit, as the remainder vanishes when the radius R approaches infinity."
+        }
+      ],
+      "i" : 200,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Euclidean Pythagorean relationship is recovered in the limit, as the remainder vanishes when the radius R approaches infinity."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "ae93662d1c986fcbdd76137f9033c80daaa8f313303d7ce74107e57bdc88075b",
+          "text" : "For practical computation in spherical trigonometry with small right triangles, cosines can be replaced with sines using the double-angle identity to avoid loss of significance. Then the spherical Pythagorean theorem can alternately be written as"
+        }
+      ],
+      "i" : 201,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For practical computation in spherical trigonometry with small right triangles, cosines can be replaced with sines using the double-angle identity to avoid loss of significance. Then the spherical Pythagorean theorem can alternately be written as"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6cfa6808666321e2b7043a07c499fc1de2ff777dfc8c2cff317437917310e656",
+          "text" : "Hyperbolic geometry"
+        }
+      ],
+      "i" : 202,
+      "kind" : "heading",
+      "level" : 4,
+      "text" : "Hyperbolic geometry"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "1cd02b47e732bf99fa78df8357d05eefdab1d9e70c91a888c0c8391437ae2ba0",
+          "text" : "In a hyperbolic space with uniform Gaussian curvature −1/R2, for a right triangle with legs a, b, and hypotenuse c, the relation between the sides takes the form:"
+        }
+      ],
+      "i" : 203,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "In a hyperbolic space with uniform Gaussian curvature −1/R2, for a right triangle with legs a, b, and hypotenuse c, the relation between the sides takes the form:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "69042e6fc002217838d836e6c838384fb6b7e84ca3c5b0b6667d7d5d7bb77148",
+          "text" : "where cosh is the hyperbolic cosine. This formula is a special form of the hyperbolic law of cosines that applies to all hyperbolic triangles:"
+        }
+      ],
+      "i" : 204,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "where cosh is the hyperbolic cosine. This formula is a special form of the hyperbolic law of cosines that applies to all hyperbolic triangles:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "b6320b3a28c56fb5d23f5bef546e21e1f0a1c25a8d5c4a338581c06a8f50ce5c",
+          "text" : "with γ the angle at the vertex opposite the side c."
+        }
+      ],
+      "i" : 205,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "with γ the angle at the vertex opposite the side c."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c4392764ac2b8367107b9244080c0d6fcb7aa524e03331de31b0bd0f2ed43935",
+          "text" : "By using the Maclaurin series for the hyperbolic cosine, cosh x ≈ 1 + x2/2, it can be shown that as a hyperbolic triangle becomes very small (that is, as a, b, and c all approach zero), the hyperbolic relation for a right triangle approaches the form of Pythagoras's theorem."
+        }
+      ],
+      "i" : 206,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "By using the Maclaurin series for the hyperbolic cosine, cosh x ≈ 1 + x2/2, it can be shown that as a hyperbolic triangle becomes very small (that is, as a, b, and c all approach zero), the hyperbolic relation for a right triangle approaches the form of Pythagoras's theorem."
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "340b3cd8f86c64ba14af19de9c7cb0ce47647865187476e7e9a90922f61e5019",
+          "text" : "For small right triangles (a, b ≪ R), the hyperbolic cosines can be eliminated to avoid loss of significance, giving"
+        }
+      ],
+      "i" : 207,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For small right triangles (a, b ≪ R), the hyperbolic cosines can be eliminated to avoid loss of significance, giving"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "c287ed3a563b4721fbf2b226fabd91d6c0e6f55e1a45f71124306c8446e85cd8",
+          "text" : "Very small triangles"
+        }
+      ],
+      "i" : 208,
+      "kind" : "heading",
+      "level" : 4,
+      "text" : "Very small triangles"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "6b2474bf2a41688fcdf3a7ad4aebff02bb29febe8b22d33353ad9d0e65defe45",
+          "text" : "For any uniform curvature K (positive, zero, or negative), in very small right triangles (|K|a2, |K|b2 ≪ 1) with hypotenuse c, it can be shown that"
+        }
+      ],
+      "i" : 209,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "For any uniform curvature K (positive, zero, or negative), in very small right triangles (|K|a2, |K|b2 ≪ 1) with hypotenuse c, it can be shown that"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "37684510dfa249642ea5aae429ee66a4cd371e2a9fef6e7aed1ecc0098ca19b0",
+          "text" : "Differential geometry"
+        }
+      ],
+      "i" : 210,
+      "kind" : "heading",
+      "level" : 3,
+      "text" : "Differential geometry"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "38cab7dd9bb27f4c39d3f050a992539450af2a30c38597a6e081e73a3abe611a",
+          "text" : "The Pythagorean theorem applies to infinitesimal triangles seen in differential geometry. In three dimensional space, the distance between two infinitesimally separated points satisfies"
+        }
+      ],
+      "i" : 211,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "The Pythagorean theorem applies to infinitesimal triangles seen in differential geometry. In three dimensional space, the distance between two infinitesimally separated points satisfies"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "7ef9c2ea3a3d029cb86c3490515410f3fc44c952441bf124ec1c2ce36db4e428",
+          "text" : "with ds the element of distance and (dx, dy, dz) the components of the vector separating the two points. Such a space is called a Euclidean space. However, in Riemannian geometry, a generalization of this expression useful for general coordinates (not just Cartesian) and general spaces (not just Euclidean) takes the form:"
+        }
+      ],
+      "i" : 212,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "with ds the element of distance and (dx, dy, dz) the components of the vector separating the two points. Such a space is called a Euclidean space. However, in Riemannian geometry, a generalization of this expression useful for general coordinates (not just Cartesian) and general spaces (not just Euclidean) takes the form:"
+    },
+    {
+      "chunks" : [
+        {
+          "key" : "7b0c110bcdaf9d7e0d30aee0665fc15e059c2c2c625a6ad8b17b048d88188e9a",
+          "text" : "which is called the metric tensor. It may be a function of position, and often describes curved space. A simple example is Euclidean (flat) space expressed in curvilinear coordinates. For example, in polar coordinates:"
+        }
+      ],
+      "i" : 213,
+      "kind" : "paragraph",
+      "level" : 0,
+      "text" : "which is called the metric tensor. It may be a function of position, and often describes curved space. A simple example is Euclidean (flat) space expressed in curvilinear coordinates. For example, in polar coordinates:"
+    }
+  ],
+  "fixture" : "pythagorean_theorem.json",
+  "title" : "Pythagorean theorem",
+  "url" : "https://en.wikipedia.org/wiki/Pythagorean_theorem",
+  "urlHash" : "537860913657aefa68af1d7321dacad2a720f69ed4b83dd07cb2c23930e7ca00",
+  "voice" : "marin"
+}
