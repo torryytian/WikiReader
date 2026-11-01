@@ -136,7 +136,7 @@
 
 ### Google Drive 共享音频缓存：格式已和 Chrome 插件对齐，iOS 端未实现（2026-11-01）
 - 用户要求：TTS 音频缓存存到 Google Drive，和 Chrome 插件（`~/Desktop/claude/chrome_extension_reading`）共享同一份；调 OpenAI 前先查 Drive，有就从 Drive 拉。
-- **共享格式以 iOS 现有格式为准**（用户同意；iOS 已有付费音频，不能改 key/切块）：规范见 `docs/shared-tts-cache-format.md`。Chrome 那个会话评估后已按此实现并提交，清洗器移植成 TS，4 个 fixture（656 块）+ 5 篇实时文章与 iOS 逐字节一致。默认声音两端都用 marin + 固定 instructions。
+- **共享格式以 iOS 现有格式为准**（用户同意；iOS 已有付费音频，不能改 key/切块）：规范见 `docs/shared-tts-cache-format.md`。Chrome 那个会话评估后已按此实现并提交，清洗器移植成 TS，4 个 fixture（656 块）+ 5 篇实时文章与 iOS 逐字节一致。两端要用同一个声音 + 同一句 instructions 才共享：用户 iPhone 上实际选的是 alloy，Chrome 默认也改成了 alloy、instructions 用 iOS 那句（Chrome 还能自选声音和风格，选得不同就不共享）。
 - iOS 侧的护栏：`SharedCacheFormatTests`（key 向量、fixture 的块文本与 key、URL/urlHash 向量）和 `WikiReaderTests/Fixtures/shared/`。**改清洗器、切块、key、`ArticleInput.articleURL` 任何一处都会让这些测试失败——那是提醒要和 Chrome 同步，不是让你改期望值了事。** Chrome 仓库把 `Fixtures/shared/` 复制到了 `tests/fixtures/ios-shared/`，用 `tests/iosShared.test.ts` 从同样的 HTML 端到端对照（Chrome 提交 95ad19a，64 个测试全过）。约定（两边都记下了）：任何一方要改清洗、切块、key 或 URL 规则，先通知另一方；iOS 重新生成 `Fixtures/shared/` 后要告诉 Chrome 同步。
 - 用户 2026-11-01 说联网不设限制（已写进 CLAUDE.md）。
 - **待做（iOS 实现）**：`ASWebAuthenticationSession` + PKCE 登录 Google（`drive.file`，token 存 Keychain，iOS OAuth Client 建在 Chrome 用的同一个 GCP 项目里，需要用户在 GCP 控制台操作）；URLSession 调 Drive REST（找/建 `WikiReader Cache/`、校验 `format.json`、按名批量查 ≤50、下载、multipart 上传）；取音频顺序 本机 → Drive → OpenAI（打开文章时批量查一遍 Drive 记在内存里）；新音频后台上传队列（持久化重试）；上传时写/更新 `articles/<urlHash>.json`（全文所有块、可带 kind/level、complete）；清单优先（Drive 有清单且 model/voice/instructions 相同就用清单里的块）；批量下载的费用预估扣掉 Drive 已有的；一次性“把本机已有音频上传到 Drive”；设置页 Google Drive 区（登录/退出/状态/待上传数）。注意：GCP OAuth 应用停在“测试”状态时 refresh token 7 天过期。

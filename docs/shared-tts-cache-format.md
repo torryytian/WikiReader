@@ -28,11 +28,11 @@ key = lowercase_hex( SHA-256( UTF-8( model + "\u001F" + voice + "\u001F" + instr
 | 字段 | 值 |
 |---|---|
 | model | `gpt-4o-mini-tts` |
-| voice | 用户选的，默认 `marin`（iOS 提供 marin、cedar、alloy、ash、ballad、coral、echo、fable、nova、onyx、sage、shimmer、verse） |
+| voice | 用户在设置里选的（iOS 提供 marin、cedar、alloy、ash、ballad、coral、echo、fable、nova、onyx、sage、shimmer、verse；代码默认 marin，用户实际用的是 **alloy**，Chrome 默认也设成 alloy） |
 | instructions | `Read like a clear, natural audiobook narrator, at a steady, moderate pace.`（固定，所有声音都带） |
 | response_format | `mp3` |
 
-两端默认声音和 instructions 不同的话，同一段文字的 key 也不同，等于不共享。
+**只有两端选的声音和 instructions 都相同，才能共享。** iOS 的 instructions 固定、设置里不能改；Chrome 可选预设或自定义，默认就是上面这句。换了任何一样都等于另一套缓存。测试向量用 marin 只是举例，与默认声音无关。
 
 ### 1.3 切块
 
