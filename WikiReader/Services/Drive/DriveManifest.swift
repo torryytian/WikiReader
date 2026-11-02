@@ -69,6 +69,13 @@ nonisolated struct DriveManifest: Codable, Equatable, Sendable {
         return (try? encoder.encode(self)) ?? Data()
     }
 
+    /// A digest of everything but `updatedAt`: two manifests with the same digest say the same thing.
+    var contentDigest: String {
+        var copy = self
+        copy.updatedAt = ""
+        return SHA256.hash(data: copy.encoded()).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// The same manifest apart from when it was written: whether writing it again would change anything.
     func sameContent(as other: DriveManifest) -> Bool {
         var a = self, b = other

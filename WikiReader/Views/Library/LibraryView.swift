@@ -118,6 +118,14 @@ struct LibraryView: View {
                 let sources = articles.map { (id: $0.persistentModelID, blocksData: $0.blocksData) }
                 audioFractions = await ArticleAudio.fractions(of: sources, voice: openAIVoice)
             }
+            .task {
+                // Incremental backup to Google Drive: whatever audio on this iPhone Drive lacks (e.g. generated while
+                // signed out) is queued. At most every ten minutes, so coming back from an article is cheap.
+                let drive = DriveAudioStore.shared
+                guard drive.isEnabled else { return }
+                let library = articles.map { (title: $0.title, url: $0.sourceURL.absoluteString, blocksData: $0.blocksData) }
+                await drive.backUpIfDue(library, voice: openAIVoice)
+            }
             .sheet(isPresented: $isAddingArticle) {
                 AddArticleView { article in
                     path = [article]

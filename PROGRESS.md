@@ -32,7 +32,7 @@
 | 4 文章库与设置 | ✅ 完成 | 断网验收按决定未实测（日志确认打开/朗读无网络请求） |
 | 5 OpenAI TTS | ✅ 模拟器验收 | 其余阶段 5 项（锁屏后台、分享导入、生词本）未开始；AI 释义已做第一版 |
 
-测试：476 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
+测试：486 个单元测试（Swift Testing），在 iPhone 15 Pro Max 模拟器上全部通过。
 
 ## 2. 代码地图
 
@@ -148,6 +148,7 @@
   - 设置 → Google Drive：Client ID 输入框、登录/退出、待上传数、本次会话下载/上传数、最近的错误、"Upload Saved Audio"。截图看过（未登录状态）。
   - 测试 26 个（`GoogleDriveTests.swift`）：OAuth（含 RFC 7636 的 PKCE 向量）、账号令牌续期和过期登出、Drive 客户端（转义、分批、401 重试、multipart）、用内存假 Drive 跑完整流程（建目录、复用、拒绝别的格式、下载、上传去重、队列重启续传、清单 complete）、Drive 优先于 OpenAI。测试抓到过一个真 bug：建文件只要 `fields=id`，解码却要求 name。
   - **真机验证（2026-11-01 18:00–18:14）**：Client ID 已内置（项目号 174740959205，Chrome 客户端在同一项目）。第一次登录时用户没勾 Google 授权页上的 Drive 项，所有请求 403 "insufficient authentication scopes"（用 `devicectl device capture screenshot` 截手机屏幕看到的）；已改为登录时检查返回的 `scope`，没有 drive.file 就拒绝并提示勾选，用的过程中收到这种 403 就自动登出并提示。重新登录勾选后，手机上 467 个已付费音频约 6 分钟全部传到 `WikiReader Cache/audio/`，无错误、无重复（监控方式：`devicectl device copy from` 读 App 容器里的 `DriveUploadQueue.json` / `DriveAudioIndex.json`）。另修：5G "允许更多数据" 时 iOS 不把 5G 标成 expensive，"只在 Wi-Fi 上传"改为按蜂窝接口判断；上传期间保持屏幕常亮（`ScreenAwake`，和批量下载共用）。
+  - **增量备份与按文章看备份状态（2026-11-02，用户问"增量部分能否只传增量""怎么看每篇是否备份成功"）**：①新生成一段立刻排队上传（原有）；②`DriveAudioStore.backUp`：比较文库所有文章在本机的音频（所有声音）和本地索引，只把 Drive 缺的排队——补上没登录时、上传失败时生成的段。文库页出现时自动跑（`backUpIfDue`，10 分钟内不重复），登录后跑一次，设置里 "Back Up Now"（原 "Upload Saved Audio"）手动跑。③清单只在内容变了才写：索引里存每份清单的内容摘要和 Drive 文件 id（`AudioIndex.manifests` / `manifestDigests`，老索引文件兼容），同步时顺带整列 `articles/`（一次请求），所以能知道清单在不在 Drive。④状态：`DriveAudioStore.ArticleBackup` + `BackupStatusLine`，四种：已备份（本机该篇所有声音的音频都在 Drive 且清单在）/ 等待上传 / 有未备份的 / 还没有音频；设置 → Google Drive 的 "Backup by Article" 每篇一行，顶部一行汇总；文章属性页语音一节同样一行。不做：删除本机音频不删 Drive 上的（付过费的，留着）。
   - **还未验证**：Chrome 读取 iOS 上传的文件和清单（已请 Chrome 会话核对）、从 Drive 下载播放（"0 from Drive"，手机本来就都有）、7 天后令牌过期的表现。
 
 ### 书签（2026-10-19）

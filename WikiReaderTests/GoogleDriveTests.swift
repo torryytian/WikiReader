@@ -494,18 +494,19 @@ struct DriveAudioStoreTests {
         #expect(store.isOnDrive(SpeechAudioCache.key(for: request("Two."))) == true)
         #expect(store.isOnDrive(SpeechAudioCache.key(for: request("Four."))) == false)
 
-        // Another device uploads one more: a forced sync lists only that (and a minute's overlap).
+        // Another device uploads one more: a forced sync lists only that (and a minute's overlap) in the audio folder,
+        // plus the few manifests: two requests however many files there are.
         _ = await drive.add(name: SpeechAudioCache.key(for: request("Four.")) + ".mp3", parent: audio)
         let before = await drive.listCount()
         await store.syncIndex(force: true)
-        #expect(await drive.listCount() == before + 1)
+        #expect(await drive.listCount() == before + 2)
         #expect(store.isOnDrive(SpeechAudioCache.key(for: request("Four."))) == true)
 
         // The index survives a restart; a recent answer needs no request at all.
         let restarted = makeStore()
         #expect(restarted.isOnDrive(SpeechAudioCache.key(for: request("One."))) == true)
         await store.syncIndex()
-        #expect(await drive.listCount() == before + 1)
+        #expect(await drive.listCount() == before + 2)
     }
 
     @Test func aPieceDeletedOnDriveIsForgottenWhenItCantBeDownloaded() async throws {
@@ -593,17 +594,86 @@ struct DriveAudioStoreTests {
         #expect(await drive.count(named: SpeechAudioCache.key(for: made) + ".mp3") == 1)
     }
 
-    @Test func perArticleBreakdownCountsTheVoiceAndTheOthers() async throws {
+    @Test func backupStatusComparesThisIPhoneWithDrive() async throws {
+        let url = "https://en.wikipedia.org/wiki/T"
         let blocks: [ContentBlock] = [.heading("History", level: 2), .paragraph("First."), .paragraph("Second.")]
         let data = try JSONEncoder().encode(blocks)
         func key(_ text: String, _ voice: String) -> String { SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: text, voice: voice)) }
+        func backup(indexed: Set<String>, pending: Set<String> = [], manifests: Set<String> = []) async -> DriveAudioStore.ArticleBackup {
+            await DriveAudioStore.backup(url: url, blocksData: data, voice: "alloy", indexed: indexed, pending: pending, manifests: manifests, cache: cache)
+        }
+        let manifest: Set<String> = [DriveManifest.urlHash(url) + ".json"]
+
+        #expect(await backup(indexed: []).state == .noAudio)
+
+        // Two alloy parts and one marin part on this iPhone.
         try cache.store(Data(count: 100), for: OpenAISpeechEngine.request(for: "History", voice: "alloy"))
         try cache.store(Data(count: 250), for: OpenAISpeechEngine.request(for: "First.", voice: "alloy"))
-        let indexed: Set<String> = [key("History", "alloy"), key("First.", "alloy"), key("Second.", "marin"), key("Unrelated.", "alloy")]
+        try cache.store(Data(count: 50), for: OpenAISpeechEngine.request(for: "Second.", voice: "marin"))
+        let all: Set<String> = [key("History", "alloy"), key("First.", "alloy"), key("Second.", "marin")]
 
-        let result = await DriveAudioStore.onDrive(blocksData: data, voice: "alloy", indexed: indexed, cache: cache)
+        let none = await backup(indexed: [])
+        #expect(none.state == .notBackedUp)
+        #expect(none.missing == 3)
+        #expect(none.piecesHere == 2 && none.pieces == 3 && none.bytesHere == 350)
 
-        #expect(result == DriveAudioStore.ArticleOnDrive(pieces: 3, piecesOnDrive: 2, bytesOnDrive: 350, otherVoicePieces: 1))
+        let queued = await backup(indexed: [key("History", "alloy")], pending: [key("First.", "alloy"), key("Second.", "marin")])
+        #expect(queued.state == .uploading)
+        #expect(queued.waiting == 2)
+
+        let done = await backup(indexed: all, manifests: manifest)
+        #expect(done == DriveAudioStore.ArticleBackup(
+            pieces: 3, piecesHere: 2, piecesOnDrive: 2, bytesHere: 350, waiting: 0, missing: 0, otherVoicePieces: 1, hasManifest: true
+        ))
+        #expect(done.state == .backedUp)
+        #expect(await backup(indexed: all).hasManifest == false)
+    }
+
+    @Test func backUpQueuesOnlyWhatDriveLacksIncludingAudioMadeWhileSignedOut() async throws {
+        let url = "https://en.wikipedia.org/wiki/T"
+        let blocks: [ContentBlock] = [.paragraph("Made earlier."), .paragraph("Made while signed out."), .paragraph("Never made.")]
+        let data = try JSONEncoder().encode(blocks)
+        let store = makeStore()
+        let audio = try await store.layout().audio
+        // On Drive already (uploaded by another device), and on this iPhone too.
+        let earlier = request("Made earlier.")
+        _ = await drive.add(name: SpeechAudioCache.key(for: earlier) + ".mp3", parent: audio)
+        try cache.store(Data("ID3 e".utf8), for: earlier)
+        // Generated while signed out: on this iPhone only, never queued.
+        let offline = request("Made while signed out.")
+        try cache.store(Data("ID3 o".utf8), for: offline)
+        let before = await drive.uploadCount()
+
+        let queued = await store.backUp([(title: "T", url: url, blocksData: data)], voice: "alloy")
+        try await waitFor { store.pendingUploads.isEmpty && !store.isUploading && store.manifestNames.count == 1 }
+
+        #expect(queued == 1)
+        #expect(await drive.count(named: SpeechAudioCache.key(for: offline) + ".mp3") == 1)
+        #expect(await drive.count(named: SpeechAudioCache.key(for: earlier) + ".mp3") == 1)
+        // The audio and the manifest: two uploads.
+        #expect(await drive.uploadCount() - before == 2)
+        #expect(store.manifestNames == [DriveManifest.urlHash(url) + ".json"])
+    }
+
+    @Test func anUnchangedManifestIsNotWrittenAgainAfterARestart() async throws {
+        let blocks: [ContentBlock] = [.paragraph("Only paragraph.")]
+        let url = "https://en.wikipedia.org/wiki/Once"
+        await makeStore().noteArticle(title: "Once", url: url, blocks: blocks, voice: "alloy")
+        let afterFirst = await drive.requests.filter { $0.hasPrefix("POST /upload") || $0.hasPrefix("PATCH") }.count
+
+        let restarted = makeStore()
+        await restarted.noteArticle(title: "Once", url: url, blocks: blocks, voice: "alloy")
+        let afterSecond = await drive.requests.filter { $0.hasPrefix("POST /upload") || $0.hasPrefix("PATCH") }.count
+
+        #expect(afterSecond == afterFirst)
+        #expect(await drive.count(named: DriveManifest.urlHash(url) + ".json") == 1)
+    }
+
+    @Test func anIndexSavedBeforeManifestsWereTrackedStillLoads() throws {
+        let old = #"{"folder":"f9","files":{"abc":"f10"},"syncedThrough":"2026-11-01T08:00:00Z"}"#
+        let index = try JSONDecoder().decode(DriveAudioStore.AudioIndex.self, from: Data(old.utf8))
+        #expect(index.files == ["abc": "f10"])
+        #expect(index.manifests.isEmpty && index.manifestDigests.isEmpty)
     }
 
     @Test func audioFromOtherCachesIsNotShared() async throws {

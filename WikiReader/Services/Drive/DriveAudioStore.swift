@@ -14,7 +14,11 @@ protocol RemoteAudioSource: AnyObject {
 
 /// The audio cache shared through Google Drive with other devices and the Chrome extension
 /// (format: docs/shared-tts-cache-format.md). Audio is looked for here after this iPhone's own cache and before
-/// OpenAI; audio generated here is uploaded in the background; each article read or downloaded gets a manifest.
+/// OpenAI; audio generated here is uploaded in the background; each article gets a manifest.
+///
+/// Backing up is incremental: a piece is uploaded right after it is generated, and `backUp` (run when the app opens,
+/// after signing in, and from Settings) compares the library's audio on this iPhone with the index and queues only
+/// what Drive lacks, which also catches audio made while signed out or while uploads were failing.
 ///
 /// What is on Drive is mirrored in a local index (`DriveAudioIndex.json`): the audio folder is listed in full once,
 /// then only what was created since the last look, usually one small request. So whether a piece is on Drive is
@@ -51,6 +55,25 @@ final class DriveAudioStore: RemoteAudioSource {
         var files: [String: String] = [:]
         /// The newest creation time seen, where the next look starts.
         var syncedThrough: String?
+        /// The articles folder's manifests, file ids by file name, as of the last sync.
+        var manifests: [String: String] = [:]
+        /// What this iPhone last wrote into each manifest (a digest of everything but the time), so an unchanged
+        /// manifest isn't written again on every launch.
+        var manifestDigests: [String: String] = [:]
+
+        init(folder: String? = nil) {
+            self.folder = folder
+        }
+
+        // Indexes saved before manifests were tracked lack those fields.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            folder = try container.decodeIfPresent(String.self, forKey: .folder)
+            files = try container.decodeIfPresent([String: String].self, forKey: .files) ?? [:]
+            syncedThrough = try container.decodeIfPresent(String.self, forKey: .syncedThrough)
+            manifests = try container.decodeIfPresent([String: String].self, forKey: .manifests) ?? [:]
+            manifestDigests = try container.decodeIfPresent([String: String].self, forKey: .manifestDigests) ?? [:]
+        }
     }
 
     /// Keys of audio generated here and not uploaded yet, oldest first. Kept on disk, so nothing is lost if the app quits.
@@ -82,9 +105,10 @@ final class DriveAudioStore: RemoteAudioSource {
     @ObservationIgnored private var syncTask: Task<Void, Error>?
     @ObservationIgnored private var uploadsInFlight: Set<String> = []
     @ObservationIgnored private var currentBackoff: Duration?
-    @ObservationIgnored private var manifestIDs: [String: String] = [:]
-    @ObservationIgnored private var writtenManifests: [String: DriveManifest] = [:]
-    /// Articles read or downloaded this session, whose manifests are brought up to date when uploads finish.
+    /// When `backUp` last compared the library with Drive, so opening the app often doesn't redo it every time.
+    @ObservationIgnored private var lastBackUp: Date?
+    static let backUpInterval: TimeInterval = 10 * 60
+    /// Articles read, downloaded or backed up this session, whose manifests are brought up to date when uploads finish.
     @ObservationIgnored private var notedArticles: [String: DriveManifest] = [:]
     @ObservationIgnored private var retryScheduled = false
 
@@ -123,9 +147,8 @@ final class DriveAudioStore: RemoteAudioSource {
         index = AudioIndex()
         lastSync = nil
         try? FileManager.default.removeItem(at: indexFile)
-        manifestIDs = [:]
-        writtenManifests = [:]
         notedArticles = [:]
+        lastBackUp = nil
         lastError = nil
     }
 
@@ -190,7 +213,8 @@ final class DriveAudioStore: RemoteAudioSource {
             return
         }
         let task = Task { () throws -> Void in
-            let audio = try await layout().audio
+            let layout = try await layout()
+            let audio = layout.audio
             if index.folder != audio { index = AudioIndex(folder: audio) }
             let since = index.syncedThrough.flatMap { Self.rfc3339(minus: 60, from: $0) }
             let listed = try await client.listFolder(audio, createdAfter: since)
@@ -200,6 +224,12 @@ final class DriveAudioStore: RemoteAudioSource {
                 if index.files[key] == nil { index.files[key] = file.id }
                 if let created = file.createdTime, created > (index.syncedThrough ?? "") { index.syncedThrough = created }
             }
+            // Manifests are few and replaced in place (their creation time doesn't move), so list them all.
+            var manifests: [String: String] = [:]
+            for file in try await client.listFolder(layout.articles) where file.name.hasSuffix(".json") {
+                if manifests[file.name] == nil { manifests[file.name] = file.id }
+            }
+            index.manifests = manifests
             lastSync = .now
             saveIndex()
             Log.app.info("Drive: index has \(self.index.files.count) pieces (\(listed.count) listed)")
@@ -386,25 +416,25 @@ final class DriveAudioStore: RemoteAudioSource {
         var manifest = base
         manifest.complete = manifest.keys.allSatisfy { index.files[$0] != nil }
         manifest.updatedAt = ISO8601DateFormatter().string(from: .now)
-        if let written = writtenManifests[manifest.fileName], written.sameContent(as: manifest) { return }
+        let digest = manifest.contentDigest
+        // Written before with the same content and still there: nothing to do, and no request.
+        if index.manifestDigests[manifest.fileName] == digest, index.manifests[manifest.fileName] != nil { return }
         do {
             let folder = try await layout().articles
-            let id: String?
-            if let known = manifestIDs[manifest.fileName] {
-                id = known
-            } else {
-                id = try await client.files(named: [manifest.fileName], in: folder)[manifest.fileName]
-            }
-            if let id {
+            if let id = index.manifests[manifest.fileName] {
                 try await client.replace(fileID: id, data: manifest.encoded(), mimeType: "application/json")
-                manifestIDs[manifest.fileName] = id
             } else {
-                manifestIDs[manifest.fileName] = try await client.upload(
+                index.manifests[manifest.fileName] = try await client.upload(
                     name: manifest.fileName, data: manifest.encoded(), mimeType: "application/json", in: folder
                 )
             }
-            writtenManifests[manifest.fileName] = manifest
+            index.manifestDigests[manifest.fileName] = digest
+            saveIndex()
             lastError = nil
+        } catch DriveError.http(status: 404, _) {
+            // Deleted on Drive since the last sync: create it again next time.
+            index.manifests[manifest.fileName] = nil
+            saveIndex()
         } catch {
             note(error, while: "writing an article manifest")
         }
@@ -415,38 +445,80 @@ final class DriveAudioStore: RemoteAudioSource {
     /// Keys known to be on Drive (from the local index).
     var indexedKeys: Set<String> { Set(index.files.keys) }
 
-    /// How much of one article's audio is on Drive.
-    nonisolated struct ArticleOnDrive: Sendable, Equatable {
-        /// Pieces of the article in `voice`, and how many of them are on Drive.
+    /// Manifest file names known to be on Drive.
+    var manifestNames: Set<String> { Set(index.manifests.keys) }
+
+    /// Whether one article's audio on this iPhone is backed up to Drive.
+    nonisolated struct ArticleBackup: Sendable, Equatable {
+        enum State: Equatable, Sendable {
+            /// No audio for this article on this iPhone or on Drive.
+            case noAudio
+            /// Everything on this iPhone is on Drive too.
+            case backedUp
+            /// Some audio is queued and will go up when uploads run.
+            case uploading
+            /// Some audio on this iPhone isn't on Drive and isn't queued (the next backup picks it up).
+            case notBackedUp
+        }
+
+        /// Pieces of the article in the chosen voice.
         var pieces = 0
+        /// Of those, how many are on this iPhone, and how many on Drive.
+        var piecesHere = 0
         var piecesOnDrive = 0
-        /// Their size, from the same files on this iPhone (Drive's copies are identical).
-        var bytesOnDrive: Int64 = 0
-        /// Pieces of the article on Drive in the other voices.
+        /// Size of the chosen voice's audio on this iPhone.
+        var bytesHere: Int64 = 0
+        /// Audio on this iPhone (any voice) queued for upload, and neither on Drive nor queued.
+        var waiting = 0
+        var missing = 0
+        /// Pieces on Drive in the other voices.
         var otherVoicePieces = 0
+        /// Whether the article's manifest is in Drive's articles folder.
+        var hasManifest = false
+
+        var state: State {
+            if missing > 0 { return .notBackedUp }
+            if waiting > 0 { return .uploading }
+            if piecesHere == 0 && piecesOnDrive == 0 && otherVoicePieces == 0 { return .noAudio }
+            return .backedUp
+        }
     }
 
-    /// Works out `ArticleOnDrive` for an article's blocks, off the main actor.
+    /// Works out `ArticleBackup` for an article, off the main actor: which of its pieces are on this iPhone, which on
+    /// Drive (`indexed`), which are queued (`pending`), and whether its manifest is listed (`manifests`).
     @concurrent
-    static func onDrive(
-        blocksData: Data, voice: String, indexed: Set<String>, cache: SpeechAudioCache = .standard
-    ) async -> ArticleOnDrive {
+    static func backup(
+        url: String, blocksData: Data, voice: String, indexed: Set<String>, pending: Set<String>, manifests: Set<String>,
+        cache: SpeechAudioCache = .standard
+    ) async -> ArticleBackup {
         let blocks = Article.decodeBlocks(blocksData)
-        var result = ArticleOnDrive()
+        var result = ArticleBackup()
+        result.hasManifest = manifests.contains(DriveManifest.urlHash(url) + ".json")
         var counted = Set<String>()
+        func tally(_ key: String, isHere: Bool) {
+            guard isHere, !indexed.contains(key) else { return }
+            if pending.contains(key) { result.waiting += 1 } else { result.missing += 1 }
+        }
         for piece in ArticleAudio.pieces(of: blocks, voice: voice) {
             let key = SpeechAudioCache.key(for: piece.request)
             guard counted.insert(key).inserted else { continue }
             result.pieces += 1
-            guard indexed.contains(key) else { continue }
-            result.piecesOnDrive += 1
             let file = cache.fileURL(for: piece.request)
-            result.bytesOnDrive += Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init)
+            if let size {
+                result.piecesHere += 1
+                result.bytesHere += size
+            }
+            if indexed.contains(key) { result.piecesOnDrive += 1 }
+            tally(key, isHere: size != nil)
         }
         for input in ArticleAudio.inputs(of: blocks) {
             for other in OpenAISpeechEngine.voices where other != voice {
-                let key = SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: input, voice: other))
-                if indexed.contains(key), counted.insert(key).inserted { result.otherVoicePieces += 1 }
+                let request = OpenAISpeechEngine.request(for: input, voice: other)
+                let key = SpeechAudioCache.key(for: request)
+                guard counted.insert(key).inserted else { continue }
+                if indexed.contains(key) { result.otherVoicePieces += 1 }
+                tally(key, isHere: cache.cachedFile(for: request) != nil)
             }
         }
         return result
@@ -454,23 +526,33 @@ final class DriveAudioStore: RemoteAudioSource {
 
     // MARK: - The library's audio
 
-    /// Queues every piece of audio on this iPhone that belongs to the library (any voice) and isn't on Drive, and
-    /// writes the articles' manifests for `voice`. For moving audio paid for before Drive was set up.
+    /// Backs up the library incrementally: queues every piece of audio on this iPhone that belongs to it (any voice)
+    /// and isn't on Drive, and brings the articles' manifests for `voice` up to date (only those that changed are
+    /// written). Usually costs a request or two: Drive is compared with the local index, not asked piece by piece.
     /// - Returns: How many pieces were queued.
     @discardableResult
-    func uploadLibrary(_ articles: [(title: String, url: String, blocksData: Data)], voice: String) async -> Int {
+    func backUp(_ articles: [(title: String, url: String, blocksData: Data)], voice: String) async -> Int {
         guard isEnabled else { return 0 }
-        let cache = cache
+        lastBackUp = .now
         let local = await Self.localKeys(of: articles.map(\.blocksData), cache: cache)
         await syncIndex(force: true)
+        guard lastSync != nil else { return 0 }  // Drive couldn't be listed; `lastError` says why
         let missing = local.filter { index.files[$0] == nil }
         enqueue(missing)
         for article in articles {
             let blocks = Article.decodeBlocks(article.blocksData)
-            notedArticles[DriveManifest.urlHash(article.url) + ".json"] = DriveManifest(title: article.title, url: article.url, blocks: blocks, voice: voice)
+            let manifest = DriveManifest(title: article.title, url: article.url, blocks: blocks, voice: voice)
+            notedArticles[manifest.fileName] = manifest
         }
         if pendingUploads.isEmpty { await refreshNotedManifests() }
+        if !missing.isEmpty { Log.app.info("Drive: backup queued \(missing.count) pieces") }
         return missing.count
+    }
+
+    /// `backUp`, unless it ran in the last `backUpInterval`: for when the app opens or comes back to the library.
+    func backUpIfDue(_ articles: [(title: String, url: String, blocksData: Data)], voice: String) async {
+        if let lastBackUp, Date.now.timeIntervalSince(lastBackUp) < Self.backUpInterval { return }
+        await backUp(articles, voice: voice)
     }
 
     @concurrent

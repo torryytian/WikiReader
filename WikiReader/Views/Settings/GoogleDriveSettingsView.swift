@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Sharing OpenAI audio through Google Drive: the Google Cloud client id, signing in and out, what is waiting to be
-/// uploaded, and moving the audio already on this iPhone.
+/// uploaded, backing up, and whether each article is backed up.
 struct GoogleDriveSettingsView: View {
     @Query(sort: \Article.addedAt, order: .reverse) private var articles: [Article]
     @AppStorage(SettingsKeys.googleClientID) private var clientID = ""
@@ -14,8 +14,8 @@ struct GoogleDriveSettingsView: View {
     @State private var signInError: String?
     @State private var isQueueing = false
     @State private var queuedMessage: String?
-    /// Each article's audio on Drive, worked out when the page opens and as uploads finish.
-    @State private var byArticle: [PersistentIdentifier: DriveAudioStore.ArticleOnDrive] = [:]
+    /// Each article's backup, worked out when the page opens and again as uploads go.
+    @State private var byArticle: [PersistentIdentifier: DriveAudioStore.ArticleBackup] = [:]
 
     /// An empty field means the built-in client id.
     private var hasValidClientID: Bool { clientID.isEmpty || GoogleOAuth.Client(id: clientID) != nil }
@@ -31,14 +31,18 @@ struct GoogleDriveSettingsView: View {
         }
         .navigationTitle("Google Drive")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: BreakdownInput(signedIn: account.isSignedIn, uploaded: drive.uploadedCount, count: articles.count, voice: openAIVoice)) {
+        .task(id: BreakdownInput(
+            signedIn: account.isSignedIn, uploaded: drive.uploadedCount / 10, pending: drive.pendingUploads.isEmpty,
+            uploading: drive.isUploading, count: articles.count, voice: openAIVoice, checked: isQueueing
+        )) {
             guard account.isSignedIn else { return }
             await drive.syncIndex()
-            let indexed = drive.indexedKeys
-            var result: [PersistentIdentifier: DriveAudioStore.ArticleOnDrive] = [:]
+            let (indexed, pending, manifests) = (drive.indexedKeys, Set(drive.pendingUploads), drive.manifestNames)
+            var result: [PersistentIdentifier: DriveAudioStore.ArticleBackup] = [:]
             for article in articles {
-                result[article.persistentModelID] = await DriveAudioStore.onDrive(
-                    blocksData: article.blocksData, voice: openAIVoice, indexed: indexed
+                result[article.persistentModelID] = await DriveAudioStore.backup(
+                    url: article.sourceURL.absoluteString, blocksData: article.blocksData, voice: openAIVoice,
+                    indexed: indexed, pending: pending, manifests: manifests
                 )
             }
             byArticle = result
@@ -89,6 +93,7 @@ struct GoogleDriveSettingsView: View {
                 try await account.signIn()
                 drive.reset()
                 drive.pumpUploads()
+                backUp()
             } catch let error as GoogleAuthError {
                 if error != .cancelled { signInError = error.message }
             } catch {
@@ -111,10 +116,10 @@ struct GoogleDriveSettingsView: View {
                     .foregroundStyle(.orange)
             }
             Button {
-                uploadSavedAudio()
+                backUp()
             } label: {
                 HStack {
-                    Label("Upload Saved Audio", systemImage: "icloud.and.arrow.up")
+                    Label("Back Up Now", systemImage: "icloud.and.arrow.up")
                     if isQueueing {
                         Spacer()
                         ProgressView()
@@ -130,7 +135,7 @@ struct GoogleDriveSettingsView: View {
         } header: {
             Text("Status")
         } footer: {
-            Text("Upload Saved Audio sends the audio already on this iPhone for your saved articles (any voice) that isn't in Drive yet, and lists the articles there. Uploads continue in the background while WikiReader is open, on Wi-Fi only unless Upload over Cellular is on (a long article is about 80 MB). Audio is always taken from Drive when needed, on any connection: that's what saves generating it again.")
+            Text("Backing up only sends what Drive doesn't have: each new paragraph is uploaded as soon as it is generated, and whenever WikiReader opens (or you tap Back Up Now) it compares your articles' audio on this iPhone with Drive and uploads whatever is missing. Uploads run while WikiReader is open, on Wi-Fi only unless Upload over Cellular is on (a long article is about 80 MB). Audio is always taken from Drive when needed, on any connection.")
         }
     }
 
@@ -141,14 +146,16 @@ struct GoogleDriveSettingsView: View {
         return "\(count)"
     }
 
-    private func uploadSavedAudio() {
+    private func backUp() {
         isQueueing = true
         queuedMessage = nil
         let library = articles.map { (title: $0.title, url: $0.sourceURL.absoluteString, blocksData: $0.blocksData) }
         Task {
-            let count = await drive.uploadLibrary(library, voice: openAIVoice)
+            let count = await drive.backUp(library, voice: openAIVoice)
             isQueueing = false
-            queuedMessage = count == 0 ? "Everything is already in Drive." : "\(count) pieces queued for upload."
+            if drive.lastError == nil {
+                queuedMessage = count == 0 ? "Everything on this iPhone is already in Drive." : "\(count) parts queued for upload."
+            }
         }
     }
 
@@ -157,37 +164,48 @@ struct GoogleDriveSettingsView: View {
     private struct BreakdownInput: Equatable {
         var signedIn: Bool
         var uploaded: Int
+        var pending: Bool
+        var uploading: Bool
         var count: Int
         var voice: String
+        var checked: Bool
     }
 
     private var byArticleSection: some View {
         Section {
+            summaryRow
             ForEach(articles) { article in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(article.title)
                         .lineLimit(1)
-                    Text(breakdownText(byArticle[article.persistentModelID]))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    BackupStatusLine(backup: byArticle[article.persistentModelID])
                 }
                 .padding(.vertical, 2)
             }
         } header: {
-            Text("By Article · \(openAIVoice.capitalized)")
+            Text("Backup by Article · \(openAIVoice.capitalized)")
         } footer: {
-            Text("How much of each article's audio in the \(openAIVoice.capitalized) voice is in Google Drive, and its size; audio in other voices is counted separately. Sizes come from the same files on this iPhone.")
+            Text("Backed up means every part of the article's audio on this iPhone, in any voice, is in Google Drive, and the article is listed there for the Chrome extension. Parts and sizes are for the \(openAIVoice.capitalized) voice.")
         }
     }
 
-    private func breakdownText(_ entry: DriveAudioStore.ArticleOnDrive?) -> String {
-        guard let entry else { return "Counting…" }
-        var text = entry.pieces > 0 && entry.piecesOnDrive == entry.pieces
-            ? "All \(entry.pieces) parts on Drive"
-            : "\(entry.piecesOnDrive) of \(entry.pieces) parts on Drive"
-        if entry.piecesOnDrive > 0 { text += " · " + AudioFormat.bytes(entry.bytesOnDrive) }
-        if entry.otherVoicePieces > 0 { text += " · +\(entry.otherVoicePieces) in other voices" }
-        return text
+    @ViewBuilder
+    private var summaryRow: some View {
+        let states = articles.compactMap { byArticle[$0.persistentModelID]?.state }
+        if states.count == articles.count {
+            let withAudio = states.filter { $0 != .noAudio }
+            let done = withAudio.filter { $0 == .backedUp }.count
+            if withAudio.isEmpty {
+                Label("No downloaded audio to back up", systemImage: "icloud")
+                    .foregroundStyle(.secondary)
+            } else if done == withAudio.count {
+                Label(done == 1 ? "1 article backed up" : "All \(done) articles with audio are backed up", systemImage: "checkmark.icloud.fill")
+                    .foregroundStyle(.green)
+            } else {
+                Label("\(done) of \(withAudio.count) articles backed up", systemImage: "icloud.and.arrow.up")
+                    .foregroundStyle(.orange)
+            }
+        }
     }
 
     // MARK: - Client id
