@@ -120,6 +120,7 @@ struct LibraryView: View {
                 audioFractions = await ArticleAudio.fractions(of: sources, voice: openAIVoice)
             }
             .task {
+                if Article.repairOrigins(articles) { try? modelContext.save() }
                 // Incremental backup to Google Drive: whatever audio on this iPhone Drive lacks (e.g. generated while
                 // signed out) is queued. At most every ten minutes, so coming back from an article is cheap.
                 let drive = DriveAudioStore.shared

@@ -22,12 +22,28 @@ final class Article {
     static let wikipediaOrigin = "wikipedia"
     static let importedOrigin = "imported"
 
-    /// An article brought in from a file, photos or pasted text, rather than fetched from Wikipedia.
-    var isImported: Bool { origin == Self.importedOrigin }
+    /// The scheme of an imported article's placeholder `sourceURL`.
+    static let importedScheme = "wikireader-import"
+
+    /// An article brought in from a file, photos or pasted text, rather than fetched from Wikipedia. Its placeholder
+    /// URL says so too, which still holds when `origin` was lost: a build without that field opened the store (on
+    /// 2026-11-01 the iPhone ran such a build, and SwiftData dropped the column) and left the default behind.
+    var isImported: Bool { origin == Self.importedOrigin || sourceURL.scheme == Self.importedScheme }
 
     /// Imported articles have no web page; this placeholder keeps `sourceURL` non-optional.
     static func importedSourceURL() -> URL {
-        URL(string: "wikireader-import://local/\(UUID().uuidString)")!
+        URL(string: "\(importedScheme)://local/\(UUID().uuidString)")!
+    }
+
+    /// Puts back `origin` on imported articles that lost it (see `isImported`). Returns whether anything changed.
+    @discardableResult
+    static func repairOrigins(_ articles: [Article]) -> Bool {
+        var changed = false
+        for article in articles where article.isImported && article.origin != importedOrigin {
+            article.origin = importedOrigin
+            changed = true
+        }
+        return changed
     }
 
     init(title: String, sourceURL: URL, blocks: [ContentBlock], addedAt: Date = .now) {

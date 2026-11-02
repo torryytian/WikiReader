@@ -134,6 +134,11 @@
 - **响度**：量过模拟器里 10 段真实 OpenAI 音频（marin，24 kHz 单声道）：平均响度约 −21 dBFS（只算非静音部分），峰值约 −3 到 −8 dBFS，所以比普通 App 小一截，切过去会觉得突然变大。`AVAudioPlayer.volume` 最大 1.0 放不大，所以打开片段时放大音频本身（`LoudnessBoost`）：先测非静音部分的 RMS，加增益，再过一个**带预读的限幅器**（天花板 0.95，提前 1.5 ms 开始压、80 ms 放开，只压会冲过天花板的那几个最响的音节），输出 16 位 WAV 交给 `AVAudioPlayer(data:)`。**缓存里的 mp3 不动**，所以备份、缓存文件名、已下载的语音都不受影响；只放大不减小；处理在后台线程（`@concurrent`，Release 下 42 秒音频连写 WAV 约 125 ms，**Debug 下约 2 秒、57 秒的要近 4 秒，每段开头会有明显停顿——真机请装 Release**）。
 - **档位**（设置 → Voice，API Key 下面，键 `speechLoudness`，随备份迁移）：Normal（原样，约 −21 dBFS）、Louder（目标 −16，约 +5 dB）、**Loudest（默认，目标 −11，约 +10 dB，振幅约 3 倍）**。10-15 改过一次：第一版只用“99.9 百分位峰值不超过 0.9”卡增益（实际只到约 +6 dB，Loudest 和原音听感差别不大，用户反馈“作用不大”），改成限幅器之后平均响度可以抬得更高。因为限幅器会吃掉一部分增益，增益是迭代找的（割线法，最多 4 次，误差 0.25 dB 内）；增益上限 18 dB，且限幅器在一段里最响的那一下最多压 6 dB（`maxReduction`），超过就不再加增益，免得声音发扁，所以峰值很高的短片段（标题那种）到不了目标。实测 10 段：Loudest 后平均响度 −11.0 到 −13.0，限幅器平均只压 0.2–1.3 dB（大部分时间没动），最深压 6 dB。**Playback Log 里每段开头有一行 `clip ... opened chunk i/n loudness=loudest gain=+11.2dB rms -20.9→-11.1 limiter avg 0.5 max 6.0dB`，能看出到底有没有生效。**从下一段开始生效，试听按钮也走同一条路径。**只对 OpenAI 声音有效**；iPhone 系统声音的 `utterance.volume` 上限就是 1.0，无法放大。**未验证**：真机上的听感（压缩感、失真、和别的 App 的响度差）。
 
+### 两台机器并行开发的合并（2026-11-02）
+- 推送时发现 `origin/main` 多了另一台机器 10-25 的两个提交：导入本地文章（文本/Markdown、PDF、照片 OCR、粘贴、`.wiki`，见 `Services/Import/`、`Views/Library/ArticleImport.swift`、`docs/ARTICLE-FORMAT.md`），`Article` 加了 `origin` 字段。合并没有冲突（`dba417c`）。
+- **数据教训**：手机上那篇导入文章（The Paradox of Convenience）是 10-25 用那边的版本导入的；11-01 起我装的版本没有 `origin` 字段，SwiftData 打开时把那一列删了（手机数据库已确认没有 `ZORIGIN`）。只丢了"是导入的"标记，正文、单词、书签、语音都在。补救：`Article.isImported` 也认 `wikireader-import://` 地址；文库页出现时 `Article.repairOrigins` 把字段写回；备份导出/导入也按地址判断。规则已写进 CLAUDE.md：装手机前先 fetch，确认包含 `origin/main`。
+- 合并后 540 个测试；`SystemSpeechEngineTests`（真合成器冒烟测试）又时好时坏，重启模拟器后通过——这组代码合并前后都没动过。
+
 ### Google Drive 共享音频缓存（2026-11-01）：格式和 Chrome 对齐；iOS 代码已写完，等 Client ID 做真机验证
 - 用户要求：TTS 音频缓存存到 Google Drive，和 Chrome 插件（`~/Desktop/claude/chrome_extension_reading`）共享同一份；调 OpenAI 前先查 Drive，有就从 Drive 拉。
 - **共享格式以 iOS 现有格式为准**（用户同意；iOS 已有付费音频，不能改 key/切块）：规范见 `docs/shared-tts-cache-format.md`。Chrome 那个会话评估后已按此实现并提交，清洗器移植成 TS，4 个 fixture（656 块）+ 5 篇实时文章与 iOS 逐字节一致。两端要用同一个声音 + 同一句 instructions 才共享：用户 iPhone 上实际选的是 alloy，Chrome 默认也改成了 alloy、instructions 用 iOS 那句（Chrome 还能自选声音和风格，选得不同就不共享）。

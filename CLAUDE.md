@@ -53,6 +53,7 @@ docs/           会话记录
   - 每次都重新申请签名：先删掉 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` 里这个 App 的旧证明文件，再用 `-allowProvisioningUpdates` 编译，让 Xcode 申请一份新的。编完读 `WikiReader.app/embedded.mobileprovision` 的 `ExpirationDate`，汇报里写明哪天到期；如果没有变新，要如实说。
   - 默认装 Release 版（`-configuration Release`）：Debug 版处理朗读音频慢，每段开头会停顿。
   - 只做覆盖安装（`xcrun devicectl device install app`），**绝不先删 App**：删 App 会清掉手机上的文章、单词本和已付费下载的 OpenAI 语音。如果安装因为签名团队或 Bundle ID 变了而被拒，停下来问我，不要删了重装。
+  - **装之前先 `git fetch`，确认本地包含 `origin/main` 的所有提交**（落后就先合并）。我有时在另一台电脑上开发、也从那边装手机：装上一个缺少某个 SwiftData 字段的版本，系统会把手机数据库里那一列删掉。2026-11-01 就这样丢过导入文章的 `origin` 标记（已用 URL 补救，见 `Article.isImported`）。
 - URL 解析和正文清洗必须有单元测试。测试用本地 fixture：先用 curl（带上下面的 User-Agent）抓一份真实的 API 返回，存进 `WikiReaderTests/Fixtures/`，测试运行时不访问网络。建议的样本：Albert Einstein（长文）、Paris（首句有音标）、Pythagorean theorem（有公式）。
 - 你验证不了的部分，明确告诉我需要在真机上验收：朗读音质、高亮和声音是否同步、真机上的系统词典。
 - 模拟器没有点击自动化，但可以用临时的启动参数（如自动打开第一篇文章、直接显示某个菜单）加 `xcrun simctl io … screenshot` 截图来看布局；临时代码看完必须删掉，不要提交。细节见 PROGRESS.md 第 6 节。

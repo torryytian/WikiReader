@@ -316,4 +316,38 @@ struct ImportedArticleBackupTests {
     @Test func newArticlesAreWikipediaByDefault() {
         #expect(Article(title: "T", sourceURL: ArticleInput.articleURL(forTitle: "T"), blocks: []).origin == Article.wikipediaOrigin)
     }
+
+    /// The iPhone ran a build without `origin` for a while, and SwiftData dropped the column: an imported article came
+    /// back as "wikipedia". Its placeholder URL still tells.
+    @Test func anImportedArticleThatLostItsOriginIsRecognizedAndRepaired() throws {
+        let context = ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let lost = Article(title: "My Essay", sourceURL: Article.importedSourceURL(), blocks: [.paragraph("A.")])
+        let wiki = Article(title: "Paris", sourceURL: ArticleInput.articleURL(forTitle: "Paris"), blocks: [.paragraph("B.")])
+        context.insert(lost)
+        context.insert(wiki)
+        #expect(lost.origin == Article.wikipediaOrigin)
+        #expect(lost.isImported)
+        #expect(!wiki.isImported)
+
+        // A backup made now says so too, and so does a backup without the field.
+        let snapshot = LibraryBackup.snapshot(of: [lost], includeAudio: false, defaults: UserDefaults(suiteName: "imp-" + UUID().uuidString)!)
+        #expect(snapshot.library.articles.first?.origin == Article.importedOrigin)
+
+        #expect(Article.repairOrigins([lost, wiki]))
+        #expect(lost.origin == Article.importedOrigin)
+        #expect(wiki.origin == Article.wikipediaOrigin)
+        #expect(!Article.repairOrigins([lost, wiki]))
+    }
+
+    @Test func aBackupWithoutOriginOfAnImportedArticleStaysImported() throws {
+        let context = ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let library = LibraryExport(articles: [
+            ExportedArticle(
+                title: "My Essay", sourceURL: Article.importedSourceURL(), addedAt: .now,
+                lastReadBlockIndex: 0, blocks: [.paragraph("A.")], savedWords: []
+            ),
+        ], settings: [:])
+        _ = try LibraryBackup.merge(library, into: context, applySettings: false, defaults: UserDefaults(suiteName: "imp-" + UUID().uuidString)!)
+        #expect(try #require(try context.fetch(FetchDescriptor<Article>()).first).origin == Article.importedOrigin)
+    }
 }
