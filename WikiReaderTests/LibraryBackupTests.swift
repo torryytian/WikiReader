@@ -282,3 +282,38 @@ struct LibraryBackupTests {
         }
     }
 }
+
+@MainActor
+struct ImportedArticleBackupTests {
+    @Test func importedOriginSurvivesABackup() throws {
+        let context = ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let source = Article(title: "My Essay", sourceURL: Article.importedSourceURL(), blocks: [.paragraph("A.")])
+        source.origin = Article.importedOrigin
+        let library = LibraryExport(articles: [
+            ExportedArticle(
+                title: source.title, origin: source.origin, sourceURL: source.sourceURL, addedAt: .now,
+                lastReadBlockIndex: 0, blocks: source.blocks, savedWords: []
+            ),
+        ], settings: [:])
+
+        _ = try LibraryBackup.merge(library, into: context, applySettings: false, defaults: UserDefaults(suiteName: "imp-" + UUID().uuidString)!)
+        let article = try #require(try context.fetch(FetchDescriptor<Article>()).first)
+        #expect(article.isImported)
+    }
+
+    @Test func backupsWithoutAnOriginAreWikipedia() throws {
+        let context = ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let library = LibraryExport(articles: [
+            ExportedArticle(
+                title: "Paris", sourceURL: ArticleInput.articleURL(forTitle: "Paris"), addedAt: .now,
+                lastReadBlockIndex: 0, blocks: [.paragraph("A.")], savedWords: []
+            ),
+        ], settings: [:])
+        _ = try LibraryBackup.merge(library, into: context, applySettings: false, defaults: UserDefaults(suiteName: "imp-" + UUID().uuidString)!)
+        #expect(try #require(try context.fetch(FetchDescriptor<Article>()).first).isImported == false)
+    }
+
+    @Test func newArticlesAreWikipediaByDefault() {
+        #expect(Article(title: "T", sourceURL: ArticleInput.articleURL(forTitle: "T"), blocks: []).origin == Article.wikipediaOrigin)
+    }
+}

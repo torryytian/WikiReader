@@ -258,6 +258,17 @@
 - 阅读页自己的主题（Auto/Light/Sepia/Dark）还在：它的 Auto 跟随 App 外观，选 Light/Sepia/Dark 则只改阅读页。
 - 截图验证过：深色（设置页）、浅色（文库页）。**未验证**：System 随 iPhone 切换时实时跟随、系统词典界面在深色下的样子、阅读页 Auto 在 App 深色下的样子。
 
+### 导入本地文章（2026-10-25）
+- 目的：把用 Claude 生成的（多半是学英语用的）文章导入进来朗读。入口：文库 + 菜单 → Import → **File…**（.txt / .md / PDF / 图片）、**Photos…**（可多选，按选择顺序拼成一篇）、**Paste Text**（取剪贴板，也可在预览页直接打字）。原来的 "Add Article" 改名 "Add from Wikipedia"。
+- 所有来源统一变成"带 `#` 标题标记的文本" → `LocalArticleParser` → `[ContentBlock]`，所以朗读、高亮、查词、书签、单词本、翻译、备份都直接可用。**全部在手机本地完成**（PDFKit 读文字 PDF，Vision 识别图片和扫描页，都是系统框架），不联网，不需要改 CLAUDE.md 的联网规则。
+- 提取完先进**预览页**（`ImportDraftView`）：可改标题和全文（OCR 可能认错词），显示段落/小节/词数/预计时长，被丢弃的表格/代码行数会提示；点 Add 才保存。同名文章自动加 " (2)"。
+- 数据：`Article.origin`（`"wikipedia"` 默认 / `"imported"`），`sourceURL` 对导入文章是占位 `wikireader-import://local/<uuid>`；文章属性页对导入文章显示 "Imported text" 而不是 "Open on Wikipedia"。备份文件带 `origin`（旧备份没有，视为 Wikipedia）。
+- 解析规则（`Services/Import/`）：恰好一个 `#` → 文章标题；`##`+ → 章节（level ≥ 2）；空行分段，相邻行并成一段；列表项各成一段；表格、代码块丢弃；Markdown/HTML 装饰去掉（转义字符保留）。PDF 用字号/加粗判断标题、用行距/行尾标点判断段落、去掉页码和重复页眉页脚、还原断词连字符；扫描页走 OCR。
+- **生成文章的规范写在 `docs/ARTICLE-FORMAT.md`**（CLAUDE.md 和记忆里都有指针，别的会话生成文章要照它写）。其中第 6 节"英语学习类文章"的**专门朗读支持还没做**：词汇表/练习题/中文释义目前会被当普通段落读。用户说之后会提需求。
+- **也认 MediaWiki 格式**（`.wiki`/`.wikitext`/`.mediawiki`，或任何含 `== 标题 ==` 且没有 Markdown 标题的文本，包括粘贴）：`WikitextConverter` 先转成 Markdown 风格再解析——链接留文字、模板/注释/`<ref>`/分类/文件/表格去掉、`*`/`#` 列表转列表项、末尾 See also/References/Notes/External links 等小节丢掉（和 Wikipedia 文章一致）。起因：用户给的第一篇文章 `The_Paradox_of_Convenience.wiki` 就是这个格式；样本放在 `WikiReaderTests/Fixtures/` 里，有测试。文件选择器额外放行 `.data`（`.wiki` 系统不认识，否则选不了），不支持的类型选了会明确提示。
+- 测试：+约 45 个（解析器 19、行组装 10、文件读取 7、真实生成的 PDF 和图片 OCR 3、备份 origin 3）。
+- **未验证**：文件选择器、照片选择器、粘贴按钮（点击没法自动化）；真实手机拍的照片和真实 PDF（只用合成的 PDF/图片测过）；多栏 PDF、带公式的 PDF 效果一般（按行顺序读，不识别分栏）。预览页和导入后的阅读页只看过模拟器截图。
+
 ### 其他
 - 模拟器默认用 iPhone 15 Pro Max（和另一个项目共用）。App 图标：蓝色渐变底 + 白色书本 + 声波，浅色、深色、着色三个版本，由 `tools/make_icon.swift` 生成。
 

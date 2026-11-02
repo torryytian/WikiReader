@@ -27,6 +27,8 @@ nonisolated enum SettingValue: Codable, Equatable, Sendable {
 
 nonisolated struct ExportedArticle: Codable, Equatable, Sendable {
     var title: String
+    /// `Article.origin`; absent in backups made before imported articles existed (those are all Wikipedia).
+    var origin: String?
     var sourceURL: URL
     var addedAt: Date
     var lastReadBlockIndex: Int
@@ -113,7 +115,7 @@ nonisolated enum LibraryBackup {
     ) -> BackupSnapshot {
         let exported = articles.map {
             ExportedArticle(
-                title: $0.title, sourceURL: $0.sourceURL, addedAt: $0.addedAt,
+                title: $0.title, origin: $0.origin, sourceURL: $0.sourceURL, addedAt: $0.addedAt,
                 lastReadBlockIndex: $0.lastReadBlockIndex, blocks: $0.blocks, savedWords: $0.savedWords,
                 bookmarks: $0.bookmarks
             )
@@ -261,6 +263,7 @@ nonisolated enum LibraryBackup {
                 let article = Article(
                     title: incoming.title, sourceURL: incoming.sourceURL, blocks: incoming.blocks, addedAt: incoming.addedAt
                 )
+                article.origin = incoming.origin ?? Article.wikipediaOrigin
                 article.lastReadBlockIndex = min(max(incoming.lastReadBlockIndex, 0), max(incoming.blocks.count - 1, 0))
                 article.savedWords = incoming.savedWords
                 article.bookmarks = (incoming.bookmarks ?? []).filter { incoming.blocks.indices.contains($0.block) }

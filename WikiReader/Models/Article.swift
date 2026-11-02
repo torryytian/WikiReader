@@ -15,6 +15,20 @@ final class Article {
     var savedWordsData: Data = Data()
     /// `[Bookmark]` encoded as JSON (see `Bookmark.swift`). The default lets existing databases upgrade in place.
     var bookmarksData: Data = Data()
+    /// Where the text came from: `Article.wikipediaOrigin`, or `Article.importedOrigin` for a file, photos or pasted
+    /// text. The default lets existing databases upgrade in place (all of them are Wikipedia articles).
+    var origin: String = Article.wikipediaOrigin
+
+    static let wikipediaOrigin = "wikipedia"
+    static let importedOrigin = "imported"
+
+    /// An article brought in from a file, photos or pasted text, rather than fetched from Wikipedia.
+    var isImported: Bool { origin == Self.importedOrigin }
+
+    /// Imported articles have no web page; this placeholder keeps `sourceURL` non-optional.
+    static func importedSourceURL() -> URL {
+        URL(string: "wikireader-import://local/\(UUID().uuidString)")!
+    }
 
     init(title: String, sourceURL: URL, blocks: [ContentBlock], addedAt: Date = .now) {
         self.title = title
