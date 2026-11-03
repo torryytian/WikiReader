@@ -77,6 +77,10 @@ private struct ArticleReader: View {
     @State private var toastGeneration = 0
     @State private var translation: PassageTranslationModel?
     @State private var isShowingSavedWords = false
+    @State private var book = VocabularyBook.shared
+    @State private var lemmas = VocabLemmas.shared
+    /// Keys of the saved words in the text, worked out when the word panel opens (it walks the whole article).
+    @State private var keysInArticle: Set<String> = []
     @State private var isShowingContents = false
     @State private var outline = ArticleOutline(blocks: [])
     @State private var scrollTarget: ArticleTextView.ScrollTarget?
@@ -125,7 +129,7 @@ private struct ArticleReader: View {
                     onToggleBookmark: toggleBookmark(block:),
                     onTranslate: { translate($0, pausing: session) },
                     onTapZone: handleTap(in:),
-                    savedWordKeys: Set(article.savedWords.flatMap { [$0.word.lowercased(), $0.term.lowercased()] }),
+                    vocabMatcher: book.matcher(lemmas: lemmas.table),
                     onSwipeLeft: {
                         hideMenus()
                         isShowingSavedWords = true
@@ -260,10 +264,11 @@ private struct ArticleReader: View {
     private func savedWordsPanel(session: ReadingSession) -> some View {
         ZStack(alignment: .trailing) {
             if isShowingSavedWords {
-                SavedWordsView(article: article, onLookUp: { saved in
+                SavedWordsView(articleURL: article.sourceURL, keysInArticle: keysInArticle, onLookUp: { entry in
                     let request = WordLookupRequest(
-                        word: saved.word, term: saved.term,
-                        hasDefinition: DictionaryLookup.bundled.hasDefinition(saved.term), sentence: saved.sentence
+                        word: entry.term, term: entry.term,
+                        hasDefinition: DictionaryLookup.bundled.hasDefinition(entry.term),
+                        sentence: entry.context(preferring: article.sourceURL)?.sentence ?? ""
                     )
                     pauseForLookup(session)
                     DictionaryPresenter.present(request, saving: saving(for: request), onDismiss: { resumeIfPausedForLookup(session) })
@@ -272,6 +277,16 @@ private struct ArticleReader: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isShowingSavedWords)
+        .onChange(of: isShowingSavedWords) { _, showing in
+            if showing { findKeysInArticle() }
+        }
+        .onChange(of: book.version) {
+            if isShowingSavedWords { findKeysInArticle() }
+        }
+    }
+
+    private func findKeysInArticle() {
+        keysInArticle = document?.savedKeys(book.matcher(lemmas: lemmas.table)) ?? []
     }
 
     /// Sideways swipes: right opens the contents (or closes the saved words if they are open), left closes the
@@ -512,12 +527,20 @@ private struct ArticleReader: View {
         if lookupResume.end(isPaused: session.state == .paused) { session.play() }
     }
 
-    /// The dictionary's bookmark button saves into this article's own word list.
+    /// The dictionary's bookmark button saves into the word book (shared by all articles and the Chrome
+    /// extension), noting this sentence and article.
     private func saving(for request: WordLookupRequest) -> WordSaving {
-        WordSaving(
-            isSaved: article.isSaved(term: request.term),
-            toggle: { [article] meaning in article.toggleSavedWord(request, meaning: meaning) },
-            setMeaning: { [article] meaning in article.setMeaning(meaning, forTerm: request.term) }
+        let (url, title) = (article.sourceURL, article.title)
+        let matcher = book.matcher(lemmas: lemmas.table)
+        let key = VocabFormat.normalize(request.term)
+        let related = matcher.match(key: key) == .related
+            ? book.entries.first { matcher.group(of: $0.key) == matcher.group(of: key) }?.term
+            : nil
+        return WordSaving(
+            isSaved: book.isSaved(term: request.term),
+            toggle: { [book] meaning in book.toggle(request, url: url, title: title, meaning: meaning) },
+            setMeaning: { [book] meaning in book.setMeaning(meaning, term: request.term, sentence: request.sentence) },
+            related: related
         )
     }
 }

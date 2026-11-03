@@ -40,6 +40,9 @@ nonisolated enum SettingsKeys {
     /// off, only backups asked for go up.
     static let driveAutoBackUp = "driveAutoBackUp"
 
+    /// Whether this device has moved the per-article saved-word lists into the global book (once).
+    static let vocabularyImported = "vocabularyImported"
+
     /// A switch that is on unless it was turned off.
     static func isOn(_ key: String, in defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: key) as? Bool ?? true

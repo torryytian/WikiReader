@@ -118,7 +118,7 @@ struct LibraryBackupView: View {
     }
 
     private func computeEstimate() -> Estimate {
-        let snapshot = LibraryBackup.snapshot(of: selectedArticles, includeAudio: includesAudio)
+        let snapshot = LibraryBackup.snapshot(of: selectedArticles, includeAudio: includesAudio, vocabulary: VocabularyBook.shared.file)
         return Estimate(
             audioFiles: snapshot.files.filter { $0.path.hasPrefix(LibraryBackup.audioFolder) }.count,
             bytes: snapshot.totalBytes
@@ -126,7 +126,7 @@ struct LibraryBackupView: View {
     }
 
     private func export() {
-        let snapshot = LibraryBackup.snapshot(of: selectedArticles, includeAudio: includesAudio)
+        let snapshot = LibraryBackup.snapshot(of: selectedArticles, includeAudio: includesAudio, vocabulary: VocabularyBook.shared.file)
         let name = "WikiReader-\(Date.now.formatted(.iso8601.year().month().day())).\(LibraryBackup.fileExtension)"
         let url = FileManager.default.temporaryDirectory.appending(path: name)
         isWorking = true
@@ -197,7 +197,7 @@ struct LibraryBackupView: View {
         }
         var report: ImportReport
         do {
-            report = try LibraryBackup.merge(library, into: modelContext, applySettings: appliesSettings)
+            report = try LibraryBackup.merge(library, into: modelContext, applySettings: appliesSettings, book: .shared)
         } catch {
             return .failure(.io(error.localizedDescription))
         }

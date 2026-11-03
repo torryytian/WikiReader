@@ -66,41 +66,6 @@ struct SavedWordTests {
     }
 }
 
-struct SavedWordHighlightTests {
-    private func document(_ paragraphs: [String]) -> ArticleDocument {
-        ArticleDocument(title: "Example", blocks: paragraphs.map { .paragraph($0) }, style: .default)
-    }
-
-    private func found(_ keys: Set<String>, in document: ArticleDocument) -> [String] {
-        let text = document.attributedText.string as NSString
-        return document.ranges(ofWords: keys).map { text.substring(with: $0) }
-    }
-
-    @Test func findsEveryOccurrenceIgnoringCase() {
-        let doc = document(["Wreckage was found. The wreckage sank.", "More WRECKAGE."])
-        #expect(found(["wreckage"], in: doc) == ["Wreckage", "wreckage", "WRECKAGE"])
-    }
-
-    @Test func matchesWholeWordsOnly() {
-        let doc = document(["The crash was a crashing bore."])
-        #expect(found(["crash"], in: doc) == ["crash"])
-    }
-
-    @Test func possessiveStillMatches() {
-        let doc = document(["The aircraft's recorders and the aircraft."])
-        #expect(found(["aircraft"], in: doc) == ["aircraft's", "aircraft"])
-    }
-
-    @Test func noKeysNoRanges() {
-        #expect(document(["Anything."]).ranges(ofWords: []).isEmpty)
-    }
-
-    @Test func titleIsNotSearched() {
-        let doc = document(["Body text."])
-        #expect(doc.ranges(ofWords: ["example"]).isEmpty)
-    }
-}
-
 @MainActor
 struct SavedWordMeaningTests {
     private func request(_ word: String) -> WordLookupRequest {

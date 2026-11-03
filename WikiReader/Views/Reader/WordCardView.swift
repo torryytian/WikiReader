@@ -52,6 +52,9 @@ final class WordCardModel {
 
     var canSave: Bool { saving != nil }
 
+    /// Another form of this word that is in the word book, while this one isn't.
+    var relatedSaved: String? { isSaved ? nil : saving?.related }
+
     func loadOnlineDefinitions() {
         task?.cancel()
         let word = definitionWord
@@ -157,6 +160,11 @@ struct WordCardView: View {
                         .background(.tint.opacity(0.12), in: Circle())
                 }
                 .accessibilityLabel("Pronounce \(model.request.term)")
+            }
+            if let related = model.relatedSaved {
+                Label("\(related) is in your word book", systemImage: "character.book.closed")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
             }
         }
     }

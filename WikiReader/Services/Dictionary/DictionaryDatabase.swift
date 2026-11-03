@@ -59,6 +59,16 @@ nonisolated struct DictionaryDatabase: Sendable {
         return table
     }
 
+    /// The base form the dictionary gives for one key (§4 of docs/shared-vocab-format.md), the same as
+    /// `lemmaTable()[key]` without reading the whole table.
+    func lemma(of key: String) -> String? {
+        let rows = query(
+            "SELECT word, phonetic, definition, translation, collins, oxford, tag, exchange FROM entries WHERE lower = ?1 ORDER BY word",
+            bind: key
+        )
+        return rows.lazy.compactMap { Self.lemma(inExchange: $0.exchange) }.first
+    }
+
     /// The "0:" item of an `exchange` value ("0:study/1:s3" → "study"), if it has one.
     static func lemma(inExchange exchange: String) -> String? {
         for item in exchange.split(separator: "/") where item.hasPrefix("0:") && item.count > 2 {

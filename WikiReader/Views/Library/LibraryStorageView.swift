@@ -56,7 +56,7 @@ struct LibraryStorageView: View {
                 }
             }
             .task(id: articles.count) {
-                totals = await Self.totals(of: articles.map(\.blocksData), savedWords: articles.reduce(0) { $0 + $1.savedWords.count })
+                totals = await Self.totals(of: articles.map(\.blocksData), savedWords: VocabularyBook.shared.count)
             }
             .task(id: MeasureInput(count: articles.count, voice: openAIVoice, done: downloader.donePieces, version: version)) {
                 usage = await ArticleAudio.usage(ofBlocksData: articles.map(\.blocksData), voice: openAIVoice)
@@ -96,7 +96,7 @@ struct LibraryStorageView: View {
             LabeledContent("Articles", value: "\(articles.count)")
             LabeledContent("Words", value: totals.map { $0.words.formatted() } ?? "…")
             LabeledContent("Listening Time", value: totals.map { AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: $0.characters)) + " at 1×" } ?? "…")
-            LabeledContent("Saved Words", value: totals.map { "\($0.savedWords)" } ?? "…")
+            LabeledContent("Word Book", value: totals.map { "\($0.savedWords)" } ?? "…")
         }
     }
 

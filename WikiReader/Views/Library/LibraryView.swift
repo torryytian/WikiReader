@@ -16,6 +16,7 @@ struct LibraryView: View {
     @State private var isShowingSettings = false
     @State private var isShowingStorage = false
     @State private var isShowingDrive = false
+    @State private var isShowingWordBook = false
     @State private var infoArticle: Article?
     /// An article with bookmarks being opened: where to start is asked first.
     @State private var startChoice: Article?
@@ -126,6 +127,8 @@ struct LibraryView: View {
             }
             .task {
                 if Article.repairOrigins(articles) { try? modelContext.save() }
+                // Words saved before the word book was global, from each article's own list (once per device).
+                VocabularyBook.shared.importArticleWordsOnce(articles)
                 // Incremental backup to Google Drive: whatever audio on this iPhone Drive lacks (e.g. generated while
                 // signed out) is queued. At most every ten minutes, so coming back from an article is cheap.
                 let drive = DriveAudioStore.shared
@@ -149,6 +152,9 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $isShowingDrive, onDismiss: refreshFractions) {
                 GoogleDriveSheet()
+            }
+            .sheet(isPresented: $isShowingWordBook) {
+                WordBookView()
             }
             .sheet(item: $infoArticle, onDismiss: performAfterInfo) { article in
                 ArticleInfoView(
@@ -315,6 +321,9 @@ struct LibraryView: View {
             .disabled(articles.isEmpty)
             // Downloading audio is in Select Articles (Select All covers the whole library) and in Library & Storage.
             Section {
+                Button("Word Book", systemImage: "character.book.closed") {
+                    isShowingWordBook = true
+                }
                 Button("Library & Storage", systemImage: "internaldrive") {
                     isShowingStorage = true
                 }

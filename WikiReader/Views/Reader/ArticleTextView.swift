@@ -42,8 +42,8 @@ struct ArticleTextView: UIViewRepresentable {
     var onTranslate: (String) -> Void = { _ in }
     /// Called for a tap that isn't on a word: near the top or bottom edge (where the menus are), or elsewhere.
     var onTapZone: (TapZone) -> Void = { _ in }
-    /// Lowercased words and terms the reader saved; they get a light highlight wherever they appear.
-    var savedWordKeys: Set<String> = []
+    /// The word book: saved words get a light highlight wherever they appear, other forms of them a dotted underline.
+    var vocabMatcher: VocabMatcher = .empty
     /// Called when the reader swipes left across the text.
     var onSwipeLeft: () -> Void = {}
     /// Scrolls to a block when `token` changes (e.g. after jumping to a section in the contents).
@@ -113,7 +113,7 @@ struct ArticleTextView: UIViewRepresentable {
         coordinator.setBottomObstruction(bottomObstruction)
         coordinator.apply(style)
         coordinator.show(document)
-        coordinator.showSavedWords(savedWordKeys)
+        coordinator.showVocab(vocabMatcher)
         coordinator.scroll(to: scrollTarget)
         coordinator.showSpokenWord(spokenWord, inBlock: spokenBlock)
     }
@@ -152,12 +152,14 @@ struct ArticleTextView: UIViewRepresentable {
         /// How long after the user's scrolling stops before the view follows speech again.
         static var followResumeDelay: TimeInterval = 3
 
-        private var savedKeys: Set<String>?
+        private var shownMatcher: VocabMatcher?
         private var savedRanges: [NSRange] = []
+        private var relatedRanges: [NSRange] = []
 
         private static let savedColor = UIColor { traits in
             UIColor.systemOrange.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.28 : 0.2)
         }
+        private static let relatedColor = UIColor.systemOrange.withAlphaComponent(0.8)
         private static let tapColor = UIColor.tintColor.withAlphaComponent(0.25)
         private static let spokenColor = UIColor { traits in
             UIColor.systemYellow.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.35 : 0.45)
@@ -176,8 +178,9 @@ struct ArticleTextView: UIViewRepresentable {
             self.document = document
             shownText = document.attributedText
             spokenRange = nil
-            savedKeys = nil
+            shownMatcher = nil
             savedRanges = []
+            relatedRanges = []
             textView.attributedText = document.attributedText
             if let anchor {
                 scroll(toBlock: anchor)
@@ -204,18 +207,30 @@ struct ArticleTextView: UIViewRepresentable {
 
         // MARK: Saved words
 
-        /// Lightly highlights every occurrence of the saved words. Redone only when the set of words changes
-        /// (or the text is replaced), since it walks the whole article.
-        func showSavedWords(_ keys: Set<String>) {
-            guard let textView, let document, keys != savedKeys else { return }
+        /// Lightly highlights every saved word, and underlines (dotted) other forms of them. Redone only when the
+        /// book changes (or the text is replaced), since it walks the whole article.
+        func showVocab(_ matcher: VocabMatcher) {
+            guard let textView, let document, matcher != shownMatcher else { return }
             let storage = textView.textStorage
             for range in savedRanges where NSMaxRange(range) <= storage.length {
                 storage.removeAttribute(.backgroundColor, range: range)
             }
-            savedKeys = keys
-            savedRanges = document.ranges(ofWords: keys)
+            for range in relatedRanges where NSMaxRange(range) <= storage.length {
+                storage.removeAttribute(.underlineStyle, range: range)
+                storage.removeAttribute(.underlineColor, range: range)
+            }
+            shownMatcher = matcher
+            let matches = document.wordMatches(matcher)
+            savedRanges = matches.filter { $0.match == .saved }.map(\.range)
+            relatedRanges = matches.filter { $0.match == .related }.map(\.range)
             for range in savedRanges where NSMaxRange(range) <= storage.length {
                 storage.addAttribute(.backgroundColor, value: Self.savedColor, range: range)
+            }
+            for range in relatedRanges where NSMaxRange(range) <= storage.length {
+                storage.addAttributes([
+                    .underlineStyle: NSUnderlineStyle([.single, .patternDot]).rawValue,
+                    .underlineColor: Self.relatedColor,
+                ], range: range)
             }
             // The spoken word keeps its stronger highlight over a saved one.
             if let spoken = spokenRange, NSMaxRange(spoken) <= storage.length {

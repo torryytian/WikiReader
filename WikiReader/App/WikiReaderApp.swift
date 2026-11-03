@@ -22,6 +22,7 @@ struct WikiReaderApp: App {
 /// appearance setting changes, and it owns applying that setting to every window.
 private struct RootView: View {
     @AppStorage(SettingsKeys.appAppearance) private var appearance = AppAppearance.system
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         LibraryView()
@@ -32,7 +33,15 @@ private struct RootView: View {
                 // connection changes (uploads may be waiting for Wi-Fi).
                 DriveAudioStore.shared.pumpUploads()
                 NetworkWatcher.shared.onChange = { DriveAudioStore.shared.pumpUploads() }
+                // The word book: the dictionary's base forms for marking related words, and a sync with Drive a
+                // few seconds after each change.
+                VocabLemmas.shared.load()
+                VocabularyBook.shared.onLocalChange = { VocabSync.shared.scheduleSync() }
             }
             .onChange(of: appearance) { _, new in new.apply() }
+            // Coming to the front (launch included): words saved on other devices or in Chrome come in.
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                if phase == .active { Task { await VocabSync.shared.sync() } }
+            }
     }
 }

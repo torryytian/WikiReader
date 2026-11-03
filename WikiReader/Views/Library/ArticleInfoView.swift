@@ -145,7 +145,7 @@ struct ArticleInfoView: View {
             LabeledContent("Sections", value: "\(outline.entries.count) · \(paragraphCount) paragraphs")
             LabeledContent("Listening Time", value: AudioFormat.duration(minutes: Double(outline.totalMinutes)) + " at 1×")
             LabeledContent("Reading Position", value: positionText)
-            LabeledContent("Saved Words", value: "\(article.savedWords.count)")
+            LabeledContent("Words Saved Here", value: "\(VocabularyBook.shared.entries(savedFrom: article.sourceURL).count)")
             LabeledContent("Added", value: article.addedAt.formatted(date: .abbreviated, time: .shortened))
         }
     }

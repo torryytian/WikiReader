@@ -47,6 +47,9 @@ nonisolated struct LibraryExport: Codable, Equatable, Sendable {
     var exportedAt = Date.now
     var articles: [ExportedArticle]
     var settings: [String: SettingValue]
+    /// The whole word book (docs/shared-vocab-format.md). Missing in backups made before it was global; those
+    /// only have each article's `savedWords`.
+    var vocabulary: VocabFile? = nil
 }
 
 /// What an import did, for the message shown afterwards.
@@ -107,17 +110,21 @@ nonisolated enum LibraryBackup {
 
     /// Reads what to export. Audio is matched to articles by recomputing the cache names of their text for every
     /// OpenAI voice, so only audio that belongs to the chosen articles is included.
+    /// - Parameter vocabulary: The word book, written whole; each article's `savedWords` are then the book's words
+    ///   saved from it (what an older version of the app reads). Without it, the articles' own old lists.
     @MainActor
     static func snapshot(
-        of articles: [Article], includeAudio: Bool,
+        of articles: [Article], includeAudio: Bool, vocabulary: VocabFile? = nil,
         defaults: UserDefaults = .standard,
         audioCache: SpeechAudioCache = .standard, translationCache: TranslationCache = .standard
     ) -> BackupSnapshot {
-        let exported = articles.map {
+        let exported = articles.map { article in
             ExportedArticle(
-                title: $0.title, origin: $0.isImported ? Article.importedOrigin : $0.origin, sourceURL: $0.sourceURL, addedAt: $0.addedAt,
-                lastReadBlockIndex: $0.lastReadBlockIndex, blocks: $0.blocks, savedWords: $0.savedWords,
-                bookmarks: $0.bookmarks
+                title: article.title, origin: article.isImported ? Article.importedOrigin : article.origin,
+                sourceURL: article.sourceURL, addedAt: article.addedAt,
+                lastReadBlockIndex: article.lastReadBlockIndex, blocks: article.blocks,
+                savedWords: vocabulary.map { savedWords(from: $0, url: article.sourceURL) } ?? article.savedWords,
+                bookmarks: article.bookmarks
             )
         }
 
@@ -136,7 +143,20 @@ nonisolated enum LibraryBackup {
         }
         files += translationFiles(in: translationCache)
 
-        return BackupSnapshot(library: LibraryExport(articles: exported, settings: settings), files: files)
+        return BackupSnapshot(library: LibraryExport(articles: exported, settings: settings, vocabulary: vocabulary), files: files)
+    }
+
+    /// The book's words saved from the article at `url`, in the per-article form older versions read.
+    static func savedWords(from book: VocabFile, url: URL) -> [SavedWord] {
+        let url = url.absoluteString
+        return book.entries.compactMap { entry in
+            guard let context = entry.contexts.last(where: { $0.url == url }) else { return nil }
+            return SavedWord(
+                word: entry.forms.first ?? entry.term, term: entry.term, sentence: context.sentence,
+                savedAt: Date(timeIntervalSince1970: Double(context.savedAt) / 1000), meaning: context.meaning ?? entry.meaning
+            )
+        }
+        .sorted { $0.savedAt > $1.savedAt }
     }
 
     static func audioFiles(for blocks: [ContentBlock], cache: SpeechAudioCache) -> [(path: String, url: URL)] {
@@ -230,10 +250,12 @@ nonisolated enum LibraryBackup {
 
     /// Adds the backup's articles to the library. An article already there (same title) isn't replaced: it keeps
     /// its reading position and gains any saved words it lacked. Settings are applied only when asked.
+    /// - Parameter book: The word book to add the backup's words to: its whole book when it has one, else each
+    ///   article's list. Nil leaves words in the articles' own (old) lists only.
     @MainActor
     static func merge(
         _ library: LibraryExport, into context: ModelContext,
-        applySettings: Bool, defaults: UserDefaults = .standard
+        applySettings: Bool, book: VocabularyBook? = nil, defaults: UserDefaults = .standard
     ) throws -> ImportReport {
         var report = ImportReport()
         let existing = try context.fetch(FetchDescriptor<Article>())
@@ -275,6 +297,14 @@ nonisolated enum LibraryBackup {
             }
         }
         try context.save()
+
+        if let book {
+            if let vocabulary = library.vocabulary {
+                book.merge(vocabulary)
+            } else {
+                book.importArticleWords(library.articles.map { (url: $0.sourceURL, title: $0.title, words: $0.savedWords) })
+            }
+        }
 
         if applySettings {
             for (key, value) in library.settings where portableSettingKeys.contains(key) {

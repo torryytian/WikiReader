@@ -9,6 +9,8 @@ struct WordSaving {
     var toggle: (String?) -> Bool
     /// Gives an already saved word a meaning.
     var setMeaning: (String) -> Void
+    /// A saved word with the same base form, when this one isn't saved ("studies" when looking up "studied").
+    var related: String? = nil
 }
 
 /// Hosts the word card as a sheet and reports when it has really gone.

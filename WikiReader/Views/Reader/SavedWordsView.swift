@@ -1,25 +1,37 @@
 import SwiftUI
 
-/// The full-screen panel that slides in from the right: the words saved from one article, newest first, each with a short Chinese meaning. Tap a word to open its
-/// dictionary entry; swipe to remove it. A word without a meaning has a button that asks AI for one, and only
-/// when pressed (nothing is sent just because the list opened).
+/// The full-screen panel that slides in from the right: the word book while reading. "In This Article" lists the
+/// saved words that appear in the text (wherever they were saved, the Chrome extension included); "All" is the
+/// whole book. Tap a word to open its dictionary entry; swipe to delete it, everywhere. A word without a meaning
+/// has a button that asks AI for one, only when pressed.
 struct SavedWordsView: View {
-    let article: Article
-    let onLookUp: (SavedWord) -> Void
+    let articleURL: URL
+    /// Keys of the saved words that appear in this article.
+    let keysInArticle: Set<String>
+    let onLookUp: (VocabEntry) -> Void
     let onClose: () -> Void
-    @State private var loading: Set<SavedWord.ID> = []
-    @State private var failures: [SavedWord.ID: String] = [:]
+    @State private var book = VocabularyBook.shared
+    @State private var meanings = MeaningFetcher()
+    @State private var scope = Scope.article
+
+    private enum Scope: Hashable {
+        case article
+        case all
+    }
+
+    private var words: [VocabEntry] {
+        scope == .all ? book.entries : book.entries.filter { keysInArticle.contains($0.key) }
+    }
 
     var body: some View {
-        let words = article.savedWords
+        let words = words
         VStack(spacing: 0) {
-            HStack {
-                Text("Saved Words")
-                    .font(.headline)
-                Text("\(words.count)")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Spacer()
+            HStack(spacing: 12) {
+                Picker("Words", selection: $scope) {
+                    Text("In This Article").tag(Scope.article)
+                    Text("All \(book.count)").tag(Scope.all)
+                }
+                .pickerStyle(.segmented)
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .semibold))
@@ -35,29 +47,17 @@ struct SavedWordsView: View {
             Divider()
 
             List {
-                ForEach(words) { saved in
+                ForEach(words) { entry in
                     Button {
-                        onLookUp(saved)
+                        onLookUp(entry)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(saved.word)
-                                .font(.headline)
-                            if let meaning = saved.meaning {
-                                Text(meaning)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 2)
+                        VocabEntryRow(entry: entry, meanings: meanings, articleURL: articleURL)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .overlay(alignment: .trailing) { meaningControl(for: saved) }
                 }
                 .onDelete { offsets in
-                    for offset in offsets {
-                        article.removeSavedWord(id: words[offset].id)
-                    }
+                    for offset in offsets { book.delete(key: words[offset].key) }
                 }
             }
             .listStyle(.plain)
@@ -65,68 +65,15 @@ struct SavedWordsView: View {
             .overlay {
                 if words.isEmpty {
                     ContentUnavailableView(
-                        "No Saved Words",
-                        systemImage: "bookmark",
-                        description: Text("Tap a word, then the bookmark in the dictionary, to save it here.")
+                        scope == .article ? "No Saved Words Here" : "No Saved Words",
+                        systemImage: "character.book.closed",
+                        description: Text(scope == .article
+                            ? "Saved words that appear in this article show here, wherever you saved them. Tap a word, then the bookmark in the dictionary, to save it."
+                            : "Tap a word, then the bookmark in the dictionary, to save it.")
                     )
                 }
             }
         }
         .background(Color(.systemBackground).ignoresSafeArea())
-    }
-
-    /// Trailing control for a word without a meaning: a button to get one, a spinner, or the reason it failed.
-    @ViewBuilder
-    private func meaningControl(for saved: SavedWord) -> some View {
-        if saved.meaning == nil {
-            if loading.contains(saved.id) {
-                ProgressView()
-            } else {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Button {
-                        fetchMeaning(of: saved)
-                    } label: {
-                        Label("Meaning", systemImage: "sparkles")
-                            .font(.footnote.weight(.semibold))
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    if let failure = failures[saved.id] {
-                        Text(failure)
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.trailing)
-                            .frame(maxWidth: 160, alignment: .trailing)
-                    }
-                }
-            }
-        }
-    }
-
-    private func fetchMeaning(of saved: SavedWord) {
-        guard let key = KeychainStore.openAIKey.read(), !key.isEmpty else {
-            failures[saved.id] = OpenAIChatError.missingKey.message
-            return
-        }
-        failures[saved.id] = nil
-        loading.insert(saved.id)
-        Task {
-            defer { loading.remove(saved.id) }
-            switch await Self.explain(saved, apiKey: key) {
-            case .success(let explanation):
-                article.setMeaning(explanation.meaning, forTerm: saved.term)
-            case .failure(let error):
-                failures[saved.id] = error.message
-            }
-        }
-    }
-
-    /// A separate function, so the typed error from the client is caught where its type is known.
-    private static func explain(_ saved: SavedWord, apiKey: String) async -> Result<WordExplanation, OpenAIChatError> {
-        do {
-            return .success(try await OpenAIExplainClient().explain(word: saved.word, sentence: saved.sentence, apiKey: apiKey))
-        } catch {
-            return .failure(error)
-        }
     }
 }

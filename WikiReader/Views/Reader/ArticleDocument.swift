@@ -98,23 +98,33 @@ struct ArticleDocument {
         return NSRange(location: blockRange.location + range.location, length: range.length)
     }
 
-    /// Full-text ranges of the words in the blocks that are in `keys` (lowercased saved words and terms).
-    /// A trailing possessive ("aircraft's") doesn't stop a word from matching.
-    func ranges(ofWords keys: Set<String>) -> [NSRange] {
-        guard !keys.isEmpty else { return [] }
+    /// A word of the text that is in the word book, or another form of one.
+    struct WordMatch: Equatable {
+        var range: NSRange
+        var match: VocabMatch
+        /// The saved word's key, for a saved one.
+        var key: String?
+    }
+
+    /// Every word in the blocks (not the title) that `matcher` finds saved or related. A trailing possessive
+    /// ("aircraft's") doesn't stop a word from matching.
+    func wordMatches(_ matcher: VocabMatcher) -> [WordMatch] {
+        guard !matcher.keys.isEmpty else { return [] }
         let text = attributedText.string as NSString
-        var found: [NSRange] = []
+        var found: [WordMatch] = []
         for blockRange in blockRanges {
             text.enumerateSubstrings(in: blockRange, options: .byWords) { word, range, _, _ in
-                guard let word else { return }
-                var key = word.lowercased()
-                for suffix in ["'s", "\u{2019}s"] where key.hasSuffix(suffix) {
-                    key.removeLast(suffix.count)
-                }
-                if keys.contains(key) { found.append(range) }
+                guard let word, let match = matcher.match(word: word) else { return }
+                let key = match == .saved ? matcher.savedKey(word: word) : nil
+                found.append(WordMatch(range: range, match: match, key: key))
             }
         }
         return found
+    }
+
+    /// The saved words that appear in the text.
+    func savedKeys(_ matcher: VocabMatcher) -> Set<String> {
+        Set(wordMatches(matcher).compactMap(\.key))
     }
 
     /// The paragraph (or heading, or title) containing `range`, and `range` expressed inside it.

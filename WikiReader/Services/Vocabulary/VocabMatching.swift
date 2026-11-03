@@ -44,6 +44,15 @@ nonisolated struct VocabMatcher: Sendable, Equatable {
         return groups.contains(group(of: key)) ? .related : nil
     }
 
+    /// The key of the saved word a word of the text is, if it is one.
+    func savedKey(word: some StringProtocol) -> String? {
+        let text = String(word)
+        let key = VocabFormat.normalize(text)
+        if keys.contains(key) { return key }
+        let base = VocabFormat.normalize(DictionaryLookup.removingPossessive(text))
+        return keys.contains(base) ? base : nil
+    }
+
     /// The match of a word as it stands in the text. The term rule asks the dictionary which candidate it knows;
     /// marking a whole article that way would ask it thousands of times, so this takes the word itself, or without
     /// its possessive. ECDICT has nearly every inflected form, so that is the term in all but rare cases (a word

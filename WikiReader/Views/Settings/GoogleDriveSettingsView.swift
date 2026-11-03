@@ -14,6 +14,8 @@ struct GoogleDriveSettingsView: View {
     @State private var account = GoogleAccount.shared
     @State private var drive = DriveAudioStore.shared
     @State private var downloader = AudioDownloader.shared
+    @State private var vocabSync = VocabSync.shared
+    @State private var book = VocabularyBook.shared
     @State private var isSigningIn = false
     @State private var signInError: String?
     /// A pull or backup being worked out, so its button shows that something is happening.
@@ -31,6 +33,7 @@ struct GoogleDriveSettingsView: View {
             if account.isSignedIn {
                 automaticSection
                 librarySection
+                wordBookSection
                 if !articles.isEmpty { byArticleSection }
             }
             clientSection
@@ -101,6 +104,7 @@ struct GoogleDriveSettingsView: View {
                 try await account.signIn()
                 drive.reset()
                 drive.pumpUploads()
+                Task { await vocabSync.sync() }
                 if drive.isBackingUpAutomatically {
                     let library = articles.map { (title: $0.title, url: $0.sourceURL.absoluteString, blocksData: $0.blocksData) }
                     await drive.backUp(library, voice: openAIVoice, showsProgress: true)
@@ -224,6 +228,41 @@ struct GoogleDriveSettingsView: View {
         Task {
             prompt = await LibraryActions.backUpToDrive(chosen)
             isPreparing = false
+        }
+    }
+
+    // MARK: - Word book
+
+    private var wordBookSection: some View {
+        Section {
+            LabeledContent("Words", value: "\(book.count)")
+            LabeledContent("Sync", value: vocabSyncText)
+            Button {
+                Task { await vocabSync.sync() }
+            } label: {
+                HStack {
+                    Label("Sync Word Book Now", systemImage: "arrow.triangle.2.circlepath")
+                    if vocabSync.state == .syncing {
+                        Spacer()
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(vocabSync.state == .syncing)
+        } header: {
+            Text("Word Book")
+        } footer: {
+            Text("Saved words are one book shared with your other devices and the Chrome extension (vocab.json in the WikiReader Cache folder). It syncs when WikiReader comes to the front and a few seconds after you save or delete a word. Deleting a word deletes it everywhere.")
+        }
+    }
+
+    private var vocabSyncText: String {
+        switch vocabSync.state {
+        case .idle: "Not yet"
+        case .syncing: "Syncing…"
+        case .synced: vocabSync.lastSynced.map { "Synced \($0.formatted(.relative(presentation: .named)))" } ?? "Synced"
+        case .waitingForChrome: "Waiting for the Chrome extension"
+        case .failed(let message): message
         }
     }
 
