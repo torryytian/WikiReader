@@ -6,7 +6,7 @@ import SwiftUI
 /// has a button that asks AI for one, only when pressed.
 struct SavedWordsView: View {
     let articleURL: URL
-    /// Keys of the saved words that appear in this article.
+    /// Keys of the saved words that appear in this article, as they are or in another form.
     let keysInArticle: Set<String>
     let onLookUp: (VocabEntry) -> Void
     let onClose: () -> Void

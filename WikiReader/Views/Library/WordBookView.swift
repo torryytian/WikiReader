@@ -33,6 +33,8 @@ struct WordBookView: View {
                         let entries = shown
                         for index in offsets { book.delete(key: entries[index].key) }
                     }
+                } header: {
+                    if !book.entries.isEmpty { Text(book.count == 1 ? "1 word" : "\(book.count) words") }
                 } footer: {
                     if !book.entries.isEmpty { Text(syncText) }
                 }
@@ -53,12 +55,6 @@ struct WordBookView: View {
             .navigationTitle("Word Book")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("\(book.count)")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("\(book.count) words")
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
@@ -177,6 +173,8 @@ struct VocabEntryRow: View {
             }
         }
         .padding(.vertical, 2)
+        // The separator starts under the word, not under the Meaning button.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 
     @ViewBuilder

@@ -14,6 +14,8 @@ nonisolated struct VocabMatcher: Sendable, Equatable {
     let keys: Set<String>
     /// `group(key)` of every saved word.
     let groups: Set<String>
+    /// The saved words of each group.
+    private let keysByGroup: [String: [String]]
     /// Lower-cased word → its dictionary base form (`DictionaryDatabase.lemmaTable()`).
     private let lemmas: [String: String]
     /// Changes whenever the words or the lemma table do, so the reader knows to mark the text again.
@@ -26,7 +28,8 @@ nonisolated struct VocabMatcher: Sendable, Equatable {
         self.keys = keys
         self.lemmas = lemmas
         self.version = version
-        groups = Set(keys.map { lemmas[$0] ?? $0 })
+        keysByGroup = Dictionary(grouping: keys) { lemmas[$0] ?? $0 }
+        groups = Set(keysByGroup.keys)
     }
 
     static func == (a: VocabMatcher, b: VocabMatcher) -> Bool {
@@ -42,6 +45,15 @@ nonisolated struct VocabMatcher: Sendable, Equatable {
     func match(key: String) -> VocabMatch? {
         if keys.contains(key) { return .saved }
         return groups.contains(group(of: key)) ? .related : nil
+    }
+
+    /// The saved words a word of the text is, or is another form of.
+    func bookKeys(word: some StringProtocol) -> [String] {
+        switch match(word: word) {
+        case .saved: savedKey(word: word).map { [$0] } ?? []
+        case .related: keysByGroup[group(of: VocabFormat.normalize(DictionaryLookup.removingPossessive(String(word))))] ?? []
+        case nil: []
+        }
     }
 
     /// The key of the saved word a word of the text is, if it is one.

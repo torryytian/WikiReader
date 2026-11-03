@@ -79,7 +79,8 @@ private struct ArticleReader: View {
     @State private var isShowingSavedWords = false
     @State private var book = VocabularyBook.shared
     @State private var lemmas = VocabLemmas.shared
-    /// Keys of the saved words in the text, worked out when the word panel opens (it walks the whole article).
+    /// Keys of the saved words in the text (or another form of them), worked out when the word panel opens (it
+    /// walks the whole article).
     @State private var keysInArticle: Set<String> = []
     @State private var isShowingContents = false
     @State private var outline = ArticleOutline(blocks: [])
@@ -286,7 +287,7 @@ private struct ArticleReader: View {
     }
 
     private func findKeysInArticle() {
-        keysInArticle = document?.savedKeys(book.matcher(lemmas: lemmas.table)) ?? []
+        keysInArticle = document?.bookKeys(book.matcher(lemmas: lemmas.table)) ?? []
     }
 
     /// Sideways swipes: right opens the contents (or closes the saved words if they are open), left closes the

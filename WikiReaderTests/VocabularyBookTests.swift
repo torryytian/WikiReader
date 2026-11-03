@@ -260,7 +260,8 @@ struct ReaderVocabMatchTests {
         let doc = document(["Studies of study: she studied it."])
         let lemmas = ["studies": "study", "studied": "study"]
         #expect(found(["studies"], lemmas: lemmas, in: doc) == ["Studies", "study~", "studied~"])
-        #expect(doc.savedKeys(VocabMatcher(keys: ["studies"], lemmas: lemmas, version: 1)) == ["studies"])
+        #expect(doc.bookKeys(VocabMatcher(keys: ["studies"], lemmas: lemmas, version: 1)) == ["studies"])
+        #expect(document(["She studied."]).bookKeys(VocabMatcher(keys: ["studies", "tabloid"], lemmas: lemmas, version: 1)) == ["studies"])
     }
 
     @Test func noWordsNoMatchesAndTheTitleIsNotSearched() {

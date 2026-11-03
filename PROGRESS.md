@@ -245,7 +245,16 @@
 - **未验证（模拟器无法验证，需真机）**：锁上屏幕后是否真的继续读；锁屏上的标题、大图、按钮是否显示并能用；打断后的行为。文字卡只在测试里渲染出图看过。
 - **已知风险**：跨文章的顺序/随机播放靠 SwiftUI 重建 reader 来切换，**锁屏状态下视图不刷新，文章读完后很可能不会接着读下一篇**（循环模式在会话里处理，不受影响）。真机验证后如果确实停了，要把"换文章"从视图里挪到会话层。
 
-### 单词本（2026-10-08 晚）
+### 全局单词本，与 Chrome 插件同步（2026-11-03）
+- **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。
+- **格式**：`docs/shared-vocab-format.md`（v2，权威定义），和 Chrome 会话逐条对齐过：Drive 上 `WikiReader Cache/vocab.json` 一个文件，逐词合并（较新的字段优先、旧边补缺、原句按 id 并集最多 20 条、删除留墓碑一年），合并与顺序无关、幂等，所以没有条件写入也不会丢改动。key = normalize(term)，term 沿用 iOS 查词规则（ECDICT 里有原词就用原词，所以 studies 和 studied 是两个词）；"同一原形"用 ECDICT `exchange` 的 `0:` 判断（只用于高亮/提示，不合并词条）。共享测试向量 `WikiReaderTests/Fixtures/shared/vocab/`（期望值手写，另用 Python 独立实现核对），Chrome 复制过去跑，四组全部通过。
+- **iOS 实现**：`Services/Vocabulary/`——`VocabFormat`（格式、normalize、合并）、`VocabMatching`（SAVED/RELATED 判断、ECDICT 原形表 `VocabLemmas` 后台读一次约 5.8 万行）、`VocabularyBook`（本机 `Application Support/Vocabulary.json`，与共享格式同结构，不进 SwiftData，避免两台电脑装手机时丢字段）、`VocabSync`（下载 → 合并 → 存本机 → 不同才上传；App 回到前台、改动后 5 秒、登录后、单词本页/Drive 页手动；遇到 Chrome 的 v1 文件不碰，提示等插件更新）。
+- **迁移**：第一次打开新版时，各篇文章的 `savedWords` 并进全局本（每台设备一次，`SettingsKeys.vocabularyImported`）；`Article.savedWordsData` 保留不删，旧版本还能读。备份文件多带一个 `vocabulary`（整本），每篇的 `savedWords` 由全局本推算（旧版本导入用）；导入旧备份时把各篇的 `savedWords` 并进全局本。
+- **界面**：阅读页收藏的词淡橙色底，同原形的其他变形橙色虚线下划线（`ArticleDocument.wordMatches`）；左滑出来的面板分 "In This Article"（本文里出现的生词，含以其他变形出现的）和 "All"；查词卡片的书签按钮存进全局本，没收藏但有同原形的词已收藏时提示 "studies is in your word book"；文库 + 菜单新增 Word Book（搜索、点开看原句和来源、左滑删除）；Google Drive 页加 Word Book 一节（词数、同步状态、立即同步）。模拟器截图看过 Word Book、阅读页高亮（islands 底色、island 虚线）、阅读页面板（临时塞了 5 个词，已删掉，也删了模拟器里的本机单词本）。
+- 测试 +26（`VocabFormatTests` 共享向量、`VocabularyBookTests`、`VocabSyncTests` 用假 Drive、`ReaderVocabMatchTests`、`VocabularyBackupTests`），全部 566 个通过。
+- **未验证**：真机上点词收藏、面板和单词本的手势、和 Chrome 真实互通（等 Chrome 会话把 v2 写上 Drive，它会通知）。
+
+### 单词本（2026-10-08 晚，2026-11-03 起改为全局一本，见上）
 - 每篇文章自己一份单词本：`Article.savedWordsData`（JSON，和 blocks 一样存成一个字段，带默认值，旧数据库原地升级）；`SavedWord`（单词、查询词、所在句子、时间），同一个查询词（不分大小写）只算一条。
 - 收藏入口：系统词典右下角的书签按钮（和 AI、喇叭一排），已收藏时是实心，再点取消。
 - 查看入口：阅读页在正文上**向左滑**（明显横向、距离超过 80pt 才触发，不影响上下滚动），Saved Words 面板**从右边滑进来并占满全屏**（原来的底部 sheet 已换掉；`ReaderView.savedWordsPanel`），点 ✕ 或在面板上向右滑收回；**右滑的层级**：面板打开时右滑（触摸或触控板双指）先收起面板，再右滑才返回文库——`SwipeBackEnabler(onSwipeBack:)` 在面板打开时关掉系统返回手势、改用自己的右滑识别（`allowedScrollTypesMask = .all`，认触控板）。**未验证**；点一行打开该词的词典，左滑一行删除。**滑动手势和面板里点词都没法在模拟器自动化，未验证。** 没有可见的按钮入口（只有手势）。

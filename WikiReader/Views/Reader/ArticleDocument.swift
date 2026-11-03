@@ -122,9 +122,17 @@ struct ArticleDocument {
         return found
     }
 
-    /// The saved words that appear in the text.
-    func savedKeys(_ matcher: VocabMatcher) -> Set<String> {
-        Set(wordMatches(matcher).compactMap(\.key))
+    /// The saved words that appear in the text, as they are or in another form ("colonies" when it says "colony").
+    func bookKeys(_ matcher: VocabMatcher) -> Set<String> {
+        guard !matcher.keys.isEmpty else { return [] }
+        let text = attributedText.string as NSString
+        var found = Set<String>()
+        for blockRange in blockRanges {
+            text.enumerateSubstrings(in: blockRange, options: .byWords) { word, _, _, _ in
+                if let word { found.formUnion(matcher.bookKeys(word: word)) }
+            }
+        }
+        return found
     }
 
     /// The paragraph (or heading, or title) containing `range`, and `range` expressed inside it.
