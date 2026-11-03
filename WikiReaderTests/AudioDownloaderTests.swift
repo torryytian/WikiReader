@@ -153,7 +153,7 @@ struct AudioDownloaderTests {
     /// A downloader whose network answers with `status` (failing with a lost connection for texts in `dropping`).
     private func makeDownloader(
         status: Int = 200, dropping: Set<String> = [], delay: Duration = .milliseconds(5), key: String? = "sk-test",
-        awake: AwakeLog = AwakeLog()
+        awake: AwakeLog = AwakeLog(), generations: SpeechGenerations = SpeechGenerations()
     ) -> AudioDownloader {
         let sent = sent
         let client = OpenAITTSClient(
@@ -168,7 +168,7 @@ struct AudioDownloaderTests {
             retry: .never
         )
         return AudioDownloader(
-            client: client, cache: cache, generations: SpeechGenerations(), apiKey: { key },
+            client: client, cache: cache, generations: generations, apiKey: { key },
             keepAwake: { awake.values.append($0) }
         )
     }
@@ -318,6 +318,42 @@ struct AudioDownloaderTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(await sent.inputs.count <= AudioDownloader.maxConcurrent)
         #expect(downloader.phase == .idle)
+    }
+
+    @Test func aDrivePullTakesWhatDriveHasAndNeverAsksOpenAI() async throws {
+        let first = try article("First", blocks)
+        let remote = FakeRemote()
+        remote.looksUp = false  // a pull doesn't depend on "Check Drive First"
+        remote.has = ["History", "The first paragraph."]
+        let downloader = makeDownloader(generations: SpeechGenerations(remote: remote))
+        var full = await plan([first])
+        let onDrive = Set(remote.has.map { SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: $0, voice: "marin")) })
+        full.markOnDrive { onDrive.contains($0) }
+
+        downloader.start(full.onlyFromDrive())
+        #expect(downloader.isFromDriveOnly)
+        try await waitUntilDone(downloader)
+
+        #expect(downloader.phase == .finished)
+        #expect(downloader.donePieces == 2)
+        #expect(downloader.failedPieces == 0)
+        #expect(await sent.inputs.isEmpty)
+        let status = ArticleAudio.status(of: blocks, voice: "marin", cache: cache)
+        #expect(status.missing.map(\.request.input) == ["The second paragraph."])
+    }
+
+    @Test func aPieceDriveNoLongerHasFailsInAPullWithoutGoingToOpenAI() async throws {
+        let first = try article("First", [.paragraph("Deleted from Drive since.")])
+        let downloader = makeDownloader(generations: SpeechGenerations(remote: FakeRemote()))
+        var full = await plan([first])
+        full.markOnDrive { _ in true }
+
+        downloader.start(full.onlyFromDrive())
+        try await waitUntilDone(downloader)
+
+        #expect(downloader.phase == .finished)
+        #expect(downloader.failedPieces == 1)
+        #expect(await sent.inputs.isEmpty)
     }
 
     @Test func addingToARunningDownloadSkipsTextAlreadyQueued() async throws {

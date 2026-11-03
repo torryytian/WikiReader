@@ -384,13 +384,13 @@ struct DriveAudioStoreTests {
         var awake: [Bool] = []
     }
 
-    private func makeStore(signedIn: Bool = true) -> DriveAudioStore {
+    private func makeStore(signedIn: Bool = true, lookUpFirst: Bool = true, autoBackUp: Bool = true) -> DriveAudioStore {
         let drive = drive, network = network, access = access
         return DriveAudioStore(
             client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
             isSignedIn: { signedIn }, cache: cache, queueFile: queueFile, indexFile: indexFile,
             retryDelay: .milliseconds(20), canUploadNow: { network.free }, onAccessLost: { access.lost += 1 },
-            keepAwake: { access.awake.append($0) }
+            keepAwake: { access.awake.append($0) }, looksUpFirst: { lookUpFirst }, backsUpAutomatically: { autoBackUp }
         )
     }
 
@@ -644,15 +644,89 @@ struct DriveAudioStoreTests {
         try cache.store(Data("ID3 o".utf8), for: offline)
         let before = await drive.uploadCount()
 
-        let queued = await store.backUp([(title: "T", url: url, blocksData: data)], voice: "alloy")
+        let result = await store.backUp([(title: "T", url: url, blocksData: data)], voice: "alloy")
         try await waitFor { store.pendingUploads.isEmpty && !store.isUploading && store.manifestNames.count == 1 }
 
-        #expect(queued == 1)
+        #expect(result == DriveAudioStore.BackupResult(onThisIPhone: 2, missing: 1))
+        #expect(store.backupRun == nil)  // automatic: no progress row
         #expect(await drive.count(named: SpeechAudioCache.key(for: offline) + ".mp3") == 1)
         #expect(await drive.count(named: SpeechAudioCache.key(for: earlier) + ".mp3") == 1)
         // The audio and the manifest: two uploads.
         #expect(await drive.uploadCount() - before == 2)
         #expect(store.manifestNames == [DriveManifest.urlHash(url) + ".json"])
+    }
+
+    @Test func whatOnlyDriveHasIsCountedForDownloading() async throws {
+        let url = "https://en.wikipedia.org/wiki/T"
+        let blocks: [ContentBlock] = [.paragraph("Here and there."), .paragraph("Only on Drive.")]
+        let data = try JSONEncoder().encode(blocks)
+        func key(_ text: String) -> String { SpeechAudioCache.key(for: request(text)) }
+        try cache.store(Data(count: 10), for: request("Here and there."))
+
+        let backup = await DriveAudioStore.backup(
+            url: url, blocksData: data, voice: "alloy", indexed: [key("Here and there."), key("Only on Drive.")],
+            pending: [], manifests: [], cache: cache
+        )
+        #expect(backup.piecesOnDrive == 2)
+        #expect(backup.piecesOnlyOnDrive == 1)
+        #expect(backup.charactersOnlyOnDrive == "Only on Drive.".count)
+        #expect(backup.state == .backedUp)
+    }
+
+    @Test func withAutomaticBackupOffOnlyWhatIsAskedForGoesUp() async throws {
+        let url = "https://en.wikipedia.org/wiki/T"
+        let blocks: [ContentBlock] = [.paragraph("Generated here.")]
+        let data = try JSONEncoder().encode(blocks)
+        let library = [(title: "T", url: url, blocksData: data)]
+        let store = makeStore(autoBackUp: false)
+        let generated = request("Generated here.")
+        try cache.store(Data("ID3 g".utf8), for: generated)
+        let manifest = DriveManifest.urlHash(url) + ".json"
+
+        store.didGenerate(generated, in: cache)
+        await store.backUpIfDue(library, voice: "alloy")
+        await store.noteArticle(title: "T", url: url, blocks: blocks, voice: "alloy")
+        #expect(store.pendingUploads.isEmpty)
+        #expect(!store.isBackingUpAutomatically)
+        #expect(await drive.file(named: manifest) == nil)
+        #expect(await drive.count(named: SpeechAudioCache.key(for: generated) + ".mp3") == 0)
+
+        let result = await store.backUp(library, voice: "alloy", showsProgress: true)
+        #expect(result?.missing == 1)
+        #expect(store.backupRun == DriveAudioStore.BackupRun(total: 1, done: 0))
+        try await waitFor { store.backupRun?.isFinished == true && store.manifestNames.contains(manifest) }
+
+        #expect(store.backupRun == DriveAudioStore.BackupRun(total: 1, done: 1))
+        #expect(await drive.count(named: SpeechAudioCache.key(for: generated) + ".mp3") == 1)
+        #expect(await drive.file(named: manifest) != nil)
+        store.dismissBackupRun()
+        #expect(store.backupRun == nil)
+    }
+
+    @Test func aBackupAskedForCanBeStopped() async throws {
+        let blocks: [ContentBlock] = [.paragraph("One."), .paragraph("Two.")]
+        let data = try JSONEncoder().encode(blocks)
+        for text in ["One.", "Two."] { try cache.store(Data("ID3".utf8), for: request(text)) }
+        network.free = false  // held, so nothing goes up before Stop
+        let store = makeStore()
+
+        await store.backUp([(title: "T", url: "https://en.wikipedia.org/wiki/T", blocksData: data)], voice: "alloy", showsProgress: true)
+        #expect(store.pendingUploads.count == 2)
+        #expect(store.backupRun == DriveAudioStore.BackupRun(total: 2, done: 0))
+        #expect(store.isWaitingForFreeNetwork)
+
+        store.stopBackupRun()
+        #expect(store.pendingUploads.isEmpty)
+        #expect(store.backupRun == nil)
+    }
+
+    @Test func checkingDriveFirstCanBeTurnedOffWithoutSigningOut() {
+        let store = makeStore(lookUpFirst: false)
+        #expect(store.isEnabled)
+        #expect(!store.looksUpBeforeGenerating)
+        #expect(store.isBackingUpAutomatically)
+        #expect(makeStore().looksUpBeforeGenerating)
+        #expect(!makeStore(signedIn: false).looksUpBeforeGenerating)
     }
 
     @Test func anUnchangedManifestIsNotWrittenAgainAfterARestart() async throws {
@@ -721,8 +795,12 @@ struct DriveAudioStoreTests {
 @MainActor
 final class FakeRemote: RemoteAudioSource {
     var isEnabled = true
+    /// Settings' "Check Drive First".
+    var looksUp = true
     var has: Set<String> = []
     var generated: [String] = []
+
+    var looksUpBeforeGenerating: Bool { isEnabled && looksUp }
 
     func fetch(_ request: OpenAISpeechRequest, into cache: SpeechAudioCache) async -> URL? {
         guard has.contains(request.input) else { return nil }
@@ -783,6 +861,50 @@ struct DriveBeforeOpenAITests {
         let generations = SpeechGenerations(remote: remote)
         _ = await generations.generate(OpenAISpeechEngine.request(for: "On Drive.", voice: "alloy"), apiKey: "sk", client: client, cache: cache).value
         #expect(await sent.inputs == ["On Drive."])
+    }
+
+    @Test func withCheckingOffOpenAIIsAskedButAPullStillTakesFromDrive() async throws {
+        let remote = FakeRemote()
+        remote.looksUp = false
+        remote.has = ["On Drive.", "Also on Drive."]
+        let generations = SpeechGenerations(remote: remote)
+        #expect(!generations.canWorkWithoutKey)
+
+        _ = await generations.generate(OpenAISpeechEngine.request(for: "On Drive.", voice: "alloy"), apiKey: "sk", client: client, cache: cache).value
+        #expect(await sent.inputs == ["On Drive."])
+
+        let pulled = await generations.fetchFromRemote(OpenAISpeechEngine.request(for: "Also on Drive.", voice: "alloy"), cache: cache)
+        #expect(try Data(contentsOf: #require(pulled)) == Data("ID3 remote".utf8))
+        #expect(await generations.fetchFromRemote(OpenAISpeechEngine.request(for: "Nowhere.", voice: "alloy"), cache: cache) == nil)
+        #expect(await sent.inputs == ["On Drive."])
+
+        remote.isEnabled = false
+        #expect(await generations.fetchFromRemote(OpenAISpeechEngine.request(for: "Also on Drive.", voice: "marin"), cache: cache) == nil)
+    }
+
+    @Test func aDrivePullKeepsOnlyWhatDriveHasAndCostsNothing() throws {
+        let container = try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let first = Article(title: "A", sourceURL: URL(string: "https://en.wikipedia.org/wiki/A")!, blocks: [])
+        let second = Article(title: "B", sourceURL: URL(string: "https://en.wikipedia.org/wiki/B")!, blocks: [])
+        container.mainContext.insert(first)
+        container.mainContext.insert(second)
+        let pieces = ArticleAudio.pieces(of: [.paragraph(String(repeating: "a", count: 840)), .paragraph(String(repeating: "b", count: 420))], voice: "alloy")
+        var plan = AudioDownloader.Plan(
+            voice: "alloy",
+            items: [.init(article: first.persistentModelID, piece: pieces[0]), .init(article: second.persistentModelID, piece: pieces[1])],
+            articleCount: 2
+        )
+        let onDrive = SpeechAudioCache.key(for: pieces[0].request)
+        plan.markOnDrive { $0 == onDrive }
+
+        let pull = plan.onlyFromDrive()
+        #expect(pull.isDriveOnly)
+        #expect(pull.items.count == 1 && pull.items.allSatisfy(\.fromDriveOnly))
+        #expect(pull.articleCount == 1)
+        #expect(pull.characters == 840)
+        #expect(pull.leftOutCharacters == 420)
+        #expect(pull.dollars == 0)
+        #expect(!plan.isDriveOnly)
     }
 
     @Test func downloadPlansPriceOnlyWhatIsNotOnDrive() throws {

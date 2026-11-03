@@ -5,7 +5,8 @@ import SwiftData
 import UIKit
 
 /// Generates the OpenAI audio of whole articles ahead of time, so they can be listened to offline. Only runs when
-/// asked from the library, after its length and cost were shown (`Plan`).
+/// asked from the library, after its length and cost were shown (`Plan`). A plan made `onlyFromDrive` takes what
+/// Google Drive has and nothing else: no OpenAI request, no cost.
 ///
 /// Two requests at a time, sharing in-flight generations with the reader (`SpeechGenerations`) so nothing is paid for
 /// twice. A rejected key or an empty account stops it at once; other failures are counted and skipped, and a run of
@@ -29,6 +30,8 @@ final class AudioDownloader {
             var piece: ArticleAudio.Piece
             /// Already in Google Drive: downloading it costs nothing.
             var isOnDrive = false
+            /// Taken from Google Drive alone, never generated.
+            var fromDriveOnly = false
         }
 
         var voice: String
@@ -36,6 +39,10 @@ final class AudioDownloader {
         var items: [Item]
         /// Articles with something to download.
         var articleCount: Int
+        /// Made by `onlyFromDrive`.
+        var isDriveOnly = false
+        /// For a Drive-only plan: the missing audio that isn't in Drive and was left out.
+        var leftOutCharacters = 0
 
         var characters: Int { items.reduce(0) { $0 + $1.piece.characters } }
         var minutes: Double { ArticleAudio.minutes(forCharacters: characters) }
@@ -52,6 +59,21 @@ final class AudioDownloader {
             }
         }
         var isEmpty: Bool { items.isEmpty }
+
+        /// Only the items `markOnDrive` found in Google Drive, to be taken from Drive alone: nothing is generated or
+        /// paid for, whatever Settings say about looking in Drive first.
+        func onlyFromDrive() -> Plan {
+            var plan = self
+            plan.items = items.filter(\.isOnDrive).map { item in
+                var item = item
+                item.fromDriveOnly = true
+                return item
+            }
+            plan.articleCount = Set(plan.items.map(\.article)).count
+            plan.isDriveOnly = true
+            plan.leftOutCharacters = generatedCharacters
+            return plan
+        }
     }
 
     enum Phase: Equatable {
@@ -72,6 +94,8 @@ final class AudioDownloader {
     private(set) var doneCharacters = 0
     /// Pieces still to do, per article.
     private(set) var pending: [PersistentIdentifier: Int] = [:]
+    /// Of `totalPieces`, those taken from Google Drive alone.
+    private(set) var driveOnlyPieces = 0
 
     @ObservationIgnored private let client: OpenAITTSClient
     @ObservationIgnored private let cache: SpeechAudioCache
@@ -100,6 +124,8 @@ final class AudioDownloader {
     }
 
     var isRunning: Bool { phase == .running }
+    /// Everything in this download comes from Google Drive alone.
+    var isFromDriveOnly: Bool { totalPieces > 0 && driveOnlyPieces == totalPieces }
     var fraction: Double { totalCharacters > 0 ? Double(doneCharacters) / Double(totalCharacters) : 0 }
 
     func isDownloading(_ article: PersistentIdentifier) -> Bool {
@@ -128,6 +154,7 @@ final class AudioDownloader {
             failedPieces = 0
             totalCharacters = 0
             doneCharacters = 0
+            driveOnlyPieces = 0
             pending = [:]
             consecutiveFailures = 0
         }
@@ -137,6 +164,7 @@ final class AudioDownloader {
             queue.append(item)
             totalPieces += 1
             totalCharacters += item.piece.characters
+            if item.fromDriveOnly { driveOnlyPieces += 1 }
             pending[item.article, default: 0] += 1
         }
         Log.speech.info("Audio download: \(self.queue.count) pieces queued with \(plan.voice, privacy: .public)")
@@ -167,6 +195,7 @@ final class AudioDownloader {
         queue.removeAll { $0.article == article }
         totalPieces -= dropped.count
         totalCharacters -= dropped.reduce(0) { $0 + $1.piece.characters }
+        driveOnlyPieces -= dropped.count(where: \.fromDriveOnly)
         pending[article] = nil
     }
 
@@ -177,40 +206,61 @@ final class AudioDownloader {
 
     // MARK: - Work
 
+    /// How one piece went.
+    private enum Outcome {
+        case done
+        /// Skipped and counted; why.
+        case failed(String)
+        /// Nothing else will work either (no key, no credit); why.
+        case stop(String)
+    }
+
     private func work(run: Int) async {
         while self.run == run, !queue.isEmpty {
             let item = queue.removeFirst()
-            let result = await fetch(item.piece.request)
+            let outcome = item.fromDriveOnly ? await fetchFromDrive(item.piece.request) : await fetch(item.piece.request)
             guard self.run == run else { return }
             pending[item.article, default: 1] -= 1
             if pending[item.article] == 0 { pending[item.article] = nil }
-            switch result {
-            case .success:
+            switch outcome {
+            case .done:
                 donePieces += 1
                 doneCharacters += item.piece.characters
                 consecutiveFailures = 0
-            case .failure(let error):
-                Log.speech.error("Audio download: a piece failed: \(error.message, privacy: .public)")
-                switch error {
-                case .missingKey, .invalidKey, .quotaExceeded:
-                    end(.stopped(error.message))
+            case .stop(let reason):
+                Log.speech.error("Audio download: a piece failed: \(reason, privacy: .public)")
+                end(.stopped(reason))
+                return
+            case .failed(let reason):
+                Log.speech.error("Audio download: a piece failed: \(reason, privacy: .public)")
+                failedPieces += 1
+                consecutiveFailures += 1
+                if consecutiveFailures >= Self.maxConsecutiveFailures {
+                    end(.stopped("Stopped after \(consecutiveFailures) failures in a row. \(reason)"))
                     return
-                default:
-                    failedPieces += 1
-                    consecutiveFailures += 1
-                    if consecutiveFailures >= Self.maxConsecutiveFailures {
-                        end(.stopped("Stopped after \(consecutiveFailures) failures in a row. \(error.message)"))
-                        return
-                    }
                 }
             }
         }
     }
 
-    private func fetch(_ request: OpenAISpeechRequest) async -> Result<URL, OpenAITTSError> {
-        if let url = cache.cachedFile(for: request) { return .success(url) }
+    private func fetch(_ request: OpenAISpeechRequest) async -> Outcome {
+        if cache.cachedFile(for: request) != nil { return .done }
         // Without a key, Google Drive may still have it; `generate` fails with missingKey otherwise.
-        return await generations.generate(request, apiKey: apiKey(), client: client, cache: cache).value
+        switch await generations.generate(request, apiKey: apiKey(), client: client, cache: cache).value {
+        case .success:
+            return .done
+        case .failure(let error):
+            switch error {
+            case .missingKey, .invalidKey, .quotaExceeded: return .stop(error.message)
+            default: return .failed(error.message)
+            }
+        }
+    }
+
+    private func fetchFromDrive(_ request: OpenAISpeechRequest) async -> Outcome {
+        if cache.cachedFile(for: request) != nil { return .done }
+        if await generations.fetchFromRemote(request, cache: cache) != nil { return .done }
+        return .failed("Google Drive didn't send the audio.")
     }
 
     private func finish() {

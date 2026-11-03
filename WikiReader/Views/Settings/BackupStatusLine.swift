@@ -41,16 +41,25 @@ struct BackupStatusLine: View {
         case .noAudio:
             parts.append("No audio yet")
         case .backedUp:
-            parts.append("Backed up")
-            parts.append(backup.piecesHere == backup.pieces
-                         ? "all \(backup.pieces) parts"
-                         : "\(backup.piecesHere) of \(backup.pieces) parts downloaded")
+            if backup.piecesHere == 0 && backup.piecesOnlyOnDrive > 0 {
+                parts.append("In Drive, not on this iPhone")
+            } else {
+                parts.append("Backed up")
+                parts.append(backup.piecesHere == backup.pieces
+                             ? "all \(backup.pieces) parts"
+                             : "\(backup.piecesHere) of \(backup.pieces) parts on this iPhone")
+            }
         case .uploading:
             parts.append(backup.waiting == 1 ? "1 part waiting to upload" : "\(backup.waiting) parts waiting to upload")
         case .notBackedUp:
             parts.append(backup.missing == 1 ? "1 part not backed up yet" : "\(backup.missing) parts not backed up yet")
         }
         if backup.bytesHere > 0 { parts.append(AudioFormat.bytes(backup.bytesHere)) }
+        if backup.piecesOnlyOnDrive > 0 {
+            parts.append(backup.piecesHere == 0
+                         ? "\(backup.piecesOnlyOnDrive) of \(backup.pieces) parts"
+                         : "\(backup.piecesOnlyOnDrive) more in Drive")
+        }
         if backup.otherVoicePieces > 0 { parts.append("+\(backup.otherVoicePieces) in other voices") }
         if backup.state != .noAudio && !backup.hasManifest { parts.append("article list not in Drive yet") }
         return parts.joined(separator: " · ")

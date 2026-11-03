@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// An article's details, opened by swiping its row in the library: what it is about, how it is laid out, how much of
-/// its OpenAI audio is on this iPhone, and deleting it.
+/// its OpenAI audio is on this iPhone, taking it from or backing it up to Google Drive, and deleting it.
 struct ArticleInfoView: View {
     let article: Article
     /// Opens the article at a block.
@@ -14,7 +14,13 @@ struct ArticleInfoView: View {
     @Query private var library: [Article]
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
     @AppStorage(SettingsKeys.speechEngine) private var engineChoice = SpeechEngineChoice.system
+    @AppStorage(SettingsKeys.driveLookUpFirst) private var driveLookUpFirst = true
+    @AppStorage(SettingsKeys.driveAutoBackUp) private var driveAutoBackUp = true
     @State private var downloader = AudioDownloader.shared
+    @State private var drive = DriveAudioStore.shared
+    @State private var account = GoogleAccount.shared
+    /// A Google Drive action being worked out.
+    @State private var isPreparingDrive = false
 
     @State private var blocks: [ContentBlock] = []
     @State private var outline = ArticleOutline(blocks: [])
@@ -37,6 +43,7 @@ struct ArticleInfoView: View {
                 overviewSection
                 bookmarksSection
                 audioSection
+                driveSection
                 contentsSection
                 Section {
                     Button("Delete Article", systemImage: "trash", role: .destructive) {
@@ -58,8 +65,10 @@ struct ArticleInfoView: View {
                     outline = ArticleOutline(blocks: blocks)
                 }
             }
-            .task(id: StatusInput(voice: openAIVoice, done: downloader.donePieces, version: audioVersion)) {
-                let drive = DriveAudioStore.shared
+            .task(id: StatusInput(
+                voice: openAIVoice, done: downloader.donePieces, version: audioVersion,
+                pending: drive.pendingUploads.count, signedIn: account.isSignedIn
+            )) {
                 if drive.isEnabled {
                     await drive.syncIndex()
                     backup = await DriveAudioStore.backup(
@@ -93,6 +102,8 @@ struct ArticleInfoView: View {
         var voice: String
         var done: Int
         var version: Int
+        var pending: Int
+        var signedIn: Bool
     }
 
     // MARK: - Summary
@@ -248,12 +259,6 @@ struct ArticleInfoView: View {
                 if status.otherVoiceBytes > 0 {
                     LabeledContent("Other Voices", value: AudioFormat.bytes(status.otherVoiceBytes))
                 }
-                if GoogleAccount.shared.isSignedIn {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Google Drive")
-                        BackupStatusLine(backup: backup)
-                    }
-                }
                 Button("Delete This Article's Audio", systemImage: "speaker.slash", role: .destructive) {
                     isConfirmingAudioDelete = true
                 }
@@ -276,6 +281,92 @@ struct ArticleInfoView: View {
             text += " You're listening with an iPhone voice now; this audio plays when the \(openAIVoice.capitalized) voice is chosen in Settings."
         }
         return text
+    }
+
+    // MARK: - Google Drive
+
+    @ViewBuilder
+    private var driveSection: some View {
+        if account.isSignedIn {
+            Section {
+                BackupStatusLine(backup: backup)
+                    .font(.subheadline)
+                    .padding(.vertical, 2)
+                driveButton(
+                    "Download from Drive", systemImage: "icloud.and.arrow.down", detail: pullDetail
+                ) {
+                    Task { downloadPrompt = await LibraryActions.drivePullPrompt(for: [article]) }
+                }
+                .disabled(isDownloading || downloader.isRunning)
+                driveButton(
+                    "Back Up to Drive", systemImage: "icloud.and.arrow.up", detail: backUpDetail
+                ) {
+                    Task { downloadPrompt = await LibraryActions.backUpToDrive([article]) }
+                }
+            } header: {
+                Text("Google Drive")
+            } footer: {
+                Text(driveFooter)
+            }
+        }
+    }
+
+    private func driveButton(_ title: String, systemImage: String, detail: String?, action: @escaping () async -> Void) -> some View {
+        Button {
+            isPreparingDrive = true
+            Task {
+                await action()
+                isPreparingDrive = false
+            }
+        } label: {
+            HStack {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                        if let detail {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(Color.secondary)
+                        }
+                    }
+                } icon: {
+                    Image(systemName: systemImage)
+                }
+                if isPreparingDrive {
+                    Spacer()
+                    ProgressView()
+                }
+            }
+        }
+        .disabled(isPreparingDrive)
+    }
+
+    private var pullDetail: String? {
+        guard let backup else { return nil }
+        guard backup.piecesOnlyOnDrive > 0 else { return "Nothing in Drive that isn't on this iPhone" }
+        let parts = backup.piecesOnlyOnDrive == 1 ? "1 part" : "\(backup.piecesOnlyOnDrive) parts"
+        return "\(parts) · about \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: backup.charactersOnlyOnDrive))) · free"
+    }
+
+    private var backUpDetail: String? {
+        guard let backup else { return nil }
+        if backup.missing > 0 { return backup.missing == 1 ? "1 part isn't in Drive yet" : "\(backup.missing) parts aren't in Drive yet" }
+        if backup.waiting > 0 { return backup.waiting == 1 ? "1 part waiting to upload" : "\(backup.waiting) parts waiting to upload" }
+        if backup.state == .noAudio { return "No audio on this iPhone yet" }
+        return backup.hasManifest ? "Everything on this iPhone is in Drive" : "Lists the article in Drive for the Chrome extension"
+    }
+
+    private var driveFooter: String {
+        switch (driveLookUpFirst, driveAutoBackUp) {
+        case (true, true):
+            "Drive is also checked before a paragraph is generated, and new audio is backed up on its own. Change that in Settings → Google Drive."
+        case (true, false):
+            "Drive is checked before a paragraph is generated. New audio isn't backed up on its own (Settings → Google Drive): back it up here."
+        case (false, true):
+            "New audio is backed up on its own, but Drive isn't checked before generating (Settings → Google Drive): download from it here."
+        case (false, false):
+            "Drive is only used when you ask here: automatic checking and backup are off in Settings → Google Drive."
+        }
     }
 
     // MARK: - Contents

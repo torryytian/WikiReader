@@ -34,6 +34,16 @@ nonisolated enum SettingsKeys {
     static let googleAccountEmail = "googleAccountEmail"
     /// Upload to Google Drive over cellular and Low Data Mode too; off (the default) waits for Wi-Fi.
     static let driveUploadAnyNetwork = "driveUploadAnyNetwork"
+    /// Look for audio in Google Drive before generating it with OpenAI. On when absent.
+    static let driveLookUpFirst = "driveLookUpFirst"
+    /// Upload new audio to Google Drive as it is generated, and what Drive lacks when the app opens. On when absent;
+    /// off, only backups asked for go up.
+    static let driveAutoBackUp = "driveAutoBackUp"
+
+    /// A switch that is on unless it was turned off.
+    static func isOn(_ key: String, in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: key) as? Bool ?? true
+    }
 }
 
 /// Whether the whole app is light, dark, or follows the iPhone's setting. The reader's own theme

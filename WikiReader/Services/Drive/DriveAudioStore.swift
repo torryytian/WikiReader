@@ -6,10 +6,16 @@ import OSLog
 protocol RemoteAudioSource: AnyObject {
     /// Whether it can be asked at all (signed in).
     var isEnabled: Bool { get }
+    /// Whether to ask it before generating: `isEnabled`, unless the reader turned that off.
+    var looksUpBeforeGenerating: Bool { get }
     /// The audio for `request`, saved into `cache`, or nil if the source doesn't have it (or can't be reached).
     func fetch(_ request: OpenAISpeechRequest, into cache: SpeechAudioCache) async -> URL?
     /// `request`'s audio was just generated and stored in `cache`; share it.
     func didGenerate(_ request: OpenAISpeechRequest, in cache: SpeechAudioCache)
+}
+
+extension RemoteAudioSource {
+    var looksUpBeforeGenerating: Bool { isEnabled }
 }
 
 /// The audio cache shared through Google Drive with other devices and the Chrome extension
@@ -17,8 +23,10 @@ protocol RemoteAudioSource: AnyObject {
 /// OpenAI; audio generated here is uploaded in the background; each article gets a manifest.
 ///
 /// Backing up is incremental: a piece is uploaded right after it is generated, and `backUp` (run when the app opens,
-/// after signing in, and from Settings) compares the library's audio on this iPhone with the index and queues only
-/// what Drive lacks, which also catches audio made while signed out or while uploads were failing.
+/// after signing in, and when asked for some articles or all of them) compares their audio on this iPhone with the
+/// index and queues only what Drive lacks, which also catches audio made while signed out or while uploads were failing.
+/// Both automatic parts, and looking in Drive before generating, can be turned off in Settings (`looksUpFirst`,
+/// `backsUpAutomatically`); what is asked for by hand always runs.
 ///
 /// What is on Drive is mirrored in a local index (`DriveAudioIndex.json`): the audio folder is listed in full once,
 /// then only what was created since the last look, usually one small request. So whether a piece is on Drive is
@@ -90,6 +98,17 @@ final class DriveAudioStore: RemoteAudioSource {
     private(set) var downloadedCount = 0
     private(set) var uploadedCount = 0
 
+    /// A backup asked for by hand (not the automatic one), for its progress row.
+    struct BackupRun: Equatable {
+        /// Pieces it found missing on Drive, and how many of them have gone up since.
+        var total = 0
+        var done = 0
+        var isFinished: Bool { done >= total }
+    }
+
+    /// The latest backup asked for by hand, until its finished summary is dismissed.
+    private(set) var backupRun: BackupRun?
+
     @ObservationIgnored private let client: DriveClient
     @ObservationIgnored private let isSignedIn: () -> Bool
     @ObservationIgnored private let cache: SpeechAudioCache
@@ -99,6 +118,10 @@ final class DriveAudioStore: RemoteAudioSource {
     @ObservationIgnored private let canUploadNow: () -> Bool
     @ObservationIgnored private let onAccessLost: () -> Void
     @ObservationIgnored private let keepAwake: (Bool) -> Void
+    @ObservationIgnored private let looksUpFirst: () -> Bool
+    @ObservationIgnored private let backsUpAutomatically: () -> Bool
+    /// The pieces of `backupRun` still to go up.
+    @ObservationIgnored private var runKeys: Set<String> = []
     @ObservationIgnored private var layoutTask: Task<Layout, Error>?
     @ObservationIgnored private var index: AudioIndex
     @ObservationIgnored private var lastSync: Date?
@@ -123,7 +146,9 @@ final class DriveAudioStore: RemoteAudioSource {
             UserDefaults.standard.bool(forKey: SettingsKeys.driveUploadAnyNetwork) || !NetworkWatcher.shared.isExpensive
         },
         onAccessLost: @escaping () -> Void = { GoogleAccount.shared.driveAccessMissing() },
-        keepAwake: @escaping (Bool) -> Void = { ScreenAwake.set("drive upload", $0) }
+        keepAwake: @escaping (Bool) -> Void = { ScreenAwake.set("drive upload", $0) },
+        looksUpFirst: @escaping () -> Bool = { SettingsKeys.isOn(SettingsKeys.driveLookUpFirst) },
+        backsUpAutomatically: @escaping () -> Bool = { SettingsKeys.isOn(SettingsKeys.driveAutoBackUp) }
     ) {
         self.client = client
         self.isSignedIn = isSignedIn
@@ -134,11 +159,20 @@ final class DriveAudioStore: RemoteAudioSource {
         self.canUploadNow = canUploadNow
         self.onAccessLost = onAccessLost
         self.keepAwake = keepAwake
+        self.looksUpFirst = looksUpFirst
+        self.backsUpAutomatically = backsUpAutomatically
         pendingUploads = (try? JSONDecoder().decode([String].self, from: Data(contentsOf: queueFile))) ?? []
         index = (try? JSONDecoder().decode(AudioIndex.self, from: Data(contentsOf: indexFile))) ?? AudioIndex()
     }
 
     var isEnabled: Bool { isSignedIn() }
+
+    /// Signed in, and Settings' "Check Drive First" is on: playing and downloading take audio from Drive before
+    /// paying OpenAI for it.
+    var looksUpBeforeGenerating: Bool { isEnabled && looksUpFirst() }
+
+    /// Signed in, and new audio is backed up without being asked.
+    var isBackingUpAutomatically: Bool { isEnabled && backsUpAutomatically() }
 
     /// Forgets what was learned about Drive (after signing out or in as someone else).
     func reset() {
@@ -150,6 +184,8 @@ final class DriveAudioStore: RemoteAudioSource {
         notedArticles = [:]
         lastBackUp = nil
         lastError = nil
+        runKeys = []
+        backupRun = nil
     }
 
     // MARK: - The shared folder
@@ -296,7 +332,7 @@ final class DriveAudioStore: RemoteAudioSource {
 
     func didGenerate(_ request: OpenAISpeechRequest, in cache: SpeechAudioCache) {
         // Only the app's own cache: tests and samples in other folders aren't shared.
-        guard isEnabled, cache.directory == self.cache.directory else { return }
+        guard isBackingUpAutomatically, cache.directory == self.cache.directory else { return }
         enqueue([SpeechAudioCache.key(for: request)])
     }
 
@@ -373,6 +409,7 @@ final class DriveAudioStore: RemoteAudioSource {
     private func dropFromQueue(_ key: String) {
         pendingUploads.removeAll { $0 == key }
         saveQueue()
+        if runKeys.remove(key) != nil { backupRun?.done += 1 }
     }
 
     private func saveQueue() {
@@ -397,9 +434,16 @@ final class DriveAudioStore: RemoteAudioSource {
     // MARK: - Manifests
 
     /// Records an article being read or downloaded with `voice`: looks its pieces up on Drive and writes its manifest
-    /// if it changed. Written again once queued uploads finish, so `complete` catches up.
+    /// if it changed. Written again once queued uploads finish, so `complete` catches up. With automatic backup off
+    /// nothing is written (only a backup asked for lists an article), and with Drive not looked in either, nothing is done.
     func noteArticle(title: String, url: String, blocks: [ContentBlock], voice: String) async {
         guard isEnabled, !blocks.isEmpty else { return }
+        let shares = backsUpAutomatically()
+        guard shares || looksUpFirst() else { return }
+        guard shares else {
+            await syncIndex()
+            return
+        }
         let manifest = DriveManifest(title: title, url: url, blocks: blocks, voice: voice)
         notedArticles[manifest.fileName] = manifest
         await syncIndex()
@@ -466,6 +510,9 @@ final class DriveAudioStore: RemoteAudioSource {
         /// Of those, how many are on this iPhone, and how many on Drive.
         var piecesHere = 0
         var piecesOnDrive = 0
+        /// Of those on Drive, the ones not on this iPhone, and their length: what downloading from Drive would bring.
+        var piecesOnlyOnDrive = 0
+        var charactersOnlyOnDrive = 0
         /// Size of the chosen voice's audio on this iPhone.
         var bytesHere: Int64 = 0
         /// Audio on this iPhone (any voice) queued for upload, and neither on Drive nor queued.
@@ -509,7 +556,13 @@ final class DriveAudioStore: RemoteAudioSource {
                 result.piecesHere += 1
                 result.bytesHere += size
             }
-            if indexed.contains(key) { result.piecesOnDrive += 1 }
+            if indexed.contains(key) {
+                result.piecesOnDrive += 1
+                if size == nil {
+                    result.piecesOnlyOnDrive += 1
+                    result.charactersOnlyOnDrive += piece.characters
+                }
+            }
             tally(key, isHere: size != nil)
         }
         for input in ArticleAudio.inputs(of: blocks) {
@@ -526,18 +579,29 @@ final class DriveAudioStore: RemoteAudioSource {
 
     // MARK: - The library's audio
 
-    /// Backs up the library incrementally: queues every piece of audio on this iPhone that belongs to it (any voice)
-    /// and isn't on Drive, and brings the articles' manifests for `voice` up to date (only those that changed are
-    /// written). Usually costs a request or two: Drive is compared with the local index, not asked piece by piece.
-    /// - Returns: How many pieces were queued.
+    /// What `backUp` found.
+    nonisolated struct BackupResult: Equatable, Sendable {
+        /// Pieces of the articles' audio on this iPhone, in any voice.
+        var onThisIPhone = 0
+        /// Of those, the ones Drive lacks, now queued (or already queued before).
+        var missing = 0
+    }
+
+    /// Backs up articles incrementally: queues every piece of audio on this iPhone that belongs to them (any voice)
+    /// and isn't on Drive, and brings their manifests for `voice` up to date (only those that changed are written).
+    /// Usually costs a request or two: Drive is compared with the local index, not asked piece by piece.
+    /// - Parameter showsProgress: Asked for by hand: `backupRun` follows the pieces it queued.
+    /// - Returns: What was found, or nil if Drive couldn't be listed (`lastError` says why).
     @discardableResult
-    func backUp(_ articles: [(title: String, url: String, blocksData: Data)], voice: String) async -> Int {
-        guard isEnabled else { return 0 }
-        lastBackUp = .now
+    func backUp(
+        _ articles: [(title: String, url: String, blocksData: Data)], voice: String, showsProgress: Bool = false
+    ) async -> BackupResult? {
+        guard isEnabled else { return nil }
         let local = await Self.localKeys(of: articles.map(\.blocksData), cache: cache)
         await syncIndex(force: true)
-        guard lastSync != nil else { return 0 }  // Drive couldn't be listed; `lastError` says why
+        guard lastSync != nil else { return nil }
         let missing = local.filter { index.files[$0] == nil }
+        if showsProgress, !missing.isEmpty { follow(missing) }
         enqueue(missing)
         for article in articles {
             let blocks = Article.decodeBlocks(article.blocksData)
@@ -546,13 +610,41 @@ final class DriveAudioStore: RemoteAudioSource {
         }
         if pendingUploads.isEmpty { await refreshNotedManifests() }
         if !missing.isEmpty { Log.app.info("Drive: backup queued \(missing.count) pieces") }
-        return missing.count
+        return BackupResult(onThisIPhone: local.count, missing: missing.count)
     }
 
-    /// `backUp`, unless it ran in the last `backUpInterval`: for when the app opens or comes back to the library.
+    /// `backUp` of the whole library, unless it ran in the last `backUpInterval` or automatic backup is off: for when
+    /// the app opens or comes back to the library.
     func backUpIfDue(_ articles: [(title: String, url: String, blocksData: Data)], voice: String) async {
+        guard isBackingUpAutomatically else { return }
         if let lastBackUp, Date.now.timeIntervalSince(lastBackUp) < Self.backUpInterval { return }
+        lastBackUp = .now
         await backUp(articles, voice: voice)
+    }
+
+    /// Adds pieces to `backupRun` (a new one if the last has finished).
+    private func follow(_ keys: [String]) {
+        if backupRun?.isFinished ?? true {
+            backupRun = BackupRun()
+            runKeys = []
+        }
+        let new = Set(keys).subtracting(runKeys)
+        runKeys.formUnion(new)
+        backupRun?.total += new.count
+    }
+
+    /// Stops the backup asked for: what it queued and hasn't started uploading is taken off the queue (an automatic
+    /// backup, if on, finds it again later). Uploads already running finish.
+    func stopBackupRun() {
+        pendingUploads.removeAll { runKeys.contains($0) && !uploadsInFlight.contains($0) }
+        saveQueue()
+        runKeys = []
+        backupRun = nil
+    }
+
+    /// Clears a finished backup's summary.
+    func dismissBackupRun() {
+        if backupRun?.isFinished ?? false { backupRun = nil }
     }
 
     @concurrent

@@ -23,7 +23,7 @@ final class SpeechGenerations {
     }
 
     /// Whether audio can be had without an OpenAI key (from `remote`).
-    var canWorkWithoutKey: Bool { remote?.isEnabled ?? false }
+    var canWorkWithoutKey: Bool { remote?.looksUpBeforeGenerating ?? false }
 
     /// The generation of `request`'s audio: the one already running, or a new one. It is never cancelled by its
     /// callers going away: the audio is paid for, so it is allowed to reach the cache. Without an `apiKey` only
@@ -33,7 +33,7 @@ final class SpeechGenerations {
         if let pending = running[file] { return pending }
         let remote = remote
         let task = Task { () -> Result<URL, OpenAITTSError> in
-            if let remote, remote.isEnabled, let url = await remote.fetch(request, into: cache) {
+            if let remote, remote.looksUpBeforeGenerating, let url = await remote.fetch(request, into: cache) {
                 return .success(url)
             }
             guard let apiKey, !apiKey.isEmpty else { return .failure(.missingKey) }
@@ -48,6 +48,15 @@ final class SpeechGenerations {
             if running[file] == task { running[file] = nil }
         }
         return task
+    }
+
+    /// `request`'s audio from `remote` alone, never from OpenAI, or nil if it isn't there: for downloading what Google
+    /// Drive has, whether or not it is looked in before generating. A generation of the same text already running is
+    /// waited for instead.
+    func fetchFromRemote(_ request: OpenAISpeechRequest, cache: SpeechAudioCache) async -> URL? {
+        if let pending = running[cache.fileURL(for: request)] { return try? await pending.value.get() }
+        guard let remote, remote.isEnabled else { return nil }
+        return await remote.fetch(request, into: cache)
     }
 
     func isGenerating(_ request: OpenAISpeechRequest, in cache: SpeechAudioCache) -> Bool {

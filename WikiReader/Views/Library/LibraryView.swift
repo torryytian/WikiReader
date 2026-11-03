@@ -3,17 +3,19 @@ import SwiftData
 import SwiftUI
 
 /// Home screen: the list of saved articles, newest first. Swiping a row reveals its Info button; the + menu adds
-/// articles, selects several for batch work (a swipe right leaves) and shows storage.
+/// articles, selects several for batch work (a swipe right leaves), and opens storage and Google Drive.
 struct LibraryView: View {
     @Query(sort: \Article.addedAt, order: .reverse) private var articles: [Article]
     @Environment(\.modelContext) private var modelContext
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
     @State private var downloader = AudioDownloader.shared
+    @State private var drive = DriveAudioStore.shared
     @State private var path: [Article] = []
     @State private var isAddingArticle = false
     @State private var importer = ArticleImportCoordinator()
     @State private var isShowingSettings = false
     @State private var isShowingStorage = false
+    @State private var isShowingDrive = false
     @State private var infoArticle: Article?
     /// An article with bookmarks being opened: where to start is asked first.
     @State private var startChoice: Article?
@@ -43,8 +45,11 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack(path: $path) {
             List(selection: $selection) {
-                if downloader.phase != .idle && !isSelecting {
-                    Section { AudioDownloadStatusRow() }
+                if (downloader.phase != .idle || drive.backupRun != nil) && !isSelecting {
+                    Section {
+                        if downloader.phase != .idle { AudioDownloadStatusRow() }
+                        if drive.backupRun != nil { DriveBackupStatusRow() }
+                    }
                 }
                 Section {
                     ForEach(shownArticles) { article in
@@ -141,6 +146,9 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $isShowingStorage, onDismiss: refreshFractions) {
                 LibraryStorageView()
+            }
+            .sheet(isPresented: $isShowingDrive, onDismiss: refreshFractions) {
+                GoogleDriveSheet()
             }
             .sheet(item: $infoArticle, onDismiss: performAfterInfo) { article in
                 ArticleInfoView(
@@ -310,6 +318,9 @@ struct LibraryView: View {
                 Button("Library & Storage", systemImage: "internaldrive") {
                     isShowingStorage = true
                 }
+                Button("Google Drive", systemImage: "icloud") {
+                    isShowingDrive = true
+                }
             }
         } label: {
             Label("Add and Manage", systemImage: "plus")
@@ -343,7 +354,28 @@ struct LibraryView: View {
             }
             .disabled(selection.isEmpty)
             Spacer()
-            Menu("Delete") {
+            Menu("Google Drive") {
+                Button("Download from Drive", systemImage: "icloud.and.arrow.down") {
+                    let chosen = selectedArticles
+                    Task {
+                        downloadPrompt = await LibraryActions.drivePullPrompt(for: chosen)
+                        if case .confirm = downloadPrompt { endSelecting() }
+                    }
+                }
+                .disabled(downloader.isRunning)
+                Button("Back Up to Drive", systemImage: "icloud.and.arrow.up") {
+                    let chosen = selectedArticles
+                    Task {
+                        downloadPrompt = await LibraryActions.backUpToDrive(chosen)
+                        // Started: the progress row at the top of the library follows it.
+                        if downloadPrompt == nil { endSelecting() }
+                    }
+                }
+            }
+            .disabled(selection.isEmpty)
+            Spacer()
+            // An icon: three titles don't fit, and the bar would fold this one into an overflow menu.
+            Menu("Delete", systemImage: "trash") {
                 Button("Delete Audio Only", systemImage: "speaker.slash") { isConfirmingAudioDelete = true }
                 Button("Delete Articles", systemImage: "trash", role: .destructive) { isConfirmingDelete = true }
             }

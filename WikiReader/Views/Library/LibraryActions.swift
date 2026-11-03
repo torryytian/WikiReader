@@ -2,8 +2,8 @@ import OSLog
 import SwiftData
 import SwiftUI
 
-/// What the library, the article info page and the storage page share: deleting articles and their audio, and
-/// asking before a download.
+/// What the library, the article info page, the storage page and the Google Drive page share: deleting articles and
+/// their audio, asking before a download, and taking audio from or backing it up to Google Drive.
 enum LibraryActions {
     /// The OpenAI voice downloads are made with: the one chosen in Settings, even while an iPhone voice reads.
     static var openAIVoice: String {
@@ -20,7 +20,7 @@ enum LibraryActions {
         let sources = articles.map { AudioDownloader.Source(id: $0.persistentModelID, blocksData: $0.blocksData) }
         var plan = await AudioDownloader.plan(for: sources, voice: openAIVoice)
         let drive = DriveAudioStore.shared
-        if drive.isEnabled, !plan.isEmpty {
+        if drive.looksUpBeforeGenerating, !plan.isEmpty {
             // What another device already made is free: only the rest is priced.
             await drive.prepareIndex(keys: plan.items.map { SpeechAudioCache.key(for: $0.piece.request) })
             plan.markOnDrive { drive.isOnDrive($0) == true }
@@ -31,6 +31,46 @@ enum LibraryActions {
             }
         }
         return plan.isEmpty ? .nothingToDo : .confirm(plan)
+    }
+
+    // MARK: Google Drive
+
+    /// Works out what taking `articles`' audio (in the chosen voice) from Google Drive would bring, for the
+    /// confirmation. Only what Drive has is downloaded; nothing is generated, so it is free.
+    static func drivePullPrompt(for articles: [Article]) async -> AudioDownloadPrompt {
+        let drive = DriveAudioStore.shared
+        guard drive.isEnabled else { return .driveNotConnected }
+        let sources = articles.map { AudioDownloader.Source(id: $0.persistentModelID, blocksData: $0.blocksData) }
+        var plan = await AudioDownloader.plan(for: sources, voice: openAIVoice)
+        guard !plan.isEmpty else { return .nothingToDo }
+        // Another device may have uploaded some a moment ago.
+        await drive.syncIndex(force: true)
+        plan.markOnDrive { drive.isOnDrive($0) == true }
+        let fromDrive = plan.onlyFromDrive()
+        guard fromDrive.isEmpty else { return .confirm(fromDrive) }
+        if let error = drive.lastError { return .notice(title: "Google Drive Unavailable", message: error) }
+        let these = articles.count == 1 ? "this article" : "these articles"
+        return .notice(
+            title: "Not in Google Drive",
+            message: "None of the \(openAIVoice.capitalized) audio \(these) still lack is in your Google Drive. Download Audio generates it with OpenAI."
+        )
+    }
+
+    /// Backs up `articles`' audio on this iPhone (any voice) that Drive lacks, and lists them in Drive. Returns what
+    /// to tell, or nil when uploads started: the backup's progress row shows them.
+    static func backUpToDrive(_ articles: [Article]) async -> AudioDownloadPrompt? {
+        let drive = DriveAudioStore.shared
+        guard drive.isEnabled else { return .driveNotConnected }
+        let library = articles.map { (title: $0.title, url: $0.sourceURL.absoluteString, blocksData: $0.blocksData) }
+        guard let result = await drive.backUp(library, voice: openAIVoice, showsProgress: true) else {
+            return .notice(title: "Google Drive Unavailable", message: drive.lastError ?? "Google Drive couldn't be reached.")
+        }
+        guard result.missing == 0 else { return nil }
+        let these = articles.count == 1 ? "this article" : "these articles"
+        if result.onThisIPhone == 0 {
+            return .notice(title: "No Audio to Back Up", message: "There is no audio for \(these) on this iPhone yet.")
+        }
+        return .notice(title: "Already Backed Up", message: "All the audio for \(these) on this iPhone is already in your Google Drive.")
     }
 
     /// Deletes articles, and with `withAudio` also the audio only they used. Anything still queued for them in a
@@ -90,30 +130,47 @@ enum AudioFormat {
 
 // MARK: - Download confirmation
 
-/// The question asked before a download starts.
+/// The question asked before a download starts, or what a Google Drive action has to say.
 enum AudioDownloadPrompt: Identifiable {
     case confirm(AudioDownloader.Plan)
     case nothingToDo
     case noKey
+    /// Just something to tell, with OK.
+    case notice(title: String, message: String)
+
+    static let driveNotConnected = AudioDownloadPrompt.notice(
+        title: "Google Drive Not Connected", message: "Sign in under Settings → Google Drive first."
+    )
 
     var id: String {
         switch self {
-        case .confirm(let plan): "confirm-\(plan.items.count)"
+        case .confirm(let plan): "confirm-\(plan.isDriveOnly)-\(plan.items.count)"
         case .nothingToDo: "nothing"
         case .noKey: "noKey"
+        case .notice(let title, _): "notice-\(title)"
         }
     }
 
     var title: String {
         switch self {
-        case .confirm: "Download Audio?"
+        case .confirm(let plan): plan.isDriveOnly ? "Download from Google Drive?" : "Download Audio?"
         case .nothingToDo: "Already Downloaded"
         case .noKey: "OpenAI Key Needed"
+        case .notice(let title, _): title
         }
     }
 
     var message: String {
         switch self {
+        case .confirm(let plan) where plan.isDriveOnly:
+            let articles = plan.articleCount == 1 ? "1 article" : "\(plan.articleCount) articles"
+            var text = "About \(AudioFormat.duration(minutes: plan.minutes)) of \(plan.voice.capitalized) audio for \(articles) is in your Google Drive. "
+                + "Downloading it is free; nothing is generated."
+            if plan.leftOutCharacters > 0 {
+                text += " Another \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: plan.leftOutCharacters))) isn't in Drive: Download Audio generates it with OpenAI."
+            }
+            if NetworkWatcher.shared.isExpensive { text += " You're on cellular data." }
+            return text + " Keep WikiReader open until it finishes."
         case .confirm(let plan):
             let articles = plan.articleCount == 1 ? "1 article" : "\(plan.articleCount) articles"
             let keepOpen = "Keep WikiReader open until it finishes; the screen stays on meanwhile."
@@ -133,6 +190,8 @@ enum AudioDownloadPrompt: Identifiable {
             return "All the audio for the \(LibraryActions.openAIVoice.capitalized) voice is already on this iPhone."
         case .noKey:
             return "Audio is generated with an OpenAI voice. Save an API key in Settings → Voice first."
+        case .notice(_, let message):
+            return message
         }
     }
 }
@@ -170,8 +229,11 @@ struct AudioDownloadStatusRow: View {
         case .running:
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("Downloading audio", systemImage: "arrow.down.circle")
-                        .font(.subheadline.weight(.semibold))
+                    Label(
+                        downloader.isFromDriveOnly ? "Downloading from Google Drive" : "Downloading audio",
+                        systemImage: downloader.isFromDriveOnly ? "icloud.and.arrow.down" : "arrow.down.circle"
+                    )
+                    .font(.subheadline.weight(.semibold))
                     Spacer()
                     Button("Stop") { downloader.cancel() }
                         .buttonStyle(.borderless)
@@ -184,7 +246,9 @@ struct AudioDownloadStatusRow: View {
             .padding(.vertical, 4)
         case .finished:
             summary(
-                downloader.failedPieces == 0 ? "Audio downloaded" : "Audio downloaded, \(downloader.failedPieces) parts failed",
+                downloader.failedPieces == 0
+                    ? (downloader.isFromDriveOnly ? "Downloaded from Google Drive" : "Audio downloaded")
+                    : "Audio downloaded, \(downloader.failedPieces) parts failed",
                 detail: downloader.failedPieces == 0
                     ? "\(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: downloader.doneCharacters))) of audio is on this iPhone."
                     : "Download again to retry the parts that failed.",
