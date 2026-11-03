@@ -33,6 +33,40 @@ nonisolated struct DictionaryDatabase: Sendable {
         entry(for: term) != nil
     }
 
+    /// Every lemma the dictionary records, by lower-cased word: the "0:" item of `exchange` ("studies" → "study"),
+    /// from the first row with one in binary order of `word` (docs/shared-vocab-format.md §4). About 58,000 rows,
+    /// read in one go so marking a whole article's words doesn't ask the file once per word.
+    func lemmaTable() -> [String: String] {
+        guard let url else { return [:] }
+        var connection: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &connection, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            sqlite3_close(connection)
+            return [:]
+        }
+        defer { sqlite3_close(connection) }
+        var statement: OpaquePointer?
+        let sql = "SELECT lower, exchange FROM entries WHERE exchange LIKE '%0:%' ORDER BY lower, word"
+        guard sqlite3_prepare_v2(connection, sql, -1, &statement, nil) == SQLITE_OK else { return [:] }
+        defer { sqlite3_finalize(statement) }
+        var table: [String: String] = [:]
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let lower = sqlite3_column_text(statement, 0).map({ String(cString: $0) }), table[lower] == nil,
+                  let exchange = sqlite3_column_text(statement, 1).map({ String(cString: $0) }),
+                  let lemma = Self.lemma(inExchange: exchange)
+            else { continue }
+            table[lower] = lemma
+        }
+        return table
+    }
+
+    /// The "0:" item of an `exchange` value ("0:study/1:s3" → "study"), if it has one.
+    static func lemma(inExchange exchange: String) -> String? {
+        for item in exchange.split(separator: "/") where item.hasPrefix("0:") && item.count > 2 {
+            return String(item.dropFirst(2))
+        }
+        return nil
+    }
+
     private func query(_ sql: String, bind text: String) -> [DictionaryEntry] {
         guard let url else { return [] }
         var connection: OpaquePointer?

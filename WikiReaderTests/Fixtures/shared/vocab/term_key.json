@@ -1,0 +1,198 @@
+[
+  {
+    "word": "Studies",
+    "term": "Studies",
+    "key": "studies",
+    "lemma": "study",
+    "group": "study"
+  },
+  {
+    "word": "studied",
+    "term": "studied",
+    "key": "studied",
+    "lemma": "study",
+    "group": "study"
+  },
+  {
+    "word": "study",
+    "term": "study",
+    "key": "study",
+    "lemma": null,
+    "group": "study"
+  },
+  {
+    "word": "studying",
+    "term": "studying",
+    "key": "studying",
+    "lemma": "study",
+    "group": "study"
+  },
+  {
+    "word": "Einstein's",
+    "term": "Einstein",
+    "key": "einstein",
+    "lemma": null,
+    "group": "einstein"
+  },
+  {
+    "word": "children's",
+    "term": "children",
+    "key": "children",
+    "lemma": "child",
+    "group": "child"
+  },
+  {
+    "word": "parents'",
+    "term": "parents",
+    "key": "parents",
+    "lemma": "parent",
+    "group": "parent"
+  },
+  {
+    "word": "Paris\u2019",
+    "term": "Paris",
+    "key": "paris",
+    "lemma": null,
+    "group": "paris"
+  },
+  {
+    "word": "Sinologists",
+    "term": "Sinologists",
+    "key": "sinologists",
+    "lemma": "sinologist",
+    "group": "sinologist"
+  },
+  {
+    "word": "left",
+    "term": "left",
+    "key": "left",
+    "lemma": "leave",
+    "group": "leave"
+  },
+  {
+    "word": "leave",
+    "term": "leave",
+    "key": "leave",
+    "lemma": null,
+    "group": "leave"
+  },
+  {
+    "word": "leaving",
+    "term": "leaving",
+    "key": "leaving",
+    "lemma": "leave",
+    "group": "leave"
+  },
+  {
+    "word": "better",
+    "term": "better",
+    "key": "better",
+    "lemma": "good",
+    "group": "good"
+  },
+  {
+    "word": "good",
+    "term": "good",
+    "key": "good",
+    "lemma": null,
+    "group": "good"
+  },
+  {
+    "word": "ran",
+    "term": "ran",
+    "key": "ran",
+    "lemma": "run",
+    "group": "run"
+  },
+  {
+    "word": "run",
+    "term": "run",
+    "key": "run",
+    "lemma": "run",
+    "group": "run"
+  },
+  {
+    "word": "running",
+    "term": "running",
+    "key": "running",
+    "lemma": "run",
+    "group": "run"
+  },
+  {
+    "word": "mice",
+    "term": "mice",
+    "key": "mice",
+    "lemma": "mouse",
+    "group": "mouse"
+  },
+  {
+    "word": "coalitions",
+    "term": "coalitions",
+    "key": "coalitions",
+    "lemma": "coalition",
+    "group": "coalition"
+  },
+  {
+    "word": "coalition",
+    "term": "coalition",
+    "key": "coalition",
+    "lemma": null,
+    "group": "coalition"
+  },
+  {
+    "word": "COVID-19's",
+    "term": "COVID-19's",
+    "key": "covid-19's",
+    "lemma": null,
+    "group": "covid-19's"
+  },
+  {
+    "word": "na\u00efve",
+    "term": "na\u00efve",
+    "key": "na\u00efve",
+    "lemma": null,
+    "group": "na\u00efve"
+  },
+  {
+    "word": "U.S.",
+    "term": "U.S.",
+    "key": "u.s.",
+    "lemma": null,
+    "group": "u.s."
+  },
+  {
+    "word": "state-of-the-art",
+    "term": "state-of-the-art",
+    "key": "state-of-the-art",
+    "lemma": null,
+    "group": "state-of-the-art"
+  },
+  {
+    "word": "Take Off",
+    "term": "Take Off",
+    "key": "take off",
+    "lemma": null,
+    "group": "take off"
+  },
+  {
+    "word": "in spite of",
+    "term": "in spite of",
+    "key": "in spite of",
+    "lemma": null,
+    "group": "in spite of"
+  },
+  {
+    "word": "blockchains",
+    "term": "blockchains",
+    "key": "blockchains",
+    "lemma": null,
+    "group": "blockchains"
+  },
+  {
+    "word": "Data",
+    "term": "Data",
+    "key": "data",
+    "lemma": null,
+    "group": "data"
+  }
+]

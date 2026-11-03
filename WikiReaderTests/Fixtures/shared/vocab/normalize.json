@@ -1,0 +1,92 @@
+[
+  {
+    "input": "\u0130stanbul",
+    "key": "i\u0307stanbul",
+    "sentence": "\u0130stanbul",
+    "id": "24ec8f72b5eac459"
+  },
+  {
+    "input": "\u03a3\u039f\u03a6\u039f\u03a3",
+    "key": "\u03c3\u03bf\u03c6\u03bf\u03c3",
+    "sentence": "\u03a3\u039f\u03a6\u039f\u03a3",
+    "id": "62cb4429a4136cd3"
+  },
+  {
+    "input": "Stra\u00dfe",
+    "key": "stra\u00dfe",
+    "sentence": "Stra\u00dfe",
+    "id": "58a3778c18c41726"
+  },
+  {
+    "input": "\ufb01le",
+    "key": "file",
+    "sentence": "file",
+    "id": "3b9c358f36f0a31b"
+  },
+  {
+    "input": "Cafe\u0301",
+    "key": "caf\u00e9",
+    "sentence": "Caf\u00e9",
+    "id": "73473dcc12b76308"
+  },
+  {
+    "input": "  Take\u00a0\u00a0Off\t",
+    "key": "take off",
+    "sentence": "Take Off",
+    "id": "2f9fb8131060f96c"
+  },
+  {
+    "input": "rock\u2019n\u2018roll",
+    "key": "rock'n'roll",
+    "sentence": "rock'n'roll",
+    "id": "c666f8ba19a0f125"
+  },
+  {
+    "input": "\u02bcokina",
+    "key": "'okina",
+    "sentence": "'okina",
+    "id": "736bf97bbb6a3d46"
+  },
+  {
+    "input": "\ufeffword\u200b",
+    "key": "word",
+    "sentence": "word",
+    "id": "98c1eb4ee9347674"
+  },
+  {
+    "input": "Line\u2028break\u3000here\u0085x",
+    "key": "line break here x",
+    "sentence": "Line break here x",
+    "id": "21c10b0b1a366d22"
+  },
+  {
+    "input": "Mixed   CASE\n\nWords",
+    "key": "mixed case words",
+    "sentence": "Mixed CASE Words",
+    "id": "0fff095fe342f742"
+  },
+  {
+    "input": "\u1680a\u205fb\u202fc\u2002d",
+    "key": "a b c d",
+    "sentence": "a b c d",
+    "id": "f82ce1b653e30b1c"
+  },
+  {
+    "input": "\uff21\uff22\uff23",
+    "key": "abc",
+    "sentence": "ABC",
+    "id": "b5d4045c3f466fa9"
+  },
+  {
+    "input": "Many studies have shown [1] that\u2026",
+    "key": "many studies have shown [1] that...",
+    "sentence": "Many studies have shown [1] that...",
+    "id": "dc4904e1272a1163"
+  },
+  {
+    "input": " \u200b ",
+    "key": "",
+    "sentence": "",
+    "id": "e3b0c44298fc1c14"
+  }
+]

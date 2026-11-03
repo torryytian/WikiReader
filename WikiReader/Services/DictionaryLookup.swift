@@ -43,7 +43,7 @@ struct DictionaryLookup {
     }
 
     /// Lookup candidates in order of preference, without duplicates.
-    static func candidates(word: String, lemma: String?) -> [String] {
+    nonisolated static func candidates(word: String, lemma: String?) -> [String] {
         let base = removingPossessive(word)
         var result: [String] = []
         for candidate in [word, base, base.lowercased(), lemma, lemma?.lowercased()] {
@@ -89,7 +89,7 @@ struct DictionaryLookup {
     }
 
     /// "Einstein's" -> "Einstein", "parents'" -> "parents".
-    static func removingPossessive(_ word: String) -> String {
+    nonisolated static func removingPossessive(_ word: String) -> String {
         for suffix in ["'s", "’s", "'", "’"] where word.count > suffix.count && word.hasSuffix(suffix) {
             return String(word.dropLast(suffix.count))
         }

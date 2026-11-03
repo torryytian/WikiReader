@@ -1,0 +1,75 @@
+{
+  "keys": [
+    "studies",
+    "left",
+    "coalition",
+    "einstein",
+    "take off"
+  ],
+  "cases": [
+    {
+      "word": "Studies",
+      "result": "saved"
+    },
+    {
+      "word": "studied",
+      "result": "related"
+    },
+    {
+      "word": "study",
+      "result": "related"
+    },
+    {
+      "word": "studying",
+      "result": "related"
+    },
+    {
+      "word": "left",
+      "result": "saved"
+    },
+    {
+      "word": "leaving",
+      "result": "related"
+    },
+    {
+      "word": "leave",
+      "result": "related"
+    },
+    {
+      "word": "coalition",
+      "result": "saved"
+    },
+    {
+      "word": "coalitions",
+      "result": "related"
+    },
+    {
+      "word": "Einstein's",
+      "result": "saved"
+    },
+    {
+      "word": "Take Off",
+      "result": "saved"
+    },
+    {
+      "word": "good",
+      "result": "none"
+    },
+    {
+      "word": "better",
+      "result": "none"
+    },
+    {
+      "word": "run",
+      "result": "none"
+    },
+    {
+      "word": "Paris\u2019",
+      "result": "none"
+    },
+    {
+      "word": "1879",
+      "result": "none"
+    }
+  ]
+}

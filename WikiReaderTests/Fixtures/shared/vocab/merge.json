@@ -1,0 +1,1261 @@
+[
+  {
+    "name": "disjoint entries are both kept",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "verdict",
+          "term": "verdict",
+          "forms": [
+            "verdict"
+          ],
+          "createdAt": 1000,
+          "updatedAt": 1000,
+          "contexts": [
+            {
+              "id": "0000000000000001",
+              "sentence": "The verdict was clear.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "tabloid",
+          "term": "tabloid",
+          "forms": [
+            "tabloids"
+          ],
+          "createdAt": 900,
+          "updatedAt": 950,
+          "contexts": [
+            {
+              "id": "0000000000000002",
+              "sentence": "A tabloid ran the story.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 900
+            }
+          ],
+          "meaning": "小报"
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "tabloid",
+          "term": "tabloid",
+          "forms": [
+            "tabloids"
+          ],
+          "createdAt": 900,
+          "updatedAt": 950,
+          "contexts": [
+            {
+              "id": "0000000000000002",
+              "sentence": "A tabloid ran the story.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 900
+            }
+          ],
+          "meaning": "小报"
+        },
+        {
+          "key": "verdict",
+          "term": "verdict",
+          "forms": [
+            "verdict"
+          ],
+          "createdAt": 1000,
+          "updatedAt": 1000,
+          "contexts": [
+            {
+              "id": "0000000000000001",
+              "sentence": "The verdict was clear.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    }
+  },
+  {
+    "name": "the newer side wins each field and the older fills gaps",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "malaise",
+          "term": "Malaise",
+          "forms": [
+            "Malaise"
+          ],
+          "createdAt": 2000,
+          "updatedAt": 5000,
+          "contexts": [
+            {
+              "id": "0000000000000003",
+              "sentence": "A deep malaise set in.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 2000
+            }
+          ],
+          "meaning": "萎靡",
+          "ios": {
+            "x": 1
+          }
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "malaise",
+          "term": "malaise",
+          "forms": [
+            "malaise"
+          ],
+          "createdAt": 1500,
+          "updatedAt": 3000,
+          "contexts": [
+            {
+              "id": "0000000000000004",
+              "sentence": "The malaise lingered.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1500,
+              "meaning": "低迷"
+            }
+          ],
+          "meaning": "不安",
+          "chrome": {
+            "explanation": {
+              "pos": "n."
+            }
+          }
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "malaise",
+          "term": "Malaise",
+          "forms": [
+            "Malaise",
+            "malaise"
+          ],
+          "createdAt": 1500,
+          "updatedAt": 5000,
+          "contexts": [
+            {
+              "id": "0000000000000004",
+              "sentence": "The malaise lingered.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1500,
+              "meaning": "低迷"
+            },
+            {
+              "id": "0000000000000003",
+              "sentence": "A deep malaise set in.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 2000
+            }
+          ],
+          "meaning": "萎靡",
+          "ios": {
+            "x": 1
+          },
+          "chrome": {
+            "explanation": {
+              "pos": "n."
+            }
+          }
+        }
+      ],
+      "deleted": {}
+    }
+  },
+  {
+    "name": "a newer tombstone deletes the word",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [],
+      "deleted": {
+        "siege": 1792836000000
+      }
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "siege",
+          "term": "siege",
+          "forms": [
+            "siege"
+          ],
+          "createdAt": 1791108000000,
+          "updatedAt": 1791972000000,
+          "contexts": [
+            {
+              "id": "0000000000000005",
+              "sentence": "Sentence 5.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1791108000000
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [],
+      "deleted": {
+        "siege": 1792836000000
+      }
+    }
+  },
+  {
+    "name": "saving again after the deletion brings the word back",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "siege",
+          "term": "siege",
+          "forms": [
+            "siege"
+          ],
+          "createdAt": 1793268000000,
+          "updatedAt": 1793268000000,
+          "contexts": [
+            {
+              "id": "0000000000000005",
+              "sentence": "Sentence 5.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1793268000000
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [],
+      "deleted": {
+        "siege": 1792836000000
+      }
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "siege",
+          "term": "siege",
+          "forms": [
+            "siege"
+          ],
+          "createdAt": 1793268000000,
+          "updatedAt": 1793268000000,
+          "contexts": [
+            {
+              "id": "0000000000000005",
+              "sentence": "Sentence 5.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1793268000000
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    }
+  },
+  {
+    "name": "a tombstone as new as the entry wins",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [],
+      "deleted": {
+        "melee": 1793008800000
+      }
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "melee",
+          "term": "melee",
+          "forms": [
+            "melee"
+          ],
+          "createdAt": 1792922400000,
+          "updatedAt": 1793008800000,
+          "contexts": [
+            {
+              "id": "0000000000000006",
+              "sentence": "Sentence 6.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1792922400000
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [],
+      "deleted": {
+        "melee": 1793008800000
+      }
+    }
+  },
+  {
+    "name": "tombstones expire after a year",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [],
+      "deleted": {
+        "old": 1762164000000,
+        "recent": 1762250400000
+      }
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [],
+      "deleted": {
+        "older": 1759140000000
+      }
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [],
+      "deleted": {
+        "recent": 1762250400000
+      }
+    }
+  },
+  {
+    "name": "contexts: union by id, the newest 20 kept, a missing meaning filled from the other copy",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "coalesced",
+          "term": "coalesced",
+          "forms": [
+            "coalesced"
+          ],
+          "createdAt": 1000000,
+          "updatedAt": 1000600,
+          "contexts": [
+            {
+              "id": "0000000000000001",
+              "sentence": "Sentence 1.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000001
+            },
+            {
+              "id": "0000000000000002",
+              "sentence": "Sentence 2.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000002
+            },
+            {
+              "id": "0000000000000003",
+              "sentence": "Sentence 3.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000003
+            },
+            {
+              "id": "0000000000000004",
+              "sentence": "Sentence 4.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000004
+            },
+            {
+              "id": "0000000000000005",
+              "sentence": "Sentence 5.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000005
+            },
+            {
+              "id": "0000000000000006",
+              "sentence": "Sentence 6.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000006
+            },
+            {
+              "id": "0000000000000007",
+              "sentence": "Sentence 7.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000007
+            },
+            {
+              "id": "0000000000000008",
+              "sentence": "Sentence 8.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000008
+            },
+            {
+              "id": "0000000000000009",
+              "sentence": "Sentence 9.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000009
+            },
+            {
+              "id": "000000000000000a",
+              "sentence": "Sentence 10.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000010
+            },
+            {
+              "id": "000000000000000b",
+              "sentence": "Sentence 11.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000011,
+              "meaning": "local m"
+            },
+            {
+              "id": "000000000000000c",
+              "sentence": "Sentence 12.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000012
+            },
+            {
+              "id": "000000000000000d",
+              "sentence": "Sentence 13.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000013
+            },
+            {
+              "id": "000000000000000e",
+              "sentence": "Sentence 14.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000014
+            },
+            {
+              "id": "000000000000000f",
+              "sentence": "Sentence 15.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000015
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "coalesced",
+          "term": "coalesced",
+          "forms": [
+            "coalesced"
+          ],
+          "createdAt": 1000011,
+          "updatedAt": 1000700,
+          "contexts": [
+            {
+              "id": "000000000000000b",
+              "sentence": "Sentence 11.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000111
+            },
+            {
+              "id": "000000000000000c",
+              "sentence": "Sentence 12.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000012
+            },
+            {
+              "id": "000000000000000d",
+              "sentence": "Sentence 13.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000013
+            },
+            {
+              "id": "000000000000000e",
+              "sentence": "Sentence 14.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000014
+            },
+            {
+              "id": "000000000000000f",
+              "sentence": "Sentence 15.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000015
+            },
+            {
+              "id": "0000000000000010",
+              "sentence": "Sentence 16.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000016
+            },
+            {
+              "id": "0000000000000011",
+              "sentence": "Sentence 17.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000017
+            },
+            {
+              "id": "0000000000000012",
+              "sentence": "Sentence 18.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000018
+            },
+            {
+              "id": "0000000000000013",
+              "sentence": "Sentence 19.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000019
+            },
+            {
+              "id": "0000000000000014",
+              "sentence": "Sentence 20.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000020
+            },
+            {
+              "id": "0000000000000015",
+              "sentence": "Sentence 21.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000021
+            },
+            {
+              "id": "0000000000000016",
+              "sentence": "Sentence 22.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000022
+            },
+            {
+              "id": "0000000000000017",
+              "sentence": "Sentence 23.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000023
+            },
+            {
+              "id": "0000000000000018",
+              "sentence": "Sentence 24.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000024
+            },
+            {
+              "id": "0000000000000019",
+              "sentence": "Sentence 25.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000025
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "coalesced",
+          "term": "coalesced",
+          "forms": [
+            "coalesced"
+          ],
+          "createdAt": 1000000,
+          "updatedAt": 1000700,
+          "contexts": [
+            {
+              "id": "0000000000000006",
+              "sentence": "Sentence 6.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000006
+            },
+            {
+              "id": "0000000000000007",
+              "sentence": "Sentence 7.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000007
+            },
+            {
+              "id": "0000000000000008",
+              "sentence": "Sentence 8.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000008
+            },
+            {
+              "id": "0000000000000009",
+              "sentence": "Sentence 9.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000009
+            },
+            {
+              "id": "000000000000000a",
+              "sentence": "Sentence 10.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000010
+            },
+            {
+              "id": "000000000000000c",
+              "sentence": "Sentence 12.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000012
+            },
+            {
+              "id": "000000000000000d",
+              "sentence": "Sentence 13.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000013
+            },
+            {
+              "id": "000000000000000e",
+              "sentence": "Sentence 14.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000014
+            },
+            {
+              "id": "000000000000000f",
+              "sentence": "Sentence 15.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000015
+            },
+            {
+              "id": "0000000000000010",
+              "sentence": "Sentence 16.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000016
+            },
+            {
+              "id": "0000000000000011",
+              "sentence": "Sentence 17.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000017
+            },
+            {
+              "id": "0000000000000012",
+              "sentence": "Sentence 18.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000018
+            },
+            {
+              "id": "0000000000000013",
+              "sentence": "Sentence 19.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000019
+            },
+            {
+              "id": "0000000000000014",
+              "sentence": "Sentence 20.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000020
+            },
+            {
+              "id": "0000000000000015",
+              "sentence": "Sentence 21.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000021
+            },
+            {
+              "id": "0000000000000016",
+              "sentence": "Sentence 22.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000022
+            },
+            {
+              "id": "0000000000000017",
+              "sentence": "Sentence 23.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000023
+            },
+            {
+              "id": "0000000000000018",
+              "sentence": "Sentence 24.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000024
+            },
+            {
+              "id": "0000000000000019",
+              "sentence": "Sentence 25.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000025
+            },
+            {
+              "id": "000000000000000b",
+              "sentence": "Sentence 11.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1000111,
+              "meaning": "local m"
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    }
+  },
+  {
+    "name": "fields this version doesn't know are kept",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 500,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "nova",
+          "term": "nova",
+          "forms": [
+            "nova"
+          ],
+          "createdAt": 100,
+          "updatedAt": 200,
+          "contexts": [
+            {
+              "id": "0000000000000007",
+              "sentence": "Sentence 7.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 100,
+              "highlight": "yellow"
+            }
+          ],
+          "futureField": {
+            "a": 1
+          }
+        }
+      ],
+      "deleted": {},
+      "topLocal": true
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 600,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "nova",
+          "term": "nova",
+          "forms": [
+            "nova"
+          ],
+          "createdAt": 100,
+          "updatedAt": 150,
+          "contexts": [
+            {
+              "id": "0000000000000007",
+              "sentence": "Sentence 7.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 100,
+              "page": 3
+            }
+          ],
+          "otherField": "x"
+        }
+      ],
+      "deleted": {},
+      "topRemote": 1
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "nova",
+          "term": "nova",
+          "forms": [
+            "nova"
+          ],
+          "createdAt": 100,
+          "updatedAt": 200,
+          "contexts": [
+            {
+              "id": "0000000000000007",
+              "sentence": "Sentence 7.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 100,
+              "highlight": "yellow",
+              "page": 3
+            }
+          ],
+          "futureField": {
+            "a": 1
+          },
+          "otherField": "x"
+        }
+      ],
+      "deleted": {},
+      "topRemote": 1
+    }
+  },
+  {
+    "name": "forms: union in code point order, at most 20",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "form",
+          "term": "form",
+          "forms": [
+            "form01",
+            "form02",
+            "form03",
+            "form04",
+            "form05",
+            "form06",
+            "form07",
+            "form08",
+            "form09",
+            "form10",
+            "form11",
+            "form12"
+          ],
+          "createdAt": 10,
+          "updatedAt": 20,
+          "contexts": [
+            {
+              "id": "0000000000000008",
+              "sentence": "Sentence 8.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 10
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "form",
+          "term": "form",
+          "forms": [
+            "form09",
+            "form10",
+            "form11",
+            "form12",
+            "form13",
+            "form14",
+            "form15",
+            "form16",
+            "form17",
+            "form18",
+            "form19",
+            "form20",
+            "form21",
+            "form22",
+            "form23",
+            "form24"
+          ],
+          "createdAt": 10,
+          "updatedAt": 30,
+          "contexts": [
+            {
+              "id": "0000000000000008",
+              "sentence": "Sentence 8.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 10
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "form",
+          "term": "form",
+          "forms": [
+            "form01",
+            "form02",
+            "form03",
+            "form04",
+            "form05",
+            "form06",
+            "form07",
+            "form08",
+            "form09",
+            "form10",
+            "form11",
+            "form12",
+            "form13",
+            "form14",
+            "form15",
+            "form16",
+            "form17",
+            "form18",
+            "form19",
+            "form20"
+          ],
+          "createdAt": 10,
+          "updatedAt": 30,
+          "contexts": [
+            {
+              "id": "0000000000000008",
+              "sentence": "Sentence 8.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 10
+            }
+          ]
+        }
+      ],
+      "deleted": {}
+    }
+  },
+  {
+    "name": "no file on Drive yet",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "relics",
+          "term": "relics",
+          "forms": [
+            "relics"
+          ],
+          "createdAt": 1793440800000,
+          "updatedAt": 1793527200000,
+          "contexts": [
+            {
+              "id": "0000000000000009",
+              "sentence": "Sentence 9.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1793440800000
+            }
+          ],
+          "lemma": "relic"
+        }
+      ],
+      "deleted": {
+        "gone": 1759140000000,
+        "keep": 1793613600000
+      }
+    },
+    "remote": null,
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "relics",
+          "term": "relics",
+          "forms": [
+            "relics"
+          ],
+          "createdAt": 1793440800000,
+          "updatedAt": 1793527200000,
+          "contexts": [
+            {
+              "id": "0000000000000009",
+              "sentence": "Sentence 9.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 1793440800000
+            }
+          ],
+          "lemma": "relic"
+        }
+      ],
+      "deleted": {
+        "keep": 1793613600000
+      }
+    }
+  },
+  {
+    "name": "same updatedAt: the larger meaning counts as newer",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "pundit",
+          "term": "pundit",
+          "forms": [
+            "pundit"
+          ],
+          "createdAt": 50,
+          "updatedAt": 300,
+          "contexts": [
+            {
+              "id": "000000000000000a",
+              "sentence": "Sentence 10.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 50
+            }
+          ],
+          "meaning": "专家"
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "pundit",
+          "term": "pundit",
+          "forms": [
+            "pundit"
+          ],
+          "createdAt": 60,
+          "updatedAt": 300,
+          "contexts": [
+            {
+              "id": "000000000000000a",
+              "sentence": "Sentence 10.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 50
+            }
+          ],
+          "meaning": "权威人士"
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "pundit",
+          "term": "pundit",
+          "forms": [
+            "pundit"
+          ],
+          "createdAt": 50,
+          "updatedAt": 300,
+          "contexts": [
+            {
+              "id": "000000000000000a",
+              "sentence": "Sentence 10.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 50
+            }
+          ],
+          "meaning": "权威人士"
+        }
+      ],
+      "deleted": {}
+    }
+  },
+  {
+    "name": "null counts as missing",
+    "now": 1793700000000,
+    "local": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "tumult",
+          "term": "tumult",
+          "forms": [
+            "tumult"
+          ],
+          "createdAt": 70,
+          "updatedAt": 400,
+          "contexts": [
+            {
+              "id": "000000000000000b",
+              "sentence": "Sentence 11.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 70,
+              "meaning": null
+            }
+          ],
+          "meaning": null,
+          "lemma": null
+        }
+      ],
+      "deleted": {}
+    },
+    "remote": {
+      "formatVersion": 2,
+      "updatedAt": 1793613600000,
+      "updatedBy": "test",
+      "entries": [
+        {
+          "key": "tumult",
+          "term": "tumult",
+          "forms": [
+            "tumult"
+          ],
+          "createdAt": 70,
+          "updatedAt": 100,
+          "contexts": [
+            {
+              "id": "000000000000000b",
+              "sentence": "Sentence 11.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 70,
+              "meaning": "骚动"
+            }
+          ],
+          "meaning": "混乱",
+          "lemma": "tumult"
+        }
+      ],
+      "deleted": {}
+    },
+    "expected": {
+      "formatVersion": 2,
+      "entries": [
+        {
+          "key": "tumult",
+          "term": "tumult",
+          "forms": [
+            "tumult"
+          ],
+          "createdAt": 70,
+          "updatedAt": 400,
+          "contexts": [
+            {
+              "id": "000000000000000b",
+              "sentence": "Sentence 11.",
+              "url": "https://en.wikipedia.org/wiki/Cultural_Revolution",
+              "title": "Cultural Revolution",
+              "savedAt": 70,
+              "meaning": "骚动"
+            }
+          ],
+          "meaning": "混乱",
+          "lemma": "tumult"
+        }
+      ],
+      "deleted": {}
+    }
+  }
+]
