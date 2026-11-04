@@ -2,14 +2,28 @@ import OSLog
 import SwiftData
 import SwiftUI
 
-/// Home screen: the list of saved articles, newest first. Swiping a row reveals its Info button; the + menu adds
-/// articles, selects several for batch work (a swipe right leaves), and opens storage and Google Drive.
+/// The two parts of the library.
+enum LibraryShelf: String {
+    /// Articles added here: from Wikipedia, files, photos, pasted text.
+    case mine
+    /// The English Reader site's catalog; an article is fetched when first opened.
+    case site
+}
+
+/// Home screen: the articles added here, newest first, or the English Reader site's catalog. Swiping a row reveals
+/// its Info button; the + menu adds articles, selects several for batch work (a swipe right leaves), and opens
+/// storage and Google Drive.
 struct LibraryView: View {
     @Query(sort: \Article.addedAt, order: .reverse) private var articles: [Article]
     @Environment(\.modelContext) private var modelContext
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
+    @AppStorage(SettingsKeys.libraryShelf) private var shelf = LibraryShelf.mine
     @State private var downloader = AudioDownloader.shared
     @State private var drive = DriveAudioStore.shared
+    @State private var site = SiteLibrary.shared
+    /// The English Reader article being fetched to be opened.
+    @State private var openingSiteID: String?
+    @State private var siteOpenError: String?
     @State private var path: [Article] = []
     @State private var isAddingArticle = false
     @State private var importer = ArticleImportCoordinator()
@@ -34,9 +48,34 @@ struct LibraryView: View {
     /// How much of each article's audio is downloaded, for the rows.
     @State private var audioFractions: [PersistentIdentifier: Double] = [:]
 
+    /// What is listed: the site's shelf only outside of selecting (selecting is for the articles added here).
+    private var showsSite: Bool { shelf == .site && !isSelecting }
+
+    /// The articles the site's text was made into: listed under English Reader, not with the ones added here.
+    private var siteArticleURLs: Set<URL> {
+        Set(site.links.values.filter(\.ownsText).map(\.articleURL))
+    }
+
+    private var myArticles: [Article] {
+        let siteURLs = siteArticleURLs
+        return articles.filter { !siteURLs.contains($0.sourceURL) }
+    }
+
     private var shownArticles: [Article] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        return query.isEmpty ? articles : articles.filter { $0.title.localizedCaseInsensitiveContains(query) }
+        let mine = myArticles
+        return query.isEmpty ? mine : mine.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var shownSiteArticles: [SiteArticleSummary] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        return query.isEmpty ? site.articles : site.articles.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    /// A catalog entry's article on this iPhone, once opened.
+    private func localArticle(_ summary: SiteArticleSummary) -> Article? {
+        guard let url = site.links[summary.id]?.articleURL else { return nil }
+        return articles.first { $0.sourceURL == url }
     }
 
     private var selectedArticles: [Article] {
@@ -46,12 +85,32 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack(path: $path) {
             List(selection: $selection) {
+                if !isSelecting {
+                    Section {
+                        Picker("Show", selection: $shelf) {
+                            Text("My Articles").tag(LibraryShelf.mine)
+                            Text("English Reader").tag(LibraryShelf.site)
+                        }
+                        .pickerStyle(.segmented)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
+                    }
+                }
                 if (downloader.phase != .idle || drive.backupRun != nil) && !isSelecting {
                     Section {
                         if downloader.phase != .idle { AudioDownloadStatusRow() }
                         if drive.backupRun != nil { DriveBackupStatusRow() }
                     }
                 }
+                if showsSite {
+                    Section {
+                        ForEach(shownSiteArticles, id: \.id) { summary in
+                            siteRow(summary)
+                        }
+                    } footer: {
+                        if !site.articles.isEmpty { Text(siteFooter) }
+                    }
+                } else {
                 Section {
                     ForEach(shownArticles) { article in
                         let id = article.persistentModelID
@@ -85,13 +144,28 @@ struct LibraryView: View {
                         .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
                     }
                 }
+                }
             }
+            // Keeps the shelf picker close to the articles.
+            .listSectionSpacing(.compact)
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             // While selecting, a swipe to the right anywhere leaves, like going back; rows can't be swiped then.
             .simultaneousGesture(leaveSelectingSwipe, including: isSelecting ? .all : .subviews)
             .searchable(text: $searchText, prompt: "Search titles")
+            // New and changed articles on English Reader (cheap: only what changed since last time).
+            .refreshable { await site.sync() }
+            .task(id: shelf) {
+                if shelf == .site { await site.sync(ifDue: true) }
+            }
+            .alert("Couldn't Open the Article", isPresented: Binding(get: { siteOpenError != nil }, set: { if !$0 { siteOpenError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(siteOpenError ?? "")
+            }
             .overlay {
-                if articles.isEmpty {
+                if showsSite {
+                    siteOverlay
+                } else if myArticles.isEmpty {
                     ContentUnavailableView(
                         "No Articles",
                         systemImage: "books.vertical",
@@ -121,9 +195,10 @@ struct LibraryView: View {
                 }
             }
             .toolbar(isSelecting ? .visible : .hidden, for: .bottomBar)
-            .task(id: FractionInput(count: articles.count, voice: openAIVoice, done: downloader.donePieces, phase: downloader.phase)) {
-                let sources = articles.map { (id: $0.persistentModelID, blocksData: $0.blocksData) }
-                audioFractions = await ArticleAudio.fractions(of: sources, voice: openAIVoice)
+            .task(id: FractionInput(
+                count: articles.count, voice: openAIVoice, done: downloader.donePieces, phase: downloader.phase, siteLinks: site.links
+            )) {
+                audioFractions = await fractions()
             }
             .task {
                 if Article.repairOrigins(articles) { try? modelContext.save() }
@@ -207,6 +282,8 @@ struct LibraryView: View {
         var voice: String
         var done: Int
         var phase: AudioDownloader.Phase
+        /// An article opened from the site, or updated from it.
+        var siteLinks: [String: SiteLibrary.Link]
     }
 
     // MARK: - Rows
@@ -262,7 +339,7 @@ struct LibraryView: View {
     }
 
     /// Icon and text close together, at caption size.
-    private struct BadgeLabelStyle: LabelStyle {
+    struct BadgeLabelStyle: LabelStyle {
         func makeBody(configuration: Configuration) -> some View {
             HStack(spacing: 3) {
                 configuration.icon
@@ -316,9 +393,12 @@ struct LibraryView: View {
                 Button("Paste Text", systemImage: "doc.on.clipboard") { importer.paste() }
             }
             Button("Select Articles", systemImage: "checkmark.circle") {
-                withAnimation { isSelecting = true }
+                withAnimation {
+                    shelf = .mine
+                    isSelecting = true
+                }
             }
-            .disabled(articles.isEmpty)
+            .disabled(myArticles.isEmpty)
             // Downloading audio is in Select Articles (Select All covers the whole library) and in Library & Storage.
             Section {
                 Button("Word Book", systemImage: "character.book.closed") {
@@ -435,10 +515,98 @@ struct LibraryView: View {
     }
 
     private func refreshFractions() {
-        Task {
-            let sources = articles.map { (id: $0.persistentModelID, blocksData: $0.blocksData) }
-            audioFractions = await ArticleAudio.fractions(of: sources, voice: openAIVoice)
+        Task { audioFractions = await fractions() }
+    }
+
+    /// How much of each article's audio is here: in the site's narration voice for articles opened from the site,
+    /// in Settings' OpenAI voice for the rest.
+    private func fractions() async -> [PersistentIdentifier: Double] {
+        let groups = Dictionary(grouping: articles) { site.narrationVoice(forArticleURL: $0.sourceURL) ?? openAIVoice }
+        var result: [PersistentIdentifier: Double] = [:]
+        for (voice, group) in groups {
+            let sources = group.map { (id: $0.persistentModelID, blocksData: $0.blocksData) }
+            result.merge(await ArticleAudio.fractions(of: sources, voice: voice)) { $1 }
         }
+        return result
+    }
+
+    // MARK: - English Reader
+
+    private func siteRow(_ summary: SiteArticleSummary) -> some View {
+        let local = localArticle(summary)
+        let rowID = local?.persistentModelID
+        return SwipeRevealRow(
+            isOpen: rowID != nil && openRow == rowID,
+            // Info needs the article here, so only once it was opened.
+            isEnabled: local != nil,
+            onOpenChange: { openRow = $0 ? rowID : nil },
+            onInfo: {
+                openRow = nil
+                infoArticle = local
+            },
+            onTap: {
+                openRow = nil
+                openSite(summary)
+            }
+        ) {
+            SiteArticleRow(
+                summary: summary,
+                audioFraction: rowID.map { audioFractions[$0] ?? 0 },
+                isOpening: openingSiteID == summary.id,
+                isDownloading: rowID.map { downloader.isDownloading($0) } ?? false
+            )
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
+    }
+
+    /// Fetches the article the first time (and when the site changed it), then opens it like any other.
+    private func openSite(_ summary: SiteArticleSummary) {
+        guard openingSiteID == nil else { return }
+        openingSiteID = summary.id
+        Task {
+            defer { openingSiteID = nil }
+            do throws(SiteError) {
+                let article = try await site.open(summary, in: modelContext)
+                try? modelContext.save()
+                if article.bookmarks.isEmpty {
+                    path = [article]
+                } else {
+                    startChoice = article
+                }
+            } catch {
+                siteOpenError = error.message
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var siteOverlay: some View {
+        if site.articles.isEmpty {
+            switch site.state {
+            case .failed(let message):
+                ContentUnavailableView {
+                    Label("Couldn't Load English Reader", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Try Again") { Task { await site.sync() } }
+                }
+            case .synced:
+                ContentUnavailableView("No Articles Yet", systemImage: "books.vertical", description: Text("Articles published on English Reader appear here."))
+            case .idle, .syncing:
+                ProgressView("Loading English Reader…")
+            }
+        } else if shownSiteArticles.isEmpty {
+            ContentUnavailableView.search(text: searchText)
+        }
+    }
+
+    private var siteFooter: String {
+        let base = "From english.thrones.wang. An article is downloaded when you open it; its narration plays from the site, free."
+        if case .failed(let message) = site.state { return "\(base)\n\nCouldn't check for new articles: \(message)" }
+        return base
     }
 }
 

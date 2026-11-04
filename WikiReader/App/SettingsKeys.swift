@@ -42,6 +42,9 @@ nonisolated enum SettingsKeys {
     /// off, only backups asked for go up.
     static let driveAutoBackUp = "driveAutoBackUp"
 
+    /// Which part of the library is shown: the articles added here, or English Reader's (`LibraryShelf`).
+    static let libraryShelf = "libraryShelf"
+
     /// Whether this device has moved the per-article saved-word lists into the global book (once).
     static let vocabularyImported = "vocabularyImported"
 

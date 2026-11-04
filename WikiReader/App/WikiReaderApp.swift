@@ -42,9 +42,12 @@ private struct RootView: View {
                 GoogleAccount.shared.onAccountChange = { DriveAudioStore.shared.reset() }
             }
             .onChange(of: appearance) { _, new in new.apply() }
-            // Coming to the front (launch included): words saved on other devices or in Chrome come in.
+            // Coming to the front (launch included): words saved on other devices or in Chrome come in, and new
+            // articles on English Reader (at most every ten minutes).
             .onChange(of: scenePhase, initial: true) { _, phase in
-                if phase == .active { Task { await VocabSync.shared.sync() } }
+                guard phase == .active else { return }
+                Task { await VocabSync.shared.sync() }
+                Task { await SiteLibrary.shared.sync(ifDue: true) }
             }
     }
 }
