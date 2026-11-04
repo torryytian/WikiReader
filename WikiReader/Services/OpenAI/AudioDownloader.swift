@@ -41,6 +41,8 @@ final class AudioDownloader {
         var articleCount: Int
         /// Made by `onlyFromDrive`.
         var isDriveOnly = false
+        /// A Drive-only plan whose free source is the English Reader site's narration (asked before Drive).
+        var isFromSite = false
         /// For a Drive-only plan: the missing audio that isn't in Drive and was left out.
         var leftOutCharacters = 0
 
@@ -96,6 +98,8 @@ final class AudioDownloader {
     private(set) var pending: [PersistentIdentifier: Int] = [:]
     /// Of `totalPieces`, those taken from Google Drive alone.
     private(set) var driveOnlyPieces = 0
+    /// What is running was asked for from English Reader (its narration, free).
+    private(set) var isFromSite = false
 
     @ObservationIgnored private let client: OpenAITTSClient
     @ObservationIgnored private let cache: SpeechAudioCache
@@ -157,6 +161,7 @@ final class AudioDownloader {
             driveOnlyPieces = 0
             pending = [:]
             consecutiveFailures = 0
+            isFromSite = plan.isFromSite
         }
         voice = plan.voice
         var queued = Set(queue.map { cache.fileURL(for: $0.piece.request) })
@@ -260,7 +265,7 @@ final class AudioDownloader {
     private func fetchFromDrive(_ request: OpenAISpeechRequest) async -> Outcome {
         if cache.cachedFile(for: request) != nil { return .done }
         if await generations.fetchFromRemote(request, cache: cache) != nil { return .done }
-        return .failed("Google Drive didn't send the audio.")
+        return .failed(isFromSite ? "English Reader didn't send the audio." : "Google Drive didn't send the audio.")
     }
 
     private func finish() {

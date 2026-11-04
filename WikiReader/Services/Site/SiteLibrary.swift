@@ -31,6 +31,8 @@ final class SiteLibrary {
         var voice: String?
         /// The text is the site's (made from it), not one added by hand before: only then is it updated from the site.
         var ownsText: Bool
+        /// Where the text comes from and its license, as the site words it.
+        var attribution: String?
     }
 
     private struct Stored: Codable {
@@ -67,7 +69,20 @@ final class SiteLibrary {
         self.now = now
         stored = (try? JSONDecoder().decode(Stored.self, from: Data(contentsOf: directory.appending(path: "Catalog.json")))) ?? Stored()
         audio = (try? JSONDecoder().decode([String: URL].self, from: Data(contentsOf: directory.appending(path: "AudioIndex.json")))) ?? [:]
+        fillInAttributions()
         publish()
+    }
+
+    /// Links made before attributions were kept get theirs from the detail kept on disk (once: then it is saved).
+    private func fillInAttributions() {
+        var filled = false
+        for (id, link) in stored.links where link.attribution == nil {
+            let file = directory.appending(path: "Articles/\(id).json")
+            guard let data = try? Data(contentsOf: file), let text = (try? SiteClient.decodeArticle(data))?.attribution?.text else { continue }
+            stored.links[id]?.attribution = text
+            filled = true
+        }
+        if filled { save() }
     }
 
     // MARK: - The catalog
@@ -173,7 +188,8 @@ final class SiteLibrary {
         audio.merge(files) { _, new in new }
         stored.links[summary.id] = Link(
             articleURL: article.sourceURL, contentVersion: detail.summary.contentVersion,
-            voice: files.isEmpty ? nil : detail.narration?.voice, ownsText: ownsText
+            voice: files.isEmpty ? nil : detail.narration?.voice, ownsText: ownsText,
+            attribution: detail.attribution?.text
         )
         // The detail is newer than the catalog entry: keep what it says.
         stored.articles[summary.id] = detail.summary
@@ -191,6 +207,11 @@ final class SiteLibrary {
     func summary(forArticleURL url: URL) -> SiteArticleSummary? {
         guard let id = stored.links.first(where: { $0.value.articleURL == url })?.key else { return nil }
         return stored.articles[id]
+    }
+
+    /// What the site says about an article opened from it: its source and license.
+    func link(forArticleURL url: URL) -> Link? {
+        stored.links.values.first { $0.articleURL == url }
     }
 
     /// The voice to read an article with so the site's narration plays: nil if it isn't from the site or the site

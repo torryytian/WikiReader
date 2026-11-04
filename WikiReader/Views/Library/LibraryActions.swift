@@ -33,6 +33,32 @@ enum LibraryActions {
         return plan.isEmpty ? .nothingToDo : .confirm(plan)
     }
 
+    // MARK: English Reader
+
+    /// Works out what taking English Reader's narration of `articles` (opened from the site) would bring, for the
+    /// confirmation. Only what the site has is downloaded, in its own voice; nothing is generated, so it is free.
+    static func siteDownloadPrompt(for articles: [Article]) async -> AudioDownloadPrompt {
+        let site = SiteLibrary.shared
+        let voiced = articles.compactMap { article in site.narrationVoice(forArticleURL: article.sourceURL).map { (article, $0) } }
+        guard let voice = voiced.first?.1 else {
+            return .notice(title: "No Narration Yet", message: "English Reader has no narration for \(articles.count == 1 ? "this article" : "these articles") yet.")
+        }
+        // The site narrates everything in one voice; an article in another would be another download.
+        let sources = voiced.filter { $0.1 == voice }.map { AudioDownloader.Source(id: $0.0.persistentModelID, blocksData: $0.0.blocksData) }
+        var plan = await AudioDownloader.plan(for: sources, voice: voice)
+        let these = articles.count == 1 ? "this article" : "these articles"
+        guard !plan.isEmpty else {
+            return .notice(title: "Already Downloaded", message: "All of English Reader's narration for \(these) is on this iPhone.")
+        }
+        plan.markOnDrive { site.audioURL(forKey: $0) != nil }
+        var fromSite = plan.onlyFromDrive()
+        fromSite.isFromSite = true
+        guard !fromSite.isEmpty else {
+            return .notice(title: "Not on English Reader Yet", message: "English Reader hasn't made the narration that \(these) still lack on this iPhone.")
+        }
+        return .confirm(fromSite)
+    }
+
     // MARK: Google Drive
 
     /// Works out what taking `articles`' audio (in the chosen voice) from Google Drive would bring, for the
@@ -144,7 +170,7 @@ enum AudioDownloadPrompt: Identifiable {
 
     var id: String {
         switch self {
-        case .confirm(let plan): "confirm-\(plan.isDriveOnly)-\(plan.items.count)"
+        case .confirm(let plan): "confirm-\(plan.isDriveOnly)-\(plan.isFromSite)-\(plan.items.count)"
         case .nothingToDo: "nothing"
         case .noKey: "noKey"
         case .notice(let title, _): "notice-\(title)"
@@ -153,7 +179,7 @@ enum AudioDownloadPrompt: Identifiable {
 
     var title: String {
         switch self {
-        case .confirm(let plan): plan.isDriveOnly ? "Download from Google Drive?" : "Download Audio?"
+        case .confirm(let plan): plan.isFromSite ? "Download from English Reader?" : plan.isDriveOnly ? "Download from Google Drive?" : "Download Audio?"
         case .nothingToDo: "Already Downloaded"
         case .noKey: "OpenAI Key Needed"
         case .notice(let title, _): title
@@ -162,6 +188,15 @@ enum AudioDownloadPrompt: Identifiable {
 
     var message: String {
         switch self {
+        case .confirm(let plan) where plan.isFromSite:
+            let articles = plan.articleCount == 1 ? "1 article" : "\(plan.articleCount) articles"
+            var text = "About \(AudioFormat.duration(minutes: plan.minutes)) of English Reader's narration for \(articles). "
+                + "Downloading it is free; nothing is generated."
+            if plan.leftOutCharacters > 0 {
+                text += " Another \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: plan.leftOutCharacters))) isn't on English Reader yet."
+            }
+            if NetworkWatcher.shared.isExpensive { text += " You're on cellular data." }
+            return text + " Keep WikiReader open until it finishes."
         case .confirm(let plan) where plan.isDriveOnly:
             let articles = plan.articleCount == 1 ? "1 article" : "\(plan.articleCount) articles"
             var text = "About \(AudioFormat.duration(minutes: plan.minutes)) of \(plan.voice.capitalized) audio for \(articles) is in your Google Drive. "
@@ -230,8 +265,9 @@ struct AudioDownloadStatusRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label(
-                        downloader.isFromDriveOnly ? "Downloading from Google Drive" : "Downloading audio",
-                        systemImage: downloader.isFromDriveOnly ? "icloud.and.arrow.down" : "arrow.down.circle"
+                        downloader.isFromSite ? "Downloading from English Reader"
+                            : downloader.isFromDriveOnly ? "Downloading from Google Drive" : "Downloading audio",
+                        systemImage: downloader.isFromDriveOnly && !downloader.isFromSite ? "icloud.and.arrow.down" : "arrow.down.circle"
                     )
                     .font(.subheadline.weight(.semibold))
                     Spacer()
@@ -247,7 +283,8 @@ struct AudioDownloadStatusRow: View {
         case .finished:
             summary(
                 downloader.failedPieces == 0
-                    ? (downloader.isFromDriveOnly ? "Downloaded from Google Drive" : "Audio downloaded")
+                    ? (downloader.isFromSite ? "Downloaded from English Reader"
+                        : downloader.isFromDriveOnly ? "Downloaded from Google Drive" : "Audio downloaded")
                     : "Audio downloaded, \(downloader.failedPieces) parts failed",
                 detail: downloader.failedPieces == 0
                     ? "\(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: downloader.doneCharacters))) of audio is on this iPhone."

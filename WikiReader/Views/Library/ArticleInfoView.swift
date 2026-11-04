@@ -19,6 +19,7 @@ struct ArticleInfoView: View {
     @State private var downloader = AudioDownloader.shared
     @State private var drive = DriveAudioStore.shared
     @State private var account = GoogleAccount.shared
+    @State private var site = SiteLibrary.shared
     /// A Google Drive action being worked out.
     @State private var isPreparingDrive = false
 
@@ -35,6 +36,15 @@ struct ArticleInfoView: View {
     @State private var audioVersion = 0
 
     private var isDownloading: Bool { downloader.isDownloading(article.persistentModelID) }
+
+    /// The English Reader entry this article was opened from, if it was.
+    private var siteSummary: SiteArticleSummary? { site.summary(forArticleURL: article.sourceURL) }
+
+    /// English Reader's narration voice for it: its audio is counted and downloaded in that voice, free.
+    private var siteVoice: String? { site.narrationVoice(forArticleURL: article.sourceURL) }
+
+    /// The voice its audio is counted in: the site's, else the OpenAI voice chosen in Settings.
+    private var voice: String { siteVoice ?? openAIVoice }
 
     var body: some View {
         NavigationStack {
@@ -66,17 +76,17 @@ struct ArticleInfoView: View {
                 }
             }
             .task(id: StatusInput(
-                voice: openAIVoice, done: downloader.donePieces, version: audioVersion,
+                voice: voice, done: downloader.donePieces, version: audioVersion,
                 pending: drive.pendingUploads.count, signedIn: account.isSignedIn
             )) {
                 if drive.isEnabled {
                     await drive.syncIndex()
                     backup = await DriveAudioStore.backup(
-                        url: article.sourceURL.absoluteString, blocksData: article.blocksData, voice: openAIVoice,
+                        url: article.sourceURL.absoluteString, blocksData: article.blocksData, voice: voice,
                         indexed: drive.indexedKeys, pending: Set(drive.pendingUploads), manifests: drive.manifestNames
                     )
                 }
-                status = await ArticleAudio.status(ofBlocksData: article.blocksData, voice: openAIVoice)
+                status = await ArticleAudio.status(ofBlocksData: article.blocksData, voice: voice)
             }
             .audioDownloadPrompt($downloadPrompt)
             .confirmationDialog("Delete \(article.title)?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
@@ -93,7 +103,9 @@ struct ArticleInfoView: View {
                     }
                 }
             } message: {
-                Text("All voices. It will be generated and paid for again when read.")
+                Text(siteVoice == nil
+                    ? "All voices. It will be generated and paid for again when read."
+                    : "All voices. English Reader's narration is downloaded again, free, when read.")
             }
         }
     }
@@ -126,7 +138,18 @@ struct ArticleInfoView: View {
                 }
             }
             .padding(.vertical, 4)
-            if article.isImported {
+            if let siteSummary {
+                if let page = siteSummary.pageUrl {
+                    Link(destination: page) {
+                        Label("Open on English Reader", systemImage: "safari")
+                    }
+                }
+                if siteSummary.isWikipedia, let wikipedia = siteSummary.source?.url {
+                    Link(destination: wikipedia) {
+                        Label("Open on Wikipedia", systemImage: "book")
+                    }
+                }
+            } else if article.isImported {
                 Label("Imported text", systemImage: "doc.text")
                     .foregroundStyle(.secondary)
             } else {
@@ -134,6 +157,28 @@ struct ArticleInfoView: View {
                     Label("Open on Wikipedia", systemImage: "safari")
                 }
             }
+        } footer: {
+            if let siteSummary {
+                Text(siteSourceNote(siteSummary))
+            }
+        }
+    }
+
+    /// The site's attribution ("Source: … Licensed under CC BY-SA 4.0 …"), or its license alone.
+    private func siteSourceNote(_ summary: SiteArticleSummary) -> String {
+        if let attribution = site.link(forArticleURL: article.sourceURL)?.attribution, !attribution.isEmpty {
+            return attribution
+        }
+        return summary.license.map { "From English Reader. License: \(Self.licenseName($0))." } ?? "From English Reader."
+    }
+
+    /// "CC-BY-SA-4.0" → "CC BY-SA 4.0"; the site's own ids in words.
+    static func licenseName(_ id: String) -> String {
+        switch id {
+        case "original": "original writing"
+        case "public-domain": "public domain"
+        case "permission": "used with permission"
+        default: id.hasPrefix("CC") ? id.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "BY SA", with: "BY-SA").replacingOccurrences(of: "BY NC", with: "BY-NC") : id
         }
     }
 
@@ -241,12 +286,18 @@ struct ArticleInfoView: View {
                     }
                 } else if !status.isComplete {
                     Button {
-                        Task { downloadPrompt = await LibraryActions.downloadPrompt(for: [article]) }
+                        Task {
+                            downloadPrompt = siteVoice == nil
+                                ? await LibraryActions.downloadPrompt(for: [article])
+                                : await LibraryActions.siteDownloadPrompt(for: [article])
+                        }
                     } label: {
                         Label {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Download Remaining Audio")
-                                Text("About \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: status.missingCharacters))), roughly \(AudioFormat.cost(ArticleAudio.dollars(forCharacters: status.missingCharacters)))")
+                                Text(siteVoice == nil
+                                    ? "About \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: status.missingCharacters))), roughly \(AudioFormat.cost(ArticleAudio.dollars(forCharacters: status.missingCharacters)))"
+                                    : "About \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: status.missingCharacters))), free from English Reader")
                                     .font(.caption)
                                     .foregroundStyle(Color.secondary)
                             }
@@ -269,13 +320,16 @@ struct ArticleInfoView: View {
                     .frame(maxWidth: .infinity)
             }
         } header: {
-            Text("Audio · \(openAIVoice.capitalized)")
+            Text("Audio · \(voice.capitalized)")
         } footer: {
             Text(audioFooter)
         }
     }
 
     private var audioFooter: String {
+        if siteVoice != nil {
+            return "English Reader's narration on this iPhone, for listening offline. Downloading it is free. Times are estimates."
+        }
         var text = "OpenAI audio on this iPhone, for listening offline. Times and costs are estimates."
         if engineChoice == .system {
             text += " You're listening with an iPhone voice now; this audio plays when the \(openAIVoice.capitalized) voice is chosen in Settings."

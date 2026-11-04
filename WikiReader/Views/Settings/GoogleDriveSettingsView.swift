@@ -136,7 +136,7 @@ struct GoogleDriveSettingsView: View {
 
     private var librarySection: some View {
         Section {
-            if downloader.phase != .idle && downloader.isFromDriveOnly {
+            if downloader.phase != .idle && downloader.isFromDriveOnly && !downloader.isFromSite {
                 AudioDownloadStatusRow()
             }
             if drive.backupRun != nil {

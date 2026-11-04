@@ -30,6 +30,8 @@ struct LibraryView: View {
     /// The English Reader article being fetched to be opened.
     @State private var openingSiteID: String?
     @State private var siteOpenError: String?
+    /// Articles being fetched from English Reader before their narration is downloaded.
+    @State private var isPreparingSiteDownload = false
     @State private var path: [LibraryRoute] = []
     @State private var isAddingArticle = false
     @State private var importer = ArticleImportCoordinator()
@@ -197,7 +199,10 @@ struct LibraryView: View {
                 case .article(let article):
                     ReaderView(article: article)
                 case .category(let category):
-                    SiteCategoryView(category: category, state: siteRowState, onOpen: openSite)
+                    SiteCategoryView(
+                        category: category, state: siteRowState, isPreparingDownload: isPreparingSiteDownload,
+                        onOpen: openSite, onDownload: downloadSite
+                    )
                 }
             }
             .toolbar {
@@ -580,6 +585,18 @@ struct LibraryView: View {
         ) {
             SiteArticleRow(summary: summary, state: siteRowState(summary))
         }
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: SwipeRevealRow<EmptyView>.cornerRadius, style: .continuous))
+        .contextMenu {
+            Button("Download Audio", systemImage: "arrow.down.circle") {
+                downloadSite([summary])
+            }
+            if let local {
+                Button("Info", systemImage: "info.circle") {
+                    openRow = nil
+                    infoArticle = local
+                }
+            }
+        }
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
@@ -632,6 +649,31 @@ struct LibraryView: View {
             } catch {
                 siteOpenError = error.message
             }
+        }
+    }
+
+    /// English Reader's narration of these articles, free: each is fetched first if it wasn't opened yet, then what
+    /// the site has and this iPhone lacks is offered for download.
+    private func downloadSite(_ summaries: [SiteArticleSummary]) {
+        guard !isPreparingSiteDownload else { return }
+        isPreparingSiteDownload = true
+        Task {
+            defer { isPreparingSiteDownload = false }
+            var opened: [Article] = []
+            var failure: String?
+            for summary in summaries {
+                do throws(SiteError) {
+                    opened.append(try await site.open(summary, in: modelContext))
+                } catch {
+                    failure = error.message
+                }
+            }
+            try? modelContext.save()
+            if opened.isEmpty, let failure {
+                siteOpenError = failure
+                return
+            }
+            downloadPrompt = await LibraryActions.siteDownloadPrompt(for: opened)
         }
     }
 

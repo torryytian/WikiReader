@@ -6,7 +6,11 @@ struct SiteCategoryView: View {
     let category: SiteCategory
     /// How an article's card looks right now (opened here, audio, being fetched), from the library.
     let state: (SiteArticleSummary) -> SiteArticleRow.State
+    /// Articles are being fetched for a download.
+    let isPreparingDownload: Bool
     let onOpen: (SiteArticleSummary) -> Void
+    /// Download the narration of these, free.
+    let onDownload: ([SiteArticleSummary]) -> Void
     @State private var site = SiteLibrary.shared
     @AppStorage(SettingsKeys.siteArticleOrder) private var order = SiteArticleOrder.newest
     @State private var level: String?
@@ -60,12 +64,23 @@ struct SiteCategoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Picker("Order", selection: $order) {
-                        ForEach(SiteArticleOrder.allCases) { Text($0.title).tag($0) }
+                if isPreparingDownload {
+                    ProgressView()
+                } else {
+                    Menu {
+                        Picker("Order", selection: $order) {
+                            ForEach(SiteArticleOrder.allCases) { Text($0.title).tag($0) }
+                        }
+                        Section {
+                            let articles = shown
+                            Button(articles.count == 1 ? "Download Audio" : "Download Audio of All \(articles.count)", systemImage: "arrow.down.circle") {
+                                onDownload(articles)
+                            }
+                            .disabled(articles.isEmpty)
+                        }
+                    } label: {
+                        Label("Order and Download", systemImage: "ellipsis")
                     }
-                } label: {
-                    Label("Order", systemImage: "arrow.up.arrow.down")
                 }
             }
         }

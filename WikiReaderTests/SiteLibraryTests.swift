@@ -428,3 +428,51 @@ struct SiteCategoryTests {
         #expect(!odd.symbol.isEmpty)
     }
 }
+
+/// Downloading a site article's whole narration: free, from the site alone.
+@MainActor
+struct SiteDownloadTests {
+    let site = FakeSite()
+    let cache = SpeechAudioCache(directory: URL.temporaryDirectory.appending(path: "SiteDownload-\(UUID().uuidString)"))
+    let sent = SentInputs()
+
+    @Test func theWholeNarrationComesFromTheSiteAndNothingIsGenerated() async throws {
+        await site.answer("/api/app/v1/articles?since=0&limit=200", try SiteFixture.page(SiteFixture.items(), latest: 4, maxSeq: 4))
+        await site.answer("/api/app/v1/articles/\(SiteFixture.essayID)", try Fixture.data("site_article_paradox"))
+        let library = SiteLibrary(directory: URL.temporaryDirectory.appending(path: "SiteDownload-\(UUID().uuidString)"), client: site.client)
+        await library.sync()
+        let container = try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let article = try await library.open(try #require(library.article(id: SiteFixture.essayID)), in: container.mainContext)
+
+        let host = FakeAudioHost()
+        let sent = sent
+        let openAI = OpenAITTSClient(transport: { request in
+            let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
+            await sent.record(body["input"]!)
+            return (Data("ID3 openai".utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }, retry: .never)
+        let generations = SpeechGenerations(remote: FakeRemote(), site: SiteAudioSource(library: library, retryDelay: .zero, transport: host.transport))
+        let downloader = AudioDownloader(client: openAI, cache: cache, generations: generations, apiKey: { "sk-test" }, keepAwake: { _ in })
+
+        // What LibraryActions.siteDownloadPrompt plans: the site's voice, only what the site has.
+        let voice = try #require(library.narrationVoice(forArticleURL: article.sourceURL))
+        var plan = await AudioDownloader.plan(
+            for: [AudioDownloader.Source(id: article.persistentModelID, blocksData: article.blocksData)], voice: voice, cache: cache
+        )
+        plan.markOnDrive { library.audioURL(forKey: $0) != nil }
+        var fromSite = plan.onlyFromDrive()
+        fromSite.isFromSite = true
+        #expect(fromSite.items.count == 13)
+        #expect(fromSite.leftOutCharacters == 0)
+        #expect(AudioDownloadPrompt.confirm(fromSite).title == "Download from English Reader?")
+
+        downloader.start(fromSite)
+        #expect(downloader.isFromSite)
+        for _ in 0..<200 where downloader.phase == .running { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(downloader.phase == .finished)
+        #expect(downloader.donePieces == 13)
+        #expect(await host.requested.count == 13)
+        #expect(await sent.inputs.isEmpty)
+        #expect(await ArticleAudio.status(ofBlocksData: article.blocksData, voice: voice, cache: cache).isComplete)
+    }
+}
