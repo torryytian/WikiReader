@@ -8,6 +8,8 @@
 > 1. 生词本是**全局一本**，两端数据和判断逻辑一致，不再按文章分别记录。
 > 2. **在任何地方取消收藏 = 两端都删除这个词**。"已掌握"就是删除，不另设状态。
 > 3. 阅读时**所有生词都高亮**；同一原形的其他变形（studies ↔ studied）用较淡的样式提示。
+>
+> 2026-11-05 起，**English Reader 网站**（english.thrones.wang）作为第三个读写方加入，规则完全相同，只是本端标识用 `"web"`（需求见 `docs/site-api-for-ios.md` §5）。这次只是增补，iOS 和 Chrome 不用改：它们本来就原样保留不认识的字段和取值。
 
 ## 1. 位置与编码
 
@@ -22,7 +24,7 @@
 {
   "formatVersion": 2,
   "updatedAt": 1793700000000,          // 写这个文件的时间
-  "updatedBy": "ios",                  // "ios" | "chrome"，只用于排查
+  "updatedBy": "ios",                  // "ios" | "chrome" | "web"，只用于排查
   "entries": [
     {
       "key": "studies",                // §3，词条主键
@@ -43,7 +45,8 @@
         }
       ],
       "chrome": { },                    // 可选，Chrome 专有（AI 解释、Wiktionary 释义等），iOS 原样保留
-      "ios": { }                        // 可选，iOS 专有（目前没有），Chrome 原样保留
+      "ios": { },                       // 可选，iOS 专有（目前没有），Chrome 原样保留
+      "web": { }                        // 可选，网站专有，其他端原样保留
     }
   ],
   "deleted": { "foo": 1793690000000 }   // 被删除的词：key → 删除时间
@@ -52,7 +55,7 @@
 
 | 字段 | 说明 |
 |---|---|
-| `contexts[].url` | 文章的规范化 URL，与音频缓存的文章 URL 相同（`shared-tts-cache-format.md` §文章 URL）。iOS 导入的本地文章是 `wikireader-import://local/<UUID>`：Chrome 只显示标题，不做链接。非 Wikipedia 网页用页面 URL（去掉 `#fragment`，host 小写）。 |
+| `contexts[].url` | 文章的规范化 URL，与音频缓存的文章 URL 相同（`shared-tts-cache-format.md` §文章 URL）。iOS 导入的本地文章是 `wikireader-import://local/<UUID>`：Chrome 只显示标题，不做链接。非 Wikipedia 网页用页面 URL（去掉 `#fragment`，host 小写）。网站上的文章（iPhone 从网站同步来的也一样）用网站接口给出的 `canonicalUrl`：Wikipedia 文章是 Wikipedia 的规范 URL，其他文章是 `https://english.thrones.wang/a/<slug>`。 |
 | `meaning` | iOS 的 AI 一句话释义写进那条原句的 `contexts[].meaning`，词条的 `meaning` 为空时也填上；Chrome 的 `meaningInContext` 同理。 |
 | 不认识的字段 | 任何一层（顶层、词条、原句）都**原样保留**，合并规则见 §6。 |
 
@@ -144,6 +147,7 @@
 时机：
 - iOS：App 回到前台；收藏、删除、生成释义后约 5 秒（合并多次操作）；连接 Drive 后；打开生词本时。
 - Chrome：打开生词本页；加词、解释、删除后约 4 秒；连接 Drive 后；浏览器开着时每 30 分钟一次。
+- 网站：用户开启同步时；在网站上加词、删除、加释义后约 5 秒；打开生词本页时；打开阅读页且距上次同步超过 2 分钟时（详见 `docs/site-api-for-ios.md` §5.2）。
 
 ## 8. 迁移
 

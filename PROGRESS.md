@@ -245,6 +245,18 @@
 - **未验证（模拟器无法验证，需真机）**：锁上屏幕后是否真的继续读；锁屏上的标题、大图、按钮是否显示并能用；打断后的行为。文字卡只在测试里渲染出图看过。
 - **已知风险**：跨文章的顺序/随机播放靠 SwiftUI 重建 reader 来切换，**锁屏状态下视图不刷新，文章读完后很可能不会接着读下一篇**（循环模式在会话里处理，不受影响）。真机验证后如果确实停了，要把"换文章"从视图里挪到会话层。
 
+### 网站 english.thrones.wang 作为文章来源（2026-11-05，需求已发给网站，iOS 端未开始）
+- **用户的决定**：重构内容这块，主要文章来源改成用户自己的网站 English Reader（`english.thrones.wang`，源码在云主机 `vultr_machine:/root/claude/english_site`，别名 `vultr_machine`；本机 `~/Desktop/claude/english_site` 是旧副本，别参考）。手动添加文章保留。网站文章的记录全部同步到本地，正文和音频按需取；书库里网站文章单独一栏。单词本保留，网站也要能同步。
+- **实测线上**：没有 JSON 接口，数据只在 Next.js 页面内嵌的 RSC 数据里（不解析它）。音频在 R2 `audio.thrones.wang/audio/mp3-128k/<key>.mp3`，**文件名就是 iOS 的缓存 key**（13/13 核对过），128 kbps，网站不转码，直接分发 OpenAI 原文件。所以下载下来就是 iOS 缓存里的文件，播放和高亮代码不用改。
+- **iOS 提的需求**：`docs/site-api-for-ios.md`，已 scp 到网站的 `docs/from-ios/`，连同两份共享格式文档和向量文件，校验过 md5。要点：
+  - 目录 `GET /api/app/v1/articles?since=<seq>` 按全站变更序号增量同步，删除和下架给墓碑，库恢复后换 epoch；
+  - 详情 `GET /api/app/v1/articles/{id}`：正文块、每片的 key/url/ms/off、`contentVersion`；
+  - `sourceIdentical` 标明 R2 文件是不是源文件（不是的话 iOS 不传 Drive）；
+  - 生词本由网站作为 Drive `vocab.json` 的第三个读写方（`updatedBy: "web"`），iOS 和 Chrome 不用改。共享格式文档已经补上这一条。
+- **等网站回复**：`docs/from-ios/REPLY.md`。拿到后先用 curl 抓线上返回存成 fixture，再开始做 iOS 端。
+- **待用户决定**：手机上直接调 OpenAI 生成语音和 Drive 语音缓存这两块要不要去掉（用户只说了单词本要保留）。
+- 顺带发现：音频响应 `cf-cache-status: DYNAMIC`，Cloudflare 没缓存音频，已写进需求 §4.1 提醒网站。
+
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
 - **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。
 - **格式**：`docs/shared-vocab-format.md`（v2，权威定义），和 Chrome 会话逐条对齐过：Drive 上 `WikiReader Cache/vocab.json` 一个文件，逐词合并（较新的字段优先、旧边补缺、原句按 id 并集最多 20 条、删除留墓碑一年），合并与顺序无关、幂等，所以没有条件写入也不会丢改动。key = normalize(term)，term 沿用 iOS 查词规则（ECDICT 里有原词就用原词，所以 studies 和 studied 是两个词）；"同一原形"用 ECDICT `exchange` 的 `0:` 判断（只用于高亮/提示，不合并词条）。共享测试向量 `WikiReaderTests/Fixtures/shared/vocab/`（期望值手写，另用 Python 独立实现核对），Chrome 复制过去跑，四组全部通过。
