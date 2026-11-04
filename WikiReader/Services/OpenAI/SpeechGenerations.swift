@@ -7,23 +7,26 @@ import OSLog
 /// Keyed by the file the audio will be stored in, which names the cache as well as the request: two caches (as in
 /// tests) never share a generation.
 ///
-/// A generation first asks `remote` (Google Drive) for audio another device made, and only then OpenAI; audio from
-/// OpenAI is handed back to `remote` to share.
+/// A generation first asks `site` (the English Reader site's narration, for its articles), then `remote` (Google
+/// Drive) for audio another device made, and only then OpenAI; audio from OpenAI is handed back to `remote` to share.
 final class SpeechGenerations {
     typealias Generation = Task<Result<URL, OpenAITTSError>, Never>
 
-    static let shared = SpeechGenerations(remote: DriveAudioStore.shared)
+    static let shared = SpeechGenerations(remote: DriveAudioStore.shared, site: SiteAudioSource.shared)
 
     private var running: [URL: Generation] = [:]
     /// Where audio is looked for before OpenAI; nil looks nowhere else.
     var remote: RemoteAudioSource?
+    /// Asked before `remote`: free, and it only knows the files it has.
+    var site: RemoteAudioSource?
 
-    init(remote: RemoteAudioSource? = nil) {
+    init(remote: RemoteAudioSource? = nil, site: RemoteAudioSource? = nil) {
         self.remote = remote
+        self.site = site
     }
 
-    /// Whether audio can be had without an OpenAI key (from `remote`).
-    var canWorkWithoutKey: Bool { remote?.looksUpBeforeGenerating ?? false }
+    /// Whether audio can be had without an OpenAI key (from the site or `remote`).
+    var canWorkWithoutKey: Bool { (site?.isEnabled ?? false) || (remote?.looksUpBeforeGenerating ?? false) }
 
     /// The generation of `request`'s audio: the one already running, or a new one. It is never cancelled by its
     /// callers going away: the audio is paid for, so it is allowed to reach the cache. Without an `apiKey` only
@@ -31,8 +34,11 @@ final class SpeechGenerations {
     func generate(_ request: OpenAISpeechRequest, apiKey: String?, client: OpenAITTSClient, cache: SpeechAudioCache) -> Generation {
         let file = cache.fileURL(for: request)
         if let pending = running[file] { return pending }
-        let remote = remote
+        let remote = remote, site = site
         let task = Task { () -> Result<URL, OpenAITTSError> in
+            if let site, site.isEnabled, let url = await site.fetch(request, into: cache) {
+                return .success(url)
+            }
             if let remote, remote.looksUpBeforeGenerating, let url = await remote.fetch(request, into: cache) {
                 return .success(url)
             }
@@ -50,11 +56,12 @@ final class SpeechGenerations {
         return task
     }
 
-    /// `request`'s audio from `remote` alone, never from OpenAI, or nil if it isn't there: for downloading what Google
-    /// Drive has, whether or not it is looked in before generating. A generation of the same text already running is
-    /// waited for instead.
+    /// `request`'s audio from the site or `remote`, never from OpenAI, or nil if neither has it: for downloading what
+    /// is to be had for free, whether or not Drive is looked in before generating. A generation of the same text
+    /// already running is waited for instead.
     func fetchFromRemote(_ request: OpenAISpeechRequest, cache: SpeechAudioCache) async -> URL? {
         if let pending = running[cache.fileURL(for: request)] { return try? await pending.value.get() }
+        if let site, site.isEnabled, let url = await site.fetch(request, into: cache) { return url }
         guard let remote, remote.isEnabled else { return nil }
         return await remote.fetch(request, into: cache)
     }

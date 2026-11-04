@@ -461,15 +461,29 @@ private struct ArticleReader: View {
         self.session = session
         nowPlaying = NowPlayingController(session: session, blocks: blocks, title: article.title)
         // With an OpenAI voice and Google Drive, look the article's audio up on Drive at once (so each paragraph
-        // doesn't wait to ask) and list the article there for other devices.
-        if engineChoice == .openAI, DriveAudioStore.shared.isEnabled {
+        // doesn't wait to ask) and list the article there for other devices. Not for the site's narration: it
+        // comes from the site.
+        if siteVoice == nil, engineChoice == .openAI, DriveAudioStore.shared.isEnabled {
             let (title, url, voice) = (article.title, article.sourceURL.absoluteString, openAIVoice)
             Task { await DriveAudioStore.shared.noteArticle(title: title, url: url, blocks: blocks, voice: voice) }
         }
         if startsPlaying { session.start(at: 0) }
     }
 
+    /// The voice of the English Reader site's narration of this article, if it was opened from the site and the site
+    /// has narration files for it.
+    private var siteVoice: String? {
+        SiteLibrary.shared.narrationVoice(forArticleURL: article.sourceURL)
+    }
+
     private func makeEngine() -> SpeechEngine {
+        if let voice = siteVoice {
+            // The site's narration, free, whatever voice Settings has. A piece the site lacks is generated only when
+            // an OpenAI voice is chosen in Settings (paid, as for any article); otherwise only Drive is asked.
+            usesCloudEngine = true
+            let mayPay = engineChoice == .openAI
+            return OpenAISpeechEngine(voice: voice, apiKey: { mayPay ? KeychainStore.openAIKey.read() : nil })
+        }
         switch engineChoice {
         case .system:
             usesCloudEngine = false
@@ -484,7 +498,7 @@ private struct ArticleReader: View {
     /// if reading can work now, continue where it stopped.
     private func settingsClosed(_ session: ReadingSession) {
         session.replaceEngine(makeEngine())
-        if engineChoice == .system || KeychainStore.openAIKey.read() != nil {
+        if engineChoice == .system || KeychainStore.openAIKey.read() != nil || siteVoice != nil {
             session.play()
         }
     }

@@ -286,3 +286,105 @@ struct SiteLibraryTests {
         await #expect(throws: SiteError.notFound) { try await library.open(usa, in: context) }
     }
 }
+
+/// Serves narration files: a status per request in turn (the last one repeats), counting what was asked.
+actor FakeAudioHost {
+    private(set) var requested: [URL] = []
+    private var statuses: [Int]
+
+    init(statuses: [Int] = [200]) {
+        self.statuses = statuses
+    }
+
+    func handle(_ request: URLRequest) -> (Data, URLResponse) {
+        requested.append(request.url!)
+        let status = statuses.count > 1 ? statuses.removeFirst() : statuses[0]
+        let body = status == 200 ? Data("ID3 site".utf8) : Data()
+        return (body, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+
+    nonisolated var transport: SiteAudioSource.Transport {
+        { request in await self.handle(request) }
+    }
+}
+
+@MainActor
+struct SiteAudioTests {
+    let site = FakeSite()
+    let cache = SpeechAudioCache(directory: URL.temporaryDirectory.appending(path: "SiteAudio-\(UUID().uuidString)"))
+    let sent = SentInputs()
+
+    private var openAI: OpenAITTSClient {
+        let sent = sent
+        return OpenAITTSClient(transport: { request in
+            let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
+            await sent.record(body["input"]!)
+            return (Data("ID3 openai".utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }, retry: .never)
+    }
+
+    /// A library that has opened The Paradox of Convenience, so it knows the site's files for it.
+    private func libraryWithTheEssay() async throws -> (SiteLibrary, [ContentBlock]) {
+        let items = try SiteFixture.items()
+        await site.answer("/api/app/v1/articles?since=0&limit=200", try SiteFixture.page(items, latest: 4, maxSeq: 4))
+        await site.answer("/api/app/v1/articles/\(SiteFixture.essayID)", try Fixture.data("site_article_paradox"))
+        let library = SiteLibrary(directory: URL.temporaryDirectory.appending(path: "SiteAudio-\(UUID().uuidString)"), client: site.client)
+        await library.sync()
+        let context = ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let article = try await library.open(try #require(library.article(id: SiteFixture.essayID)), in: context)
+        return (library, article.blocks)
+    }
+
+    @Test func theSiteIsAskedFirstThenDriveThenOpenAI() async throws {
+        let (library, blocks) = try await libraryWithTheEssay()
+        let host = FakeAudioHost()
+        let drive = FakeRemote()
+        let first = blocks[0].text
+        drive.has = [first, "On Drive."]
+        let generations = SpeechGenerations(remote: drive, site: SiteAudioSource(library: library, retryDelay: .zero, transport: host.transport))
+
+        let fromSite = await generations.generate(OpenAISpeechEngine.request(for: first, voice: "alloy"), apiKey: "sk", client: openAI, cache: cache).value
+        #expect(try Data(contentsOf: fromSite.get()) == Data("ID3 site".utf8))
+        #expect(await host.requested.first?.host() == "audio.thrones.wang")
+
+        // Not the site's: no request to it at all, Drive has it.
+        let fromDrive = await generations.generate(OpenAISpeechEngine.request(for: "On Drive.", voice: "alloy"), apiKey: "sk", client: openAI, cache: cache).value
+        #expect(try Data(contentsOf: fromDrive.get()) == Data("ID3 remote".utf8))
+        #expect(await host.requested.count == 1)
+
+        // Another voice is another file: the site doesn't have it (nor does Drive, here), so it is generated.
+        let second = blocks[1].text
+        let otherVoice = await generations.generate(OpenAISpeechEngine.request(for: second, voice: "marin"), apiKey: "sk", client: openAI, cache: cache).value
+        #expect(try Data(contentsOf: otherVoice.get()) == Data("ID3 openai".utf8))
+        #expect(await sent.inputs == [second])
+        #expect(await host.requested.count == 1)
+    }
+
+    @Test func withoutAKeyOrDriveTheSitesNarrationStillPlays() async throws {
+        let (library, blocks) = try await libraryWithTheEssay()
+        let drive = FakeRemote()
+        drive.isEnabled = false
+        let generations = SpeechGenerations(remote: drive, site: SiteAudioSource(library: library, retryDelay: .zero, transport: FakeAudioHost().transport))
+        #expect(generations.canWorkWithoutKey)
+        let hit = await generations.generate(OpenAISpeechEngine.request(for: blocks[1].text, voice: "alloy"), apiKey: nil, client: openAI, cache: cache).value
+        let miss = await generations.generate(OpenAISpeechEngine.request(for: "Elsewhere.", voice: "alloy"), apiKey: nil, client: openAI, cache: cache).value
+        #expect((try? hit.get()) != nil)
+        #expect(miss == .failure(.missingKey))
+        #expect(await sent.inputs.isEmpty)
+    }
+
+    @Test func aPassingFailureIsTriedAgainAMissingFileIsNot() async throws {
+        let (library, blocks) = try await libraryWithTheEssay()
+        let request = OpenAISpeechEngine.request(for: blocks[2].text, voice: "alloy")
+
+        let flaky = FakeAudioHost(statuses: [503, 200])
+        #expect(await SiteAudioSource(library: library, retryDelay: .zero, transport: flaky.transport).fetch(request, into: cache) != nil)
+        #expect(await flaky.requested.count == 2)
+
+        let gone = FakeAudioHost(statuses: [404])
+        let other = OpenAISpeechEngine.request(for: blocks[3].text, voice: "alloy")
+        #expect(await SiteAudioSource(library: library, retryDelay: .zero, transport: gone.transport).fetch(other, into: cache) == nil)
+        #expect(await gone.requested.count == 1)
+        #expect(cache.cachedFile(for: other) == nil)
+    }
+}
