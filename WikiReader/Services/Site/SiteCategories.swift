@@ -43,9 +43,15 @@ extension SiteArticleSummary {
 }
 
 nonisolated enum SiteCategories {
-    /// The catalog by category: the fullest first (ties by name), Other last. Each category's articles keep the
-    /// order they came in.
-    static func group(_ articles: [SiteArticleSummary]) -> [(category: SiteCategory, articles: [SiteArticleSummary])] {
+    /// The catalog by category: in the site's order (`info`'s `sort`) where it gives one, then the fullest first (ties
+    /// by name), Other last. Each category's articles keep the order they came in.
+    static func group(
+        _ articles: [SiteArticleSummary], info: [Int: SiteCategoryInfo] = [:]
+    ) -> [(category: SiteCategory, articles: [SiteArticleSummary])] {
+        func sort(_ category: SiteCategory) -> Int? {
+            guard category.id.hasPrefix("c"), let number = Int(category.id.dropFirst()) else { return nil }
+            return info[number]?.sort
+        }
         var order: [SiteCategory] = []
         var members: [SiteCategory: [SiteArticleSummary]] = [:]
         for article in articles {
@@ -57,6 +63,12 @@ nonisolated enum SiteCategories {
             .map { (category: $0, articles: members[$0] ?? []) }
             .sorted { a, b in
                 if a.category.isOther != b.category.isOther { return b.category.isOther }
+                switch (sort(a.category), sort(b.category)) {
+                case let (x?, y?) where x != y: return x < y
+                case (.some, nil): return true
+                case (nil, .some): return false
+                default: break
+                }
                 if a.articles.count != b.articles.count { return a.articles.count > b.articles.count }
                 return a.category.name.localizedStandardCompare(b.category.name) == .orderedAscending
             }

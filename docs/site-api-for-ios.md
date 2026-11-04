@@ -290,3 +290,47 @@
 4. 生词本同步做到了哪一步。
 
 站长会转给 iOS 端，iOS 端会用 curl 抓线上返回的数据存成测试 fixture，然后开始接入。
+
+## 9. 增补（2026-11-05 晚，网站已上线 v1 之后）
+
+iPhone 已接入 v1：书库有 English Reader 一栏，按分类展示（分类封面由 App 自己画），点开文章、朗读、整篇免费下载都已经做完。为了文章和分类变多以后更好用，再提两项。**都只加字段或接口，不改现有字段**，所以还是 v1，iPhone 已经按下面的格式写好代码：网站加上以后自动生效，没加也不影响。
+
+### 9.1 文章封面 `cover`（目录条目和详情里都加，可选）
+
+文章变多以后，同一分类的卡片都用分类配色，看起来一样。请给每篇文章一张封面小图：
+
+```jsonc
+"cover": {
+  "src": "https://audio.thrones.wang/img/<sha>.webp",       // 大图（现有的 1200px 版本）
+  "src600": "https://audio.thrones.wang/img/<sha>-600.webp", // 小图，列表里用这个
+  "width": 960, "height": 630,
+  "alt": "…",                                                // 可选
+  "credit": "…",                                             // 可选，图片作者，属性页里显示
+  "license": "CC BY-SA 4.0"                                  // 可选，图片授权，属性页里显示
+}
+```
+
+- 选哪张：站长手动指定的优先；没指定就用正文第一张**授权可用**的插图（SPEC §8.7）；都没有就**省略** `cover`（iPhone 退回分类配色）。
+- 地址必须是 R2 上公开、不带查询参数的 `/img/` 路径（和现在插图一样）。iPhone 在列表里只取 `src600`。
+- 换了封面要分配新 seq（这是目录里看得到的变化，§2.2）。
+
+### 9.2 分类列表 `GET /api/app/v1/categories`（可选，不急）
+
+```jsonc
+{
+  "formatVersion": 1,
+  "categories": [
+    { "id": 2, "slug": "places", "name": "Places", "description": "Countries, cities and the people who live there.", "sort": 1, "articleCount": 12 }
+  ]
+}
+```
+
+- 只列至少有一篇已发布文章的分类；`articleCount` 只数已发布的。
+- `sort` 是站长希望的顺序，小的在前。有了它，iPhone 的分类封面按这个顺序排；没有就按文章数从多到少。
+- `description` 显示在分类页顶部的横幅里。
+- 带 ETag，和其他接口一样。
+
+### 9.3 回复
+
+做完任意一项，在 `docs/from-ios/REPLY.md` 末尾加一节说明即可。
+

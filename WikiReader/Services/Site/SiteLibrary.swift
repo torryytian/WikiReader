@@ -40,6 +40,8 @@ final class SiteLibrary {
         var since = 0
         var articles: [String: SiteArticleSummary] = [:]
         var links: [String: Link] = [:]
+        /// The site's categories, by number, when it lists them.
+        var categories: [Int: SiteCategoryInfo]?
     }
 
     private(set) var state = State.idle
@@ -47,6 +49,8 @@ final class SiteLibrary {
     /// Newest first.
     private(set) var articles: [SiteArticleSummary] = []
     private(set) var links: [String: Link] = [:]
+    /// The site's categories, by number: descriptions and the order it wants (empty until it lists them).
+    private(set) var categoryInfo: [Int: SiteCategoryInfo] = [:]
 
     @ObservationIgnored private var stored: Stored
     /// Narration files on the site, by cache key: for the articles opened here.
@@ -127,6 +131,7 @@ final class SiteLibrary {
                 save()
                 if !page.hasMore || page.items.isEmpty { break }
             }
+            await syncCategories()
             publish()
             lastSynced = now()
             state = .synced
@@ -137,6 +142,30 @@ final class SiteLibrary {
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    /// The category list is an optional part of the site's API: without it, categories are ordered by size and have
+    /// no description. Never fails the sync.
+    private func syncCategories() async {
+        do throws(SiteError) {
+            let list = try await client.categories()
+            stored.categories = Dictionary(list.map { ($0.id, $0) }) { first, _ in first }
+            save()
+        } catch .notFound {
+            // Not offered (yet).
+        } catch {
+            Log.app.error("English Reader: categories failed: \(error.message, privacy: .public)")
+        }
+    }
+
+    /// Categories with their articles, in the site's order when it gives one.
+    var categories: [(category: SiteCategory, articles: [SiteArticleSummary])] {
+        SiteCategories.group(articles, info: categoryInfo)
+    }
+
+    func info(for category: SiteCategory) -> SiteCategoryInfo? {
+        guard category.id.hasPrefix("c"), let number = Int(category.id.dropFirst()) else { return nil }
+        return categoryInfo[number]
     }
 
     func article(id: String) -> SiteArticleSummary? {
@@ -258,5 +287,6 @@ final class SiteLibrary {
             return a != b ? a > b : $0.title < $1.title
         }
         links = stored.links
+        categoryInfo = stored.categories ?? [:]
     }
 }

@@ -606,7 +606,7 @@ struct LibraryView: View {
     private var categoryCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
-                ForEach(SiteCategories.group(site.articles), id: \.category) { group in
+                ForEach(site.categories, id: \.category) { group in
                     Button {
                         path.append(.category(group.category))
                     } label: {

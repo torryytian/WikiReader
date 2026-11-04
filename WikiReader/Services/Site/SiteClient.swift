@@ -53,6 +53,14 @@ nonisolated struct SiteClient: Sendable {
         return page
     }
 
+    /// The categories, with their descriptions and order (an optional part of the API: `.notFound` if the site
+    /// doesn't have it).
+    @concurrent
+    func categories() async throws(SiteError) -> [SiteCategoryInfo] {
+        let list: SiteCategoryList = try decode(try await get(baseURL.appending(path: "api/app/v1/categories")))
+        return list.categories
+    }
+
     /// One article in full, with the response itself, kept so it needn't be fetched again until it changes.
     @concurrent
     func article(id: String) async throws(SiteError) -> (detail: SiteArticleDetail, data: Data) {

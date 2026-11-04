@@ -100,6 +100,12 @@ struct SiteCategoryView: View {
                     Text(summaryLine(count: count, levels: levels))
                         .font(.subheadline.weight(.semibold))
                         .opacity(0.9)
+                    if let description = site.info(for: category)?.description, !description.isEmpty {
+                        Text(description)
+                            .font(.footnote)
+                            .lineLimit(2)
+                            .opacity(0.85)
+                    }
                 }
                 .foregroundStyle(.white)
                 .padding(20)

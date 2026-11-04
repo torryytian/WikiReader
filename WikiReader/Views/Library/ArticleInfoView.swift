@@ -122,6 +122,20 @@ struct ArticleInfoView: View {
 
     private var summarySection: some View {
         Section {
+            if let cover = siteSummary?.cover {
+                AsyncImage(url: cover.src) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Color.secondary.opacity(0.12)
+                    }
+                }
+                .frame(height: 190)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .listRowInsets(EdgeInsets())
+                .accessibilityLabel(cover.alt ?? "Cover picture")
+            }
             VStack(alignment: .leading, spacing: 10) {
                 Text(article.title)
                     .font(.title2.weight(.bold))
@@ -166,10 +180,14 @@ struct ArticleInfoView: View {
 
     /// The site's attribution ("Source: … Licensed under CC BY-SA 4.0 …"), or its license alone.
     private func siteSourceNote(_ summary: SiteArticleSummary) -> String {
-        if let attribution = site.link(forArticleURL: article.sourceURL)?.attribution, !attribution.isEmpty {
-            return attribution
+        var note = site.link(forArticleURL: article.sourceURL)?.attribution ?? ""
+        if note.isEmpty {
+            note = summary.license.map { "From English Reader. License: \(Self.licenseName($0))." } ?? "From English Reader."
         }
-        return summary.license.map { "From English Reader. License: \(Self.licenseName($0))." } ?? "From English Reader."
+        if let cover = summary.cover, let credit = cover.credit {
+            note += "\nPicture: \(credit)" + (cover.license.map { ", \($0)" } ?? "") + "."
+        }
+        return note
     }
 
     /// "CC-BY-SA-4.0" → "CC BY-SA 4.0"; the site's own ids in words.

@@ -154,6 +154,11 @@ struct SiteLibraryTests {
         "/api/app/v1/articles?since=\(since)&limit=200"
     }
 
+    /// The catalog requests made (each sync also asks for the optional category list).
+    private func catalogRequests() async -> [String] {
+        await site.paths.filter { $0.hasPrefix("/api/app/v1/articles?") }
+    }
+
     private func detailPath(_ id: String) -> String {
         "/api/app/v1/articles/\(id)"
     }
@@ -171,7 +176,7 @@ struct SiteLibraryTests {
         await library.sync()
         #expect(library.state == .synced)
         #expect(library.articles.count == 4)
-        #expect(await site.paths == [catalog(since: 0), catalog(since: 2)])
+        #expect(await catalogRequests() == [catalog(since: 0), catalog(since: 2)])
         #expect(await site.requests.allSatisfy { $0.value(forHTTPHeaderField: "User-Agent") == SiteClient.userAgent })
         #expect(!SiteClient.userAgent.contains("@"))
 
@@ -179,7 +184,7 @@ struct SiteLibraryTests {
         await site.answer(catalog(since: 4), try SiteFixture.page([["id": SiteFixture.essayID, "seq": 5, "removed": true]], latest: 5, maxSeq: 5))
         let again = makeLibrary()
         await again.sync()
-        #expect(await site.paths.last == catalog(since: 4))
+        #expect(await catalogRequests().last == catalog(since: 4))
         #expect(again.articles.map(\.title).sorted() == ["Australia", "COVID-19", "United States"])
     }
 
@@ -197,7 +202,7 @@ struct SiteLibraryTests {
         // And from there on, the new numbers.
         await site.answer(catalog(since: 1), try SiteFixture.page([], latest: 1, maxSeq: 1, epoch: "new"))
         await library.sync()
-        #expect(await site.paths.last == catalog(since: 1))
+        #expect(await catalogRequests().last == catalog(since: 1))
     }
 
     @Test func aWebPageInsteadOfDataIsReportedAsABotCheck() async throws {
@@ -474,5 +479,54 @@ struct SiteDownloadTests {
         #expect(await host.requested.count == 13)
         #expect(await sent.inputs.isEmpty)
         #expect(await ArticleAudio.status(ofBlocksData: article.blocksData, voice: voice, cache: cache).isComplete)
+    }
+}
+
+/// The two optional parts asked for later (docs/site-api-for-ios.md §9): article pictures and the category list.
+@MainActor
+struct SiteExtrasTests {
+    let site = FakeSite()
+
+    @Test func anArticlesPictureIsReadAndItsSmallVersionUsedInLists() throws {
+        var items = try SiteFixture.items()
+        items[3]["cover"] = [
+            "src": "https://audio.thrones.wang/img/abc.webp", "src600": "https://audio.thrones.wang/img/abc-600.webp",
+            "width": 960, "height": 630, "credit": "Someone", "license": "CC BY-SA 4.0",
+        ]
+        let page = try JSONDecoder().decode(SiteCatalogPage.self, from: SiteFixture.page(items, latest: 4, maxSeq: 4))
+        guard case .article(let usa) = page.items[3], case .article(let essay) = page.items[0] else {
+            Issue.record("expected articles")
+            return
+        }
+        #expect(usa.cover?.small == URL(string: "https://audio.thrones.wang/img/abc-600.webp"))
+        #expect(usa.cover?.credit == "Someone")
+        #expect(essay.cover == nil)
+    }
+
+    @Test func theSitesCategoryListOrdersAndDescribesCategories() async throws {
+        await site.answer("/api/app/v1/articles?since=0&limit=200", try SiteFixture.page(SiteFixture.items(), latest: 4, maxSeq: 4))
+        await site.answer("/api/app/v1/categories", try SiteFixture.data([
+            "formatVersion": 1,
+            "categories": [
+                ["id": 1, "slug": "society", "name": "Society & Ideas", "description": "How we live.", "sort": 0, "articleCount": 1],
+                ["id": 2, "slug": "places", "name": "Places", "sort": 5, "articleCount": 1],
+            ],
+        ]))
+        let library = SiteLibrary(directory: URL.temporaryDirectory.appending(path: "SiteExtras-\(UUID().uuidString)"), client: site.client)
+        await library.sync()
+        // The site's order rather than size and name; Other stays last.
+        #expect(library.categories.map(\.category.name) == ["Society & Ideas", "Places", "Other"])
+        let society = try #require(library.categories.first?.category)
+        #expect(library.info(for: society)?.description == "How we live.")
+        #expect(library.info(for: .other) == nil)
+    }
+
+    @Test func withoutTheCategoryListTheCatalogStillSyncs() async throws {
+        await site.answer("/api/app/v1/articles?since=0&limit=200", try SiteFixture.page(SiteFixture.items(), latest: 4, maxSeq: 4))
+        let library = SiteLibrary(directory: URL.temporaryDirectory.appending(path: "SiteExtras-\(UUID().uuidString)"), client: site.client)
+        await library.sync()
+        #expect(library.state == .synced)
+        #expect(library.categoryInfo.isEmpty)
+        #expect(library.categories.map(\.category.name) == ["Places", "Society & Ideas", "Other"])
     }
 }

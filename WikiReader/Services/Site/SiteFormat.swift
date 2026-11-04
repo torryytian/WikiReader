@@ -66,6 +66,8 @@ nonisolated struct SiteArticleSummary: Codable, Equatable, Sendable {
     var contentVersion: String
     /// Nil for an article read with the system voice only.
     var audio: Audio?
+    /// A picture for its card (docs/site-api-for-ios.md §9.1); nil: the category's drawn cover stands in.
+    var cover: Cover?
 
     nonisolated struct Category: Codable, Equatable, Sendable {
         /// The site's own number for it: stays the same when the category is renamed.
@@ -81,6 +83,20 @@ nonisolated struct SiteArticleSummary: Codable, Equatable, Sendable {
         var revision: Int?
     }
 
+    nonisolated struct Cover: Codable, Equatable, Sendable {
+        var src: URL
+        /// The small version, for lists.
+        var src600: URL?
+        var width: Int?
+        var height: Int?
+        var alt: String?
+        /// Who made the picture and its license, shown on the Info page.
+        var credit: String?
+        var license: String?
+
+        var small: URL { src600 ?? src }
+    }
+
     nonisolated struct Audio: Codable, Equatable, Sendable {
         var voice: String?
         var totalChunks: Int
@@ -94,6 +110,22 @@ nonisolated struct SiteArticleSummary: Codable, Equatable, Sendable {
     var shownDate: Date? {
         (releasedAt ?? publishedAt).map { Date(timeIntervalSince1970: Double($0) / 1000) }
     }
+}
+
+/// What the site says about a category (docs/site-api-for-ios.md §9.2).
+nonisolated struct SiteCategoryInfo: Codable, Equatable, Sendable {
+    var id: Int
+    var slug: String?
+    var name: String
+    var description: String?
+    /// The site's order, smallest first.
+    var sort: Int?
+    var articleCount: Int?
+}
+
+nonisolated struct SiteCategoryList: Decodable, Sendable {
+    var formatVersion: Int
+    var categories: [SiteCategoryInfo]
 }
 
 /// An article in full: its text in blocks, and where each piece of its narration is.

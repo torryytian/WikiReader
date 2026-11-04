@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The inside of an English Reader article's card: its category's small cover, the title, a line of what it is
+/// The inside of an English Reader article's card: its picture (or its category's small cover), the title, a line of what it is
 /// (category, level, length, narration) and its summary; once opened here, how much of its audio is on this iPhone.
 struct SiteArticleRow: View {
     /// What the library knows about the article on this iPhone.
@@ -13,12 +13,25 @@ struct SiteArticleRow: View {
 
     let summary: SiteArticleSummary
     let state: State
-    /// Off where every article is of the same category (its own page).
+    /// The category's cover when the article has no picture; off where every article is of the same category.
     var showsThumbnail = true
+
+    private var hasThumbnail: Bool { summary.cover != nil || showsThumbnail }
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            if showsThumbnail {
+            if let cover = summary.cover {
+                AsyncImage(url: cover.small) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        CategoryThumbnail(category: summary.siteCategory)
+                    }
+                }
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 56 * 0.24, style: .continuous))
+                .accessibilityHidden(true)
+            } else if showsThumbnail {
                 CategoryThumbnail(category: summary.siteCategory)
             }
             VStack(alignment: .leading, spacing: 5) {
@@ -50,7 +63,7 @@ struct SiteArticleRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, showsThumbnail ? 16 : 20)
+        .padding(.horizontal, hasThumbnail ? 16 : 20)
         .padding(.vertical, 14)
     }
 
