@@ -388,3 +388,43 @@ struct SiteAudioTests {
         #expect(cache.cachedFile(for: other) == nil)
     }
 }
+
+/// The library's categories and their covers.
+struct SiteCategoryTests {
+    private func articles() throws -> [SiteArticleSummary] {
+        try JSONDecoder().decode(SiteCatalogPage.self, from: Fixture.data("site_catalog")).items.compactMap {
+            if case .article(let article) = $0 { article } else { nil }
+        }
+    }
+
+    @Test func theCatalogIsGroupedFullestFirstWithOtherLast() throws {
+        let groups = SiteCategories.group(try articles())
+        #expect(groups.map(\.category.name) == ["Places", "Society & Ideas", "Other"])
+        #expect(groups.map(\.articles.count) == [1, 1, 2])
+        #expect(groups.last?.articles.map(\.title).sorted() == ["COVID-19", "United States"])
+        // The site's number names a category, so a rename keeps it the same one.
+        #expect(groups[0].category.id == "c2")
+    }
+
+    @Test func levelsAndOrders() throws {
+        let all = try articles()
+        #expect(SiteCategories.levels(in: all) == ["B2", "C1", "C2"])
+        #expect(SiteCategories.sorted(all, by: .easiest).map(\.title) == ["The Paradox of Convenience", "Australia", "United States", "COVID-19"])
+        #expect(SiteCategories.sorted(all, by: .shortest).first?.title == "The Paradox of Convenience")
+    }
+
+    @Test func everyCategoryGetsACoverEvenOnesThatDontExistYet() {
+        #expect(CategoryTheme.forCategory("Places").symbol == "globe.europe.africa.fill")
+        #expect(CategoryTheme.forCategory("HISTORY") == CategoryTheme.forCategory("History"))
+        // Words in a new category's name.
+        #expect(CategoryTheme.forCategory("Sports").symbol == "figure.run")
+        #expect(CategoryTheme.forCategory("World Music").symbol == "music.note")
+        #expect(CategoryTheme.forCategory("Artificial Intelligence").symbol == "cpu.fill")
+        #expect(CategoryTheme.forCategory("Air Travel").symbol == "airplane")  // not "ai", technology
+        #expect(CategoryTheme.forCategory("Global Warming").symbol != "building.columns.fill")  // not "war", history
+        // Nothing to go by: still a cover, the same one every time.
+        let odd = CategoryTheme.forCategory("Zebra Crossing")
+        #expect(odd == CategoryTheme.forCategory("Zebra Crossing"))
+        #expect(!odd.symbol.isEmpty)
+    }
+}

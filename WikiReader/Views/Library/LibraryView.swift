@@ -2,6 +2,12 @@ import OSLog
 import SwiftData
 import SwiftUI
 
+/// Where the library leads: an article, or one of English Reader's categories.
+enum LibraryRoute: Hashable {
+    case article(Article)
+    case category(SiteCategory)
+}
+
 /// The two parts of the library.
 enum LibraryShelf: String {
     /// Articles added here: from Wikipedia, files, photos, pasted text.
@@ -24,7 +30,7 @@ struct LibraryView: View {
     /// The English Reader article being fetched to be opened.
     @State private var openingSiteID: String?
     @State private var siteOpenError: String?
-    @State private var path: [Article] = []
+    @State private var path: [LibraryRoute] = []
     @State private var isAddingArticle = false
     @State private var importer = ArticleImportCoordinator()
     @State private var isShowingSettings = false
@@ -103,10 +109,19 @@ struct LibraryView: View {
                     }
                 }
                 if showsSite {
+                    if searchText.isEmpty, !site.articles.isEmpty {
+                        Section {
+                            categoryCarousel
+                        } header: {
+                            Text("Categories")
+                        }
+                    }
                     Section {
                         ForEach(shownSiteArticles, id: \.id) { summary in
                             siteRow(summary)
                         }
+                    } header: {
+                        if searchText.isEmpty, !site.articles.isEmpty { Text("Latest") }
                     } footer: {
                         if !site.articles.isEmpty { Text(siteFooter) }
                     }
@@ -126,7 +141,7 @@ struct LibraryView: View {
                                 openRow = nil
                                 // With bookmarks, ask where to start; otherwise carry on where reading stopped.
                                 if article.bookmarks.isEmpty {
-                                    path = [article]
+                                    path = [.article(article)]
                                 } else {
                                     startChoice = article
                                 }
@@ -177,8 +192,13 @@ struct LibraryView: View {
             }
             .navigationTitle(isSelecting ? (selection.isEmpty ? "Select Articles" : "\(selection.count) Selected") : "Library")
             .navigationBarTitleDisplayMode(isSelecting ? .inline : .automatic)
-            .navigationDestination(for: Article.self) { article in
-                ReaderView(article: article)
+            .navigationDestination(for: LibraryRoute.self) { route in
+                switch route {
+                case .article(let article):
+                    ReaderView(article: article)
+                case .category(let category):
+                    SiteCategoryView(category: category, state: siteRowState, onOpen: openSite)
+                }
             }
             .toolbar {
                 if isSelecting {
@@ -213,11 +233,11 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $isAddingArticle) {
                 AddArticleView { article in
-                    path = [article]
+                    path = [.article(article)]
                 }
             }
             .articleImport(importer) { article in
-                path = [article]
+                path = [.article(article)]
             }
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView()
@@ -353,7 +373,7 @@ struct LibraryView: View {
     private func rowMenu(_ article: Article) -> some View {
         Button("Continue Reading", systemImage: "book") {
             openRow = nil
-            path = [article]
+            path = [.article(article)]
         }
         let marks = article.bookmarks
         if !marks.isEmpty {
@@ -377,7 +397,16 @@ struct LibraryView: View {
     private func open(_ article: Article, at block: Int) {
         openRow = nil
         article.lastReadBlockIndex = block
-        path = [article]
+        show(article)
+    }
+
+    /// Opens the reader: over a category's page if one is shown (back returns to it), else from the library.
+    private func show(_ article: Article) {
+        if case .category = path.last {
+            path.append(.article(article))
+        } else {
+            path = [.article(article)]
+        }
     }
 
     // MARK: - + menu
@@ -549,16 +578,41 @@ struct LibraryView: View {
                 openSite(summary)
             }
         ) {
-            SiteArticleRow(
-                summary: summary,
-                audioFraction: rowID.map { audioFractions[$0] ?? 0 },
-                isOpening: openingSiteID == summary.id,
-                isDownloading: rowID.map { downloader.isDownloading($0) } ?? false
-            )
+            SiteArticleRow(summary: summary, state: siteRowState(summary))
         }
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
+    }
+
+    /// The site's categories as a row of covers, the fullest first; each leads to its own page.
+    private var categoryCarousel: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(SiteCategories.group(site.articles), id: \.category) { group in
+                    Button {
+                        path.append(.category(group.category))
+                    } label: {
+                        CategoryTile(category: group.category, count: group.articles.count)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        // The covers scroll out to the screen's edges rather than stopping at the list's margins.
+        .scrollClipDisabled()
+        .frame(height: CategoryTile.size.height)
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
+        .listRowBackground(Color.clear)
+    }
+
+    private func siteRowState(_ summary: SiteArticleSummary) -> SiteArticleRow.State {
+        let rowID = localArticle(summary)?.persistentModelID
+        return SiteArticleRow.State(
+            audioFraction: rowID.map { audioFractions[$0] ?? 0 },
+            isOpening: openingSiteID == summary.id,
+            isDownloading: rowID.map { downloader.isDownloading($0) } ?? false
+        )
     }
 
     /// Fetches the article the first time (and when the site changed it), then opens it like any other.
@@ -571,7 +625,7 @@ struct LibraryView: View {
                 let article = try await site.open(summary, in: modelContext)
                 try? modelContext.save()
                 if article.bookmarks.isEmpty {
-                    path = [article]
+                    show(article)
                 } else {
                     startChoice = article
                 }

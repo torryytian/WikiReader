@@ -68,6 +68,8 @@ nonisolated struct SiteArticleSummary: Codable, Equatable, Sendable {
     var audio: Audio?
 
     nonisolated struct Category: Codable, Equatable, Sendable {
+        /// The site's own number for it: stays the same when the category is renamed.
+        var id: Int?
         var name: String
     }
 

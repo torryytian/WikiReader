@@ -44,6 +44,8 @@ nonisolated enum SettingsKeys {
 
     /// Which part of the library is shown: the articles added here, or English Reader's (`LibraryShelf`).
     static let libraryShelf = "libraryShelf"
+    /// How a category's English Reader articles are ordered (`SiteArticleOrder`).
+    static let siteArticleOrder = "siteArticleOrder"
 
     /// Whether this device has moved the per-article saved-word lists into the global book (once).
     static let vocabularyImported = "vocabularyImported"
