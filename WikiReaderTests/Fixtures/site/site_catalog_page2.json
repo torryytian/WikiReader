@@ -1,0 +1,43 @@
+{
+ "_note": "Made by hand in the format of docs/site-api-for-ios.md from the live page's data (2026-11-05), before the site's API existed. Replace with a real capture once it is live.",
+ "formatVersion": 1,
+ "epoch": "k3v9q2",
+ "maxSeq": 15,
+ "latest": 15,
+ "hasMore": false,
+ "items": [
+  {
+   "id": "77b0d4aa-1c2e-4f3a-8b5d-6e7f8091a2b3",
+   "seq": 14,
+   "removed": true
+  },
+  {
+   "id": "8a6f0c2e-5b1d-4c7a-9e3f-2d4b6a8c0e11",
+   "seq": 15,
+   "slug": "the-paradox-of-convenience",
+   "pageUrl": "https://english.thrones.wang/a/the-paradox-of-convenience",
+   "canonicalUrl": "https://english.thrones.wang/a/the-paradox-of-convenience",
+   "title": "The Paradox of Convenience",
+   "excerpt": "For most of human history, effort was an unavoidable feature of daily life. Food had to be grown, cooked, and preserved; messages took days or weeks to arrive; information was scarce and often expensi",
+   "cefr": "B2",
+   "wordCount": 556,
+   "source": {
+    "kind": "original"
+   },
+   "license": "Original",
+   "publishedAt": 1793750000000,
+   "releasedAt": 1793750012000,
+   "contentVersion": "611d331aaaffdcd6",
+   "audio": {
+    "voice": "alloy",
+    "totalChunks": 13,
+    "readyChunks": 13,
+    "readyMs": 224136
+   },
+   "category": {
+    "id": 1,
+    "name": "Society & Ideas"
+   }
+  }
+ ]
+}

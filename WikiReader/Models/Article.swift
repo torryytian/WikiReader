@@ -21,6 +21,9 @@ final class Article {
 
     static let wikipediaOrigin = "wikipedia"
     static let importedOrigin = "imported"
+    /// Written for the English Reader site (its Wikipedia articles keep `wikipediaOrigin`). Its `sourceURL` is the
+    /// article's page on the site.
+    static let siteOrigin = "site"
 
     /// The scheme of an imported article's placeholder `sourceURL`.
     static let importedScheme = "wikireader-import"

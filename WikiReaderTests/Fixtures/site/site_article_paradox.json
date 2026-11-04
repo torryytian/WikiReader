@@ -1,0 +1,236 @@
+{
+ "_note": "Made by hand in the format of docs/site-api-for-ios.md from the live page's data (2026-11-05), before the site's API existed. Replace with a real capture once it is live.",
+ "formatVersion": 1,
+ "id": "8a6f0c2e-5b1d-4c7a-9e3f-2d4b6a8c0e11",
+ "seq": 12,
+ "slug": "the-paradox-of-convenience",
+ "pageUrl": "https://english.thrones.wang/a/the-paradox-of-convenience",
+ "canonicalUrl": "https://english.thrones.wang/a/the-paradox-of-convenience",
+ "title": "The Paradox of Convenience",
+ "excerpt": "For most of human history, effort was an unavoidable feature of daily life. Food had to be grown, cooked, and preserved; messages took days or weeks to arrive; information was scarce and often expensi",
+ "cefr": "B2",
+ "wordCount": 556,
+ "source": {
+  "kind": "original"
+ },
+ "license": "Original",
+ "publishedAt": 1793750000000,
+ "releasedAt": 1793750012000,
+ "contentVersion": "611d331aaaffdcd6",
+ "audio": {
+  "voice": "alloy",
+  "totalChunks": 13,
+  "readyChunks": 13,
+  "readyMs": 224136
+ },
+ "narration": {
+  "key": "ios-v1",
+  "model": "gpt-4o-mini-tts",
+  "voice": "alloy",
+  "instructions": "Read like a clear, natural audiobook narrator, at a steady, moderate pace.",
+  "chunker": "ios-paragraph-4096",
+  "profile": "mp3-128k",
+  "sourceIdentical": true
+ },
+ "blocks": [
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "For most of human history, effort was an unavoidable feature of daily life. Food had to be grown, cooked, and preserved; messages took days or weeks to arrive; information was scarce and often expensive to obtain. Today, by contrast, a growing share of these burdens has been quietly absorbed by technology. Groceries appear at the door within hours, answers to almost any question are a few keystrokes away, and entire social lives can be conducted without leaving the sofa. It would seem reasonable to assume that such abundance would leave us more satisfied than any previous generation. Yet a substantial body of research suggests the opposite may be true.",
+   "chunks": [
+    {
+     "key": "2b845ef76004ff4e94c3ac7d889936f5a96eba2370b618321ffab39c8dae312a",
+     "off": 0,
+     "text": "For most of human history, effort was an unavoidable feature of daily life. Food had to be grown, cooked, and preserved; messages took days or weeks to arrive; information was scarce and often expensive to obtain. Today, by contrast, a growing share of these burdens has been quietly absorbed by technology. Groceries appear at the door within hours, answers to almost any question are a few keystrokes away, and entire social lives can be conducted without leaving the sofa. It would seem reasonable to assume that such abundance would leave us more satisfied than any previous generation. Yet a substantial body of research suggests the opposite may be true.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/2b845ef76004ff4e94c3ac7d889936f5a96eba2370b618321ffab39c8dae312a.mp3",
+     "ms": 41712
+    }
+   ]
+  },
+  {
+   "kind": "heading",
+   "level": 2,
+   "readable": true,
+   "text": "Hedonic adaptation",
+   "chunks": [
+    {
+     "key": "da2cd8c71bedf1b602b428fba4fc7b8e0ca2eaf7446bbcb3967f4e3100f43984",
+     "off": 0,
+     "text": "Hedonic adaptation",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/da2cd8c71bedf1b602b428fba4fc7b8e0ca2eaf7446bbcb3967f4e3100f43984.mp3",
+     "ms": 1848
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "Part of the explanation lies in what psychologists call hedonic adaptation: the tendency to return to a relatively stable level of happiness regardless of improvements in our circumstances. A new convenience delights us briefly, but it is soon taken for granted and, eventually, expected. What was once a luxury becomes a baseline, and its absence is experienced not as neutral but as a deprivation. In this sense, every gain in convenience quietly raises the threshold for frustration.",
+   "chunks": [
+    {
+     "key": "b7e9857365e1816f2d72e39263adea94814bb8940d5c41f5483f9951bd865ff7",
+     "off": 0,
+     "text": "Part of the explanation lies in what psychologists call hedonic adaptation: the tendency to return to a relatively stable level of happiness regardless of improvements in our circumstances. A new convenience delights us briefly, but it is soon taken for granted and, eventually, expected. What was once a luxury becomes a baseline, and its absence is experienced not as neutral but as a deprivation. In this sense, every gain in convenience quietly raises the threshold for frustration.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/b7e9857365e1816f2d72e39263adea94814bb8940d5c41f5483f9951bd865ff7.mp3",
+     "ms": 29952
+    }
+   ]
+  },
+  {
+   "kind": "heading",
+   "level": 2,
+   "readable": true,
+   "text": "Effort as a source of meaning",
+   "chunks": [
+    {
+     "key": "97138d88470b9bdb7c4c687b81740db323c3ab5f7decf53035e7e187b6cd838f",
+     "off": 0,
+     "text": "Effort as a source of meaning",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/97138d88470b9bdb7c4c687b81740db323c3ab5f7decf53035e7e187b6cd838f.mp3",
+     "ms": 2352
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "There is, however, a more subtle cost. Many of the activities that technology has made effortless were never merely obstacles to be removed; they were also sources of meaning. Cooking a meal from scratch, navigating an unfamiliar city with a paper map, or writing a letter by hand all demand attention, patience, and a degree of skill. These demands are precisely what make such experiences memorable. Economists have described a related phenomenon known as the IKEA effect, whereby people place disproportionate value on objects they have assembled themselves, however imperfectly. The labour, it appears, is not incidental to the satisfaction but constitutive of it.",
+   "chunks": [
+    {
+     "key": "42e2b56b20b21bc649e3ac6f1761af20bc1193b7c315bff1ebbea48c8406805b",
+     "off": 0,
+     "text": "There is, however, a more subtle cost. Many of the activities that technology has made effortless were never merely obstacles to be removed; they were also sources of meaning. Cooking a meal from scratch, navigating an unfamiliar city with a paper map, or writing a letter by hand all demand attention, patience, and a degree of skill. These demands are precisely what make such experiences memorable. Economists have described a related phenomenon known as the IKEA effect, whereby people place disproportionate value on objects they have assembled themselves, however imperfectly. The labour, it appears, is not incidental to the satisfaction but constitutive of it.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/42e2b56b20b21bc649e3ac6f1761af20bc1193b7c315bff1ebbea48c8406805b.mp3",
+     "ms": 42360
+    }
+   ]
+  },
+  {
+   "kind": "heading",
+   "level": 2,
+   "readable": true,
+   "text": "Convenience and time",
+   "chunks": [
+    {
+     "key": "64e767aaeb5235cd33593b976311738d4acdca0478a0f6478dd7ce0a197b168c",
+     "off": 0,
+     "text": "Convenience and time",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/64e767aaeb5235cd33593b976311738d4acdca0478a0f6478dd7ce0a197b168c.mp3",
+     "ms": 1920
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "Convenience also reshapes our relationship with time. One might expect that eliminating tedious tasks would free up hours for reflection, creativity, or rest. In practice, the time saved is frequently filled with yet more stimulation, much of it delivered through the same devices that saved us the effort in the first place. The result is a curious form of busyness in which people feel perpetually occupied while struggling to identify what, exactly, has occupied them.",
+   "chunks": [
+    {
+     "key": "e6d71880b4541dd5d91b70b98c302d51445b28b82e5d8804180f839602d356b6",
+     "off": 0,
+     "text": "Convenience also reshapes our relationship with time. One might expect that eliminating tedious tasks would free up hours for reflection, creativity, or rest. In practice, the time saved is frequently filled with yet more stimulation, much of it delivered through the same devices that saved us the effort in the first place. The result is a curious form of busyness in which people feel perpetually occupied while struggling to identify what, exactly, has occupied them.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/e6d71880b4541dd5d91b70b98c302d51445b28b82e5d8804180f839602d356b6.mp3",
+     "ms": 29448
+    }
+   ]
+  },
+  {
+   "kind": "heading",
+   "level": 2,
+   "readable": true,
+   "text": "Trade-offs",
+   "chunks": [
+    {
+     "key": "dc960011dbb9eaa83cfb7802d394c6537f94b6bd3cefe90daa8e22b7758aab4e",
+     "off": 0,
+     "text": "Trade-offs",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/dc960011dbb9eaa83cfb7802d394c6537f94b6bd3cefe90daa8e22b7758aab4e.mp3",
+     "ms": 2016
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "None of this is to romanticise hardship or to suggest that we should abandon the comforts of modern life. Few people would willingly return to washing clothes by hand or waiting a month for a reply from abroad. The point is rather that convenience is not a neutral good to be maximised without limit. It carries trade-offs that are easy to overlook precisely because they are gradual and largely invisible.",
+   "chunks": [
+    {
+     "key": "51945edfa1600153d8592b1851bcff3d76a167ff3e8fd18bf39cff8e0b620125",
+     "off": 0,
+     "text": "None of this is to romanticise hardship or to suggest that we should abandon the comforts of modern life. Few people would willingly return to washing clothes by hand or waiting a month for a reply from abroad. The point is rather that convenience is not a neutral good to be maximised without limit. It carries trade-offs that are easy to overlook precisely because they are gradual and largely invisible.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/51945edfa1600153d8592b1851bcff3d76a167ff3e8fd18bf39cff8e0b620125.mp3",
+     "ms": 24264
+    }
+   ]
+  },
+  {
+   "kind": "heading",
+   "level": 2,
+   "readable": true,
+   "text": "Deliberate friction",
+   "chunks": [
+    {
+     "key": "cca6aadb68697ec33a2e8cbfb78b5379c8063a5a663fee03d1ddcefc5a439389",
+     "off": 0,
+     "text": "Deliberate friction",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/cca6aadb68697ec33a2e8cbfb78b5379c8063a5a663fee03d1ddcefc5a439389.mp3",
+     "ms": 2112
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "A more deliberate approach might involve distinguishing between friction that merely wastes our time and friction that enriches it. The former is worth eliminating; the latter may be worth preserving, or even reintroducing on purpose. Choosing to walk rather than take a ride, to read a whole book rather than a summary, or to learn a skill rather than outsource it are small acts of resistance against the assumption that easier is always better.",
+   "chunks": [
+    {
+     "key": "3a4e9ab455537327c2f5043c64fc3607403fbf4ecfb3d9c07affcb096f7308b7",
+     "off": 0,
+     "text": "A more deliberate approach might involve distinguishing between friction that merely wastes our time and friction that enriches it. The former is worth eliminating; the latter may be worth preserving, or even reintroducing on purpose. Choosing to walk rather than take a ride, to read a whole book rather than a summary, or to learn a skill rather than outsource it are small acts of resistance against the assumption that easier is always better.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/3a4e9ab455537327c2f5043c64fc3607403fbf4ecfb3d9c07affcb096f7308b7.mp3",
+     "ms": 28104
+    }
+   ]
+  },
+  {
+   "kind": "heading",
+   "level": 2,
+   "readable": true,
+   "text": "Conclusion",
+   "chunks": [
+    {
+     "key": "935c1fa7160ae6dc6e7e1f2d14a0bf3596f8fe7b882f96f0af190678f6ab6562",
+     "off": 0,
+     "text": "Conclusion",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/935c1fa7160ae6dc6e7e1f2d14a0bf3596f8fe7b882f96f0af190678f6ab6562.mp3",
+     "ms": 1248
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "readable": true,
+   "text": "Ultimately, the question is not whether technology should make life more convenient, but whether we remain conscious of what we exchange in return. Convenience, like any powerful tool, serves us best when we decide how to use it, rather than allowing it to decide for us.",
+   "chunks": [
+    {
+     "key": "8cf2c015ffdfad0d5a5a00860a4c53f663919caa2733d3bef8108105fe9a2cdf",
+     "off": 0,
+     "text": "Ultimately, the question is not whether technology should make life more convenient, but whether we remain conscious of what we exchange in return. Convenience, like any powerful tool, serves us best when we decide how to use it, rather than allowing it to decide for us.",
+     "url": "https://audio.thrones.wang/audio/mp3-128k/8cf2c015ffdfad0d5a5a00860a4c53f663919caa2733d3bef8108105fe9a2cdf.mp3",
+     "ms": 16800
+    }
+   ]
+  }
+ ],
+ "category": {
+  "id": 1,
+  "name": "Society & Ideas"
+ }
+}
