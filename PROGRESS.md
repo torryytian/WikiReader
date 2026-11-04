@@ -245,17 +245,59 @@
 - **未验证（模拟器无法验证，需真机）**：锁上屏幕后是否真的继续读；锁屏上的标题、大图、按钮是否显示并能用；打断后的行为。文字卡只在测试里渲染出图看过。
 - **已知风险**：跨文章的顺序/随机播放靠 SwiftUI 重建 reader 来切换，**锁屏状态下视图不刷新，文章读完后很可能不会接着读下一篇**（循环模式在会话里处理，不受影响）。真机验证后如果确实停了，要把"换文章"从视图里挪到会话层。
 
-### 网站 english.thrones.wang 作为文章来源（2026-11-05，需求已发给网站，iOS 端未开始）
-- **用户的决定**：重构内容这块，主要文章来源改成用户自己的网站 English Reader（`english.thrones.wang`，源码在云主机 `vultr_machine:/root/claude/english_site`，别名 `vultr_machine`；本机 `~/Desktop/claude/english_site` 是旧副本，别参考）。手动添加文章保留。网站文章的记录全部同步到本地，正文和音频按需取；书库里网站文章单独一栏。单词本保留，网站也要能同步。
-- **实测线上**：没有 JSON 接口，数据只在 Next.js 页面内嵌的 RSC 数据里（不解析它）。音频在 R2 `audio.thrones.wang/audio/mp3-128k/<key>.mp3`，**文件名就是 iOS 的缓存 key**（13/13 核对过），128 kbps，网站不转码，直接分发 OpenAI 原文件。所以下载下来就是 iOS 缓存里的文件，播放和高亮代码不用改。
-- **iOS 提的需求**：`docs/site-api-for-ios.md`，已 scp 到网站的 `docs/from-ios/`，连同两份共享格式文档和向量文件，校验过 md5。要点：
-  - 目录 `GET /api/app/v1/articles?since=<seq>` 按全站变更序号增量同步，删除和下架给墓碑，库恢复后换 epoch；
-  - 详情 `GET /api/app/v1/articles/{id}`：正文块、每片的 key/url/ms/off、`contentVersion`；
-  - `sourceIdentical` 标明 R2 文件是不是源文件（不是的话 iOS 不传 Drive）；
-  - 生词本由网站作为 Drive `vocab.json` 的第三个读写方（`updatedBy: "web"`），iOS 和 Chrome 不用改。共享格式文档已经补上这一条。
-- **等网站回复**：`docs/from-ios/REPLY.md`。拿到后先用 curl 抓线上返回存成 fixture，再开始做 iOS 端。
-- **用户决定（2026-11-05）**：手机上直接调 OpenAI 生成语音、Drive 语音缓存这两块**先保留**，等网站接口上线、手机能从网站听之后再决定去不去掉。重构期间不要动它们。
-- 顺带发现：音频响应 `cf-cache-status: DYNAMIC`，Cloudflare 没缓存音频，已写进需求 §4.1 提醒网站。
+### 网站 english.thrones.wang 作为文章来源（2026-11-05，第一期已完成，未上真机）
+- **用户的决定**：
+  - 重构内容这块，主要文章来源改成用户自己的网站 English Reader（`english.thrones.wang`）。
+  - 网站源码在云主机 `vultr_machine:/root/claude/english_site`（别名 `vultr_machine`，SSH 直连，不走 Cloudflare）；本机 `~/Desktop/claude/english_site` 是旧副本，别参考。
+  - 手动添加文章保留；网站文章的记录全部同步到本地，正文和音频按需取；书库里网站文章单独一栏。
+  - 单词本保留，要和网站同步，不同账号不能混。
+  - 手机上直接调 OpenAI 生成语音、Drive 语音缓存**先保留**，等能从网站听之后再决定去不去掉。重构期间不要动它们。
+- **接口**：
+  - iOS 写需求 `docs/site-api-for-ios.md`，scp 到网站 `docs/from-ios/`。网站当天就实现并上线，回复在云主机 `docs/from-ios/REPLY.md`。
+  - 目录 `GET /api/app/v1/articles?since=<seq>`：按全站变更序号增量同步，下架和删除给墓碑，数据库恢复后换 epoch。
+  - 详情 `GET /api/app/v1/articles/{id}`：正文块，以及每个片段的 key、url、ms、off，外加 `contentVersion`。
+  - 音频在 R2 `audio.thrones.wang/audio/mp3-128k/<key>.mp3`，**文件名就是 iOS 的缓存 key**，文件就是 OpenAI 原文件（`sourceIdentical: true`）。
+  - 网站回复里要注意的几条：
+    - ETag 要原样回传；
+    - license 有 SPDX 编号的给 SPDX，其余是网站内部 id（`original` 等）；
+    - 上传真人录音的文章 `model: "upload"`、`sourceIdentical: false`，**iOS 第一期不用这类音频**（当作没有，走 Drive 或系统声音），目前线上也没有这类文章。
+- **iOS 实现**：
+  - `Services/Site/`：
+    - `SiteFormat`：格式；校验每个片段的 key 确实是它文字的 key，只收 `sourceIdentical` 的文件；
+    - `SiteClient`：只读；返回网页而不是 JSON 时报"被 bot 检查拦了"；
+    - `SiteLibrary`：目录、文章链接、音频索引，存在 `Application Support/Site/` 的 JSON 里，不进 SwiftData；
+    - `SiteAudioSource`：从 R2 取片段放进同一个缓存，5xx/429 重试，404 不重试。
+  - `SpeechGenerations` 的取音频顺序：网站 → Drive → OpenAI。
+  - 网站文章固定用网站的声音（alloy），和设置里选的声音无关。网站缺的片段，只有设置里选了 OpenAI 声音时才花钱生成。
+  - 打开网站文章时：
+    - 第一次打开：建一篇普通的 `Article`，`sourceURL` 是 canonicalUrl；维基百科文章 origin 是 `wikipedia`，其他是 `site`。
+    - 网站改过正文：原地更新，阅读位置截到新长度以内。
+    - 手机上已有同一篇维基百科文章（自己加的）：直接用它，不改它的文字，只记下链接。
+  - 书库：
+    - 顶部分段 My Articles / English Reader（记住选择）。
+    - 网站文章只在 English Reader 一栏出现。打开过的可以左滑看属性，并显示"Audio xx% on this iPhone"。
+    - 目录同步时机：下拉刷新；切到这一栏、App 回到前台（这两种 10 分钟内最多一次）。
+- **单词本按账号隔离**：
+  - 每本生词本绑定一个 Google 账号（记在 `Vocabulary.json.owner`，不进同步的文件）。
+  - 换账号登录时，旧本子存成 `Vocabulary-<账号 hash>.json`，换上新账号自己的本子；换回来原样恢复，删除记录也在。
+  - 换账号登录时会清掉 Drive 的文件夹和索引缓存。原来只有"设置 → 退出登录"会清，Google 自动作废登录那条路径漏了。
+  - 网站那边同样要求：授权 Drive 的账号必须等于登录账号。
+- **测试**：
+  - 用 curl 从本机抓的真实返回做 fixture：目录、Paradox、COVID-19。4 篇共 598 个片段的 key 都和 iOS 的一致。
+  - +20 个测试，全部 583 个通过。
+- **模拟器实测（连真实网站）**：
+  - 目录显示 4 篇；
+  - 打开 Paradox：建了文章，用 alloy 朗读、逐词高亮正常；
+  - 缓存文件的 md5 等于 R2 的 ETag，没有任何 OpenAI 请求。
+- **未验证**：
+  - 真机上的点击、滑动和播放；
+  - 网站 ↔ iPhone 单词本实机互通：站长要先在网站生词本页打开同步开关；
+  - 换账号的界面流程。
+- **下一步可做**：
+  - 网站文章的"下载整篇音频"（免费，不弹费用窗口），以及属性页里网站文章的来源和授权信息；
+  - 插图和表格（详情里已有数据）；
+  - 上传录音的文章：需要不同 model 的引擎，以及不上传 Drive 的单独缓存。
+- 后台检查网站回复的脚本在 scratchpad（`watch_site.sh`），这次第二轮（30 分钟）就等到了。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
 - **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。
