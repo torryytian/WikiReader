@@ -254,7 +254,7 @@
   - `sourceIdentical` 标明 R2 文件是不是源文件（不是的话 iOS 不传 Drive）；
   - 生词本由网站作为 Drive `vocab.json` 的第三个读写方（`updatedBy: "web"`），iOS 和 Chrome 不用改。共享格式文档已经补上这一条。
 - **等网站回复**：`docs/from-ios/REPLY.md`。拿到后先用 curl 抓线上返回存成 fixture，再开始做 iOS 端。
-- **待用户决定**：手机上直接调 OpenAI 生成语音和 Drive 语音缓存这两块要不要去掉（用户只说了单词本要保留）。
+- **用户决定（2026-11-05）**：手机上直接调 OpenAI 生成语音、Drive 语音缓存这两块**先保留**，等网站接口上线、手机能从网站听之后再决定去不去掉。重构期间不要动它们。
 - 顺带发现：音频响应 `cf-cache-status: DYNAMIC`，Cloudflare 没缓存音频，已写进需求 §4.1 提醒网站。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
