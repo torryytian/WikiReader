@@ -3,63 +3,113 @@ import SwiftData
 import Testing
 @testable import WikiReader
 
-/// The English Reader site as an article source (docs/site-api-for-ios.md). The samples in `Fixtures/site/` are in
-/// the specified format, made from the live pages' data before the API existed.
-struct SiteFormatTests {
-    @Test func catalogPagesReadArticlesAndRemovals() throws {
-        let page = try JSONDecoder().decode(SiteCatalogPage.self, from: Fixture.data("site_catalog_page1"))
-        #expect(page.epoch == "k3v9q2")
-        #expect(page.hasMore)
-        guard case .article(let usa) = page.items[0], case .article(let essay) = page.items[1] else {
-            Issue.record("expected two articles")
-            return
-        }
-        #expect(usa.isWikipedia)
-        #expect(usa.canonicalUrl == URL(string: "https://en.wikipedia.org/wiki/United_States"))
-        #expect(usa.audio?.readyChunks == 191)
-        #expect(!essay.isWikipedia)
-        #expect(essay.canonicalUrl == URL(string: "https://english.thrones.wang/a/the-paradox-of-convenience"))
+/// The English Reader site as an article source (docs/site-api-for-ios.md). `Fixtures/site/` holds the live API's
+/// answers, captured with curl on 2026-11-05: the catalog (4 articles), The Paradox of Convenience and COVID-19
+/// (one piece of it without audio yet, list items, figures and tables).
+enum SiteFixture {
+    static let essayID = "c73e080c-2414-475a-a57d-34d395598637"
+    static let australiaID = "73d62e6f-a9a2-4365-9244-1f2249e3a79f"
+    static let covidID = "08fbef10-d1ab-4b39-9fb5-64be1089a0f5"
+    static let usaID = "e490d1f0-d0ae-4eb1-b572-e4656518773a"
 
-        let next = try JSONDecoder().decode(SiteCatalogPage.self, from: Fixture.data("site_catalog_page2"))
-        #expect(next.items.first == .removed(id: "77b0d4aa-1c2e-4f3a-8b5d-6e7f8091a2b3", seq: 14))
+    static func json(_ name: String) throws -> [String: Any] {
+        try JSONSerialization.jsonObject(with: Fixture.data(name)) as! [String: Any]
     }
 
-    @Test func theReadersOwnKeysFindTheSitesFiles() throws {
-        let detail = try SiteClient.decodeArticle(Fixture.data("site_article_paradox"))
-        let blocks = detail.contentBlocks
-        #expect(blocks.count == 13)
-        #expect(blocks.first?.text.hasPrefix("For most of human history") == true)
-        let files = detail.audioFiles
-        #expect(files.count == 13)
-        #expect(detail.mismatchedChunks == 0)
-        // What the OpenAI engine asks the cache for while reading, with the site's voice: every piece is there.
-        let voice = try #require(detail.narration?.voice)
-        for block in blocks {
-            let text = block.text as NSString
-            for range in SpeechChunking.chunks(of: block.text) {
-                let key = SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: text.substring(with: range), voice: voice))
-                #expect(files[key] != nil)
-            }
-        }
+    /// The live catalog's items.
+    static func items() throws -> [[String: Any]] {
+        try json("site_catalog")["items"] as! [[String: Any]]
     }
 
-    @Test func aPieceWhoseKeyDoesntMatchItsTextIsNotUsed() throws {
-        var json = try #require(String(data: Fixture.data("site_article_paradox"), encoding: .utf8))
-        json = json.replacingOccurrences(of: "\"text\":\"For most of human history", with: "\"text\":\"For much of human history")
-            .replacingOccurrences(of: "\"text\": \"For most of human history", with: "\"text\": \"For much of human history")
-        let detail = try SiteClient.decodeArticle(Data(json.utf8))
-        #expect(detail.audioFiles.count == 12)
-        #expect(detail.mismatchedChunks == 1)
+    /// A catalog page around `items`.
+    static func page(_ items: [[String: Any]], latest: Int, maxSeq: Int, hasMore: Bool = false, epoch: String = "yr2oIK3N") throws -> Data {
+        try JSONSerialization.data(withJSONObject: [
+            "formatVersion": 1, "epoch": epoch, "maxSeq": maxSeq, "latest": latest, "hasMore": hasMore, "items": items,
+        ])
     }
 
-    @Test func filesThatArentTheOriginalsAreNotTakenAsCachedAudio() throws {
-        var json = try #require(String(data: Fixture.data("site_article_paradox"), encoding: .utf8))
-        json = json.replacingOccurrences(of: "\"sourceIdentical\": true", with: "\"sourceIdentical\": false")
-        #expect(try SiteClient.decodeArticle(Data(json.utf8)).audioFiles.isEmpty)
+    static func data(_ object: [String: Any]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: object)
     }
 }
 
-/// Answers the app API's requests from the fixtures, keeping them.
+struct SiteFormatTests {
+    @Test func theCatalogListsArticlesWithWhatTheyAreCalledEverywhere() throws {
+        let page = try JSONDecoder().decode(SiteCatalogPage.self, from: Fixture.data("site_catalog"))
+        #expect(page.epoch == "yr2oIK3N")
+        #expect(!page.hasMore)
+        let articles = page.items.compactMap { if case .article(let a) = $0 { a } else { nil } }
+        #expect(articles.map(\.title) == ["The Paradox of Convenience", "Australia", "COVID-19", "United States"])
+        let usa = try #require(articles.last)
+        #expect(usa.isWikipedia)
+        #expect(usa.canonicalUrl == URL(string: "https://en.wikipedia.org/wiki/United_States"))
+        #expect(usa.audio?.readyChunks == 191)
+        let essay = try #require(articles.first)
+        #expect(!essay.isWikipedia)
+        #expect(essay.canonicalUrl == URL(string: "https://english.thrones.wang/a/the-paradox-of-convenience"))
+        #expect(essay.category?.name == "Society & Ideas")
+
+        let removed = try JSONDecoder().decode(SiteCatalogPage.self, from: SiteFixture.page(
+            [["id": SiteFixture.essayID, "seq": 5, "removed": true]], latest: 5, maxSeq: 5
+        ))
+        #expect(removed.items == [.removed(id: SiteFixture.essayID, seq: 5)])
+    }
+
+    @Test func theReadersOwnKeysFindTheSitesFiles() throws {
+        for name in ["site_article_paradox", "site_article_covid"] {
+            let detail = try SiteClient.decodeArticle(Fixture.data(name))
+            let voice = try #require(detail.narration?.voice)
+            let files = detail.audioFiles
+            #expect(detail.mismatchedChunks == 0)
+            // What the OpenAI engine asks the cache for while reading, with the site's voice.
+            var asked = 0, found = 0
+            for block in detail.contentBlocks {
+                let text = block.text as NSString
+                for range in SpeechChunking.chunks(of: block.text) {
+                    asked += 1
+                    let key = SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: text.substring(with: range), voice: voice))
+                    if files[key] != nil { found += 1 }
+                }
+            }
+            #expect(found == files.count)
+            #expect(asked == (name == "site_article_paradox" ? 13 : 241))
+            #expect(found == (name == "site_article_paradox" ? 13 : 240))  // one COVID-19 piece isn't made yet
+        }
+    }
+
+    @Test func headingsParagraphsAndListItemsAreReadFiguresAndTablesAreNot() throws {
+        let essay = try SiteClient.decodeArticle(Fixture.data("site_article_paradox"))
+        #expect(essay.contentBlocks.first == .paragraph(essay.blocks[0].text!))
+        #expect(essay.contentBlocks[1] == .heading("Hedonic adaptation", level: 2))
+        let covid = try SiteClient.decodeArticle(Fixture.data("site_article_covid"))
+        #expect(covid.contentBlocks.count == 241)
+        #expect(covid.blocks.count { $0.kind == "figure" } == 28)
+        #expect(covid.contentBlocks.allSatisfy { !$0.text.isEmpty })
+    }
+
+    @Test func aPieceWhoseKeyDoesntMatchItsTextIsNotUsed() throws {
+        var detail = try SiteFixture.json("site_article_paradox")
+        var blocks = detail["blocks"] as! [[String: Any]]
+        var chunks = blocks[0]["chunks"] as! [[String: Any]]
+        chunks[0]["text"] = "Something else entirely."
+        blocks[0]["chunks"] = chunks
+        detail["blocks"] = blocks
+        let decoded = try SiteClient.decodeArticle(SiteFixture.data(detail))
+        #expect(decoded.audioFiles.count == 12)
+        #expect(decoded.mismatchedChunks == 1)
+    }
+
+    @Test func recordingsCutUpByTheSiteAreNotTakenAsCachedAudio() throws {
+        // An uploaded recording's pieces are re-encoded, not OpenAI's originals (the site's reply, §2.4).
+        var detail = try SiteFixture.json("site_article_paradox")
+        var narration = detail["narration"] as! [String: Any]
+        narration["sourceIdentical"] = false
+        detail["narration"] = narration
+        #expect(try SiteClient.decodeArticle(SiteFixture.data(detail)).audioFiles.isEmpty)
+    }
+}
+
+/// Answers the app API's requests, keeping them.
 actor FakeSite {
     private(set) var requests: [URLRequest] = []
     /// Path and query → (status, content type, body).
@@ -91,7 +141,6 @@ actor FakeSite {
 struct SiteLibraryTests {
     let site = FakeSite()
     let directory = URL.temporaryDirectory.appending(path: "Site-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let essayID = "8a6f0c2e-5b1d-4c7a-9e3f-2d4b6a8c0e11"
 
     private func makeLibrary() -> SiteLibrary {
         SiteLibrary(directory: directory, client: site.client)
@@ -101,59 +150,58 @@ struct SiteLibraryTests {
         ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
     }
 
-    private func page(_ json: [String: Any]) throws -> Data {
-        try JSONSerialization.data(withJSONObject: json)
+    private func catalog(since: Int) -> String {
+        "/api/app/v1/articles?since=\(since)&limit=200"
+    }
+
+    private func detailPath(_ id: String) -> String {
+        "/api/app/v1/articles/\(id)"
+    }
+
+    /// The live catalog, as two pages.
+    private func serveCatalog() async throws {
+        let items = try SiteFixture.items()
+        await site.answer(catalog(since: 0), try SiteFixture.page(Array(items[0..<2]), latest: 2, maxSeq: 4, hasMore: true))
+        await site.answer(catalog(since: 2), try SiteFixture.page(Array(items[2...]), latest: 4, maxSeq: 4))
     }
 
     @Test func theCatalogComesInPagesAndThenOnlyWhatChanged() async throws {
-        await site.answer("/api/app/v1/articles?since=0&limit=200", try Fixture.data("site_catalog_page1"))
-        await site.answer("/api/app/v1/articles?since=12&limit=200", try Fixture.data("site_catalog_page2"))
+        try await serveCatalog()
         let library = makeLibrary()
         await library.sync()
         #expect(library.state == .synced)
-        #expect(library.articles.map(\.title).sorted() == ["The Paradox of Convenience", "United States"])
-        #expect(library.article(id: essayID)?.seq == 15)
+        #expect(library.articles.count == 4)
+        #expect(await site.paths == [catalog(since: 0), catalog(since: 2)])
         #expect(await site.requests.allSatisfy { $0.value(forHTTPHeaderField: "User-Agent") == SiteClient.userAgent })
         #expect(!SiteClient.userAgent.contains("@"))
 
-        // Next time (after a restart too): only what changed after 15.
-        await site.answer("/api/app/v1/articles?since=15&limit=200", try page([
-            "formatVersion": 1, "epoch": "k3v9q2", "maxSeq": 16, "latest": 16, "hasMore": false,
-            "items": [["id": essayID, "seq": 16, "removed": true]],
-        ]))
+        // Next time, after a restart too: only what changed after 4.
+        await site.answer(catalog(since: 4), try SiteFixture.page([["id": SiteFixture.essayID, "seq": 5, "removed": true]], latest: 5, maxSeq: 5))
         let again = makeLibrary()
         await again.sync()
-        #expect(await site.paths.last == "/api/app/v1/articles?since=15&limit=200")
-        #expect(again.articles.map(\.title) == ["United States"])
+        #expect(await site.paths.last == catalog(since: 4))
+        #expect(again.articles.map(\.title).sorted() == ["Australia", "COVID-19", "United States"])
     }
 
     @Test func aRestoredSiteDatabaseMeansFetchingEverythingAgain() async throws {
-        await site.answer("/api/app/v1/articles?since=0&limit=200", try Fixture.data("site_catalog_page1"))
-        await site.answer("/api/app/v1/articles?since=12&limit=200", try Fixture.data("site_catalog_page2"))
+        try await serveCatalog()
         let library = makeLibrary()
         await library.sync()
 
         // Restored from a backup: a new epoch, and only the essay is published there.
-        let essay = try JSONSerialization.jsonObject(with: Fixture.data("site_article_paradox")) as! [String: Any]
-        await site.answer("/api/app/v1/articles?since=15&limit=200", try page([
-            "formatVersion": 1, "epoch": "new", "maxSeq": 3, "latest": 15, "hasMore": false, "items": [],
-        ]))
-        await site.answer("/api/app/v1/articles?since=0&limit=200", try page([
-            "formatVersion": 1, "epoch": "new", "maxSeq": 3, "latest": 3, "hasMore": false,
-            "items": [essay.filter { !["blocks", "narration", "_note", "formatVersion"].contains($0.key) }.merging(["seq": 3]) { $1 }],
-        ]))
+        let essay = try SiteFixture.items()[0].merging(["seq": 1]) { $1 }
+        await site.answer(catalog(since: 4), try SiteFixture.page([], latest: 4, maxSeq: 1, epoch: "new"))
+        await site.answer(catalog(since: 0), try SiteFixture.page([essay], latest: 1, maxSeq: 1, epoch: "new"))
         await library.sync()
         #expect(library.articles.map(\.title) == ["The Paradox of Convenience"])
         // And from there on, the new numbers.
-        await site.answer("/api/app/v1/articles?since=3&limit=200", try page([
-            "formatVersion": 1, "epoch": "new", "maxSeq": 3, "latest": 3, "hasMore": false, "items": [],
-        ]))
+        await site.answer(catalog(since: 1), try SiteFixture.page([], latest: 1, maxSeq: 1, epoch: "new"))
         await library.sync()
-        #expect(await site.paths.last == "/api/app/v1/articles?since=3&limit=200")
+        #expect(await site.paths.last == catalog(since: 1))
     }
 
     @Test func aWebPageInsteadOfDataIsReportedAsABotCheck() async throws {
-        await site.answer("/api/app/v1/articles?since=0&limit=200", Data("<html>Just a moment…</html>".utf8), type: "text/html")
+        await site.answer(catalog(since: 0), Data("<html>Just a moment…</html>".utf8), type: "text/html")
         let library = makeLibrary()
         await library.sync()
         #expect(library.state == .failed(SiteError.notJSON.message))
@@ -161,13 +209,12 @@ struct SiteLibraryTests {
     }
 
     @Test func openingMakesAnArticleOnceAndUpdatesItWhenTheSiteChangesIt() async throws {
-        await site.answer("/api/app/v1/articles?since=0&limit=200", try Fixture.data("site_catalog_page1"))
-        await site.answer("/api/app/v1/articles?since=12&limit=200", try Fixture.data("site_catalog_page2"))
-        await site.answer("/api/app/v1/articles/\(essayID)", try Fixture.data("site_article_paradox"))
+        try await serveCatalog()
+        await site.answer(detailPath(SiteFixture.essayID), try Fixture.data("site_article_paradox"))
         let library = makeLibrary()
         await library.sync()
         let context = try makeContext()
-        let summary = try #require(library.article(id: essayID))
+        let summary = try #require(library.article(id: SiteFixture.essayID))
 
         let article = try await library.open(summary, in: context)
         #expect(article.title == "The Paradox of Convenience")
@@ -181,19 +228,17 @@ struct SiteLibraryTests {
 
         // Unchanged: opened again without asking the site.
         article.lastReadBlockIndex = 12
-        let same = try await library.open(try #require(library.article(id: essayID)), in: context)
+        let same = try await library.open(try #require(library.article(id: SiteFixture.essayID)), in: context)
         #expect(same === article)
         #expect(await detailRequests() == 1)
         #expect(try context.fetch(FetchDescriptor<Article>()).count == 1)
 
         // The site edited it: the text is updated in place and the reading position kept within it.
-        var edited = try JSONSerialization.jsonObject(with: Fixture.data("site_article_paradox")) as! [String: Any]
-        var blocks = edited["blocks"] as! [[String: Any]]
-        blocks.removeLast(3)
-        edited["blocks"] = blocks
+        var edited = try SiteFixture.json("site_article_paradox")
+        edited["blocks"] = Array((edited["blocks"] as! [[String: Any]]).dropLast(3))
         edited["contentVersion"] = "edited"
         edited["seq"] = 20
-        await site.answer("/api/app/v1/articles/\(essayID)", try JSONSerialization.data(withJSONObject: edited))
+        await site.answer(detailPath(SiteFixture.essayID), try SiteFixture.data(edited))
         var changed = summary
         changed.contentVersion = "edited"
         let updated = try await library.open(changed, in: context)
@@ -204,43 +249,40 @@ struct SiteLibraryTests {
     }
 
     @Test func aWikipediaArticleAlreadyAddedIsUsedAsItIs() async throws {
-        await site.answer("/api/app/v1/articles?since=0&limit=200", try Fixture.data("site_catalog_page1"))
-        await site.answer("/api/app/v1/articles?since=12&limit=200", try Fixture.data("site_catalog_page2"))
-        // The site's United States, in brief: one paragraph.
-        let usaID = "3c9e7d21-0f4a-4b8e-a6d2-91c5e7f3b204"
+        try await serveCatalog()
+        await site.answer(detailPath(SiteFixture.covidID), try Fixture.data("site_article_covid"))
         let library = makeLibrary()
         await library.sync()
-        let usa = try #require(library.article(id: usaID))
-        var detail = try JSONSerialization.jsonObject(with: Fixture.data("site_article_paradox")) as! [String: Any]
-        for (key, value) in try JSONSerialization.jsonObject(with: JSONEncoder().encode(usa)) as! [String: Any] { detail[key] = value }
-        await site.answer("/api/app/v1/articles/\(usaID)", try JSONSerialization.data(withJSONObject: detail))
+        let covid = try #require(library.article(id: SiteFixture.covidID))
 
         let context = try makeContext()
-        let mine = Article(title: "United States", sourceURL: usa.canonicalUrl, blocks: [.paragraph("My own copy.")])
+        let mine = Article(title: "COVID-19", sourceURL: covid.canonicalUrl, blocks: [.paragraph("My own copy.")])
         context.insert(mine)
-        let opened = try await library.open(usa, in: context)
+        let opened = try await library.open(covid, in: context)
         #expect(opened === mine)
         #expect(mine.blocks == [.paragraph("My own copy.")])
+        #expect(mine.origin == Article.wikipediaOrigin)
         #expect(try context.fetch(FetchDescriptor<Article>()).count == 1)
-        #expect(library.links[usaID]?.ownsText == false)
+        #expect(library.links[SiteFixture.covidID]?.ownsText == false)
+        // Its narration is still the site's where the text is the same.
+        #expect(library.narrationVoice(forArticleURL: mine.sourceURL) == "alloy")
     }
 
     @Test func offlineAnArticleOpenedBeforeStillOpens() async throws {
-        await site.answer("/api/app/v1/articles?since=0&limit=200", try Fixture.data("site_catalog_page1"))
-        await site.answer("/api/app/v1/articles?since=12&limit=200", try Fixture.data("site_catalog_page2"))
-        await site.answer("/api/app/v1/articles/\(essayID)", try Fixture.data("site_article_paradox"))
+        try await serveCatalog()
+        await site.answer(detailPath(SiteFixture.essayID), try Fixture.data("site_article_paradox"))
         let library = makeLibrary()
         await library.sync()
         let context = try makeContext()
-        let article = try await library.open(try #require(library.article(id: essayID)), in: context)
+        let article = try await library.open(try #require(library.article(id: SiteFixture.essayID)), in: context)
 
-        await site.answer("/api/app/v1/articles/\(essayID)", Data(), status: 503)
-        var changed = try #require(library.article(id: essayID))
+        await site.answer(detailPath(SiteFixture.essayID), Data(), status: 503)
+        var changed = try #require(library.article(id: SiteFixture.essayID))
         changed.contentVersion = "newer"
         #expect(try await library.open(changed, in: context) === article)
 
         // Never opened and unreachable: an error.
-        let usa = try #require(library.article(id: "3c9e7d21-0f4a-4b8e-a6d2-91c5e7f3b204"))
+        let usa = try #require(library.article(id: SiteFixture.usaID))
         await #expect(throws: SiteError.notFound) { try await library.open(usa, in: context) }
     }
 }
