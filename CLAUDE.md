@@ -88,9 +88,11 @@ docs/           会话记录
 - 选用 OpenAI 朗读时，为当前段和它之后的几段请求 `api.openai.com` 生成音频：向后最多约 75 秒语音、最多 4 段（取先到者），最多同时 2 个预取请求；每次换位置（跳段、快进快退）都重新算，没轮到的不请求，停止朗读时丢掉排队的。生成结果缓存在本地，不重复请求（朗读和批量下载共用"正在生成"登记，同一段不会同时请求两次）。**批量生成整篇/多篇的语音只在我手动触发时进行**（多选后的 Download Audio、文库与存储页的 Download All Remaining Audio、文章属性页的 Download Remaining Audio），开始前先弹窗显示预计时长和费用，我确认后才开始；同时 2 个请求，Key 无效/没额度立即停，连续 4 段失败也停。请求超时、断网、5xx、429 时自动重试，最多共 3 次（401、没额度、请求被拒不重试）。
 - Google Drive（2026-11-01，设置 → Google Drive 登录后才启用）：`accounts.google.com`（登录页，系统登录弹窗）、`oauth2.googleapis.com`（换取/续期令牌、退出时吊销）、`www.googleapis.com`（Drive API，scope 只有 `drive.file` + `openid email`）。取 OpenAI 语音前先查 Drive 的 `WikiReader Cache/audio/<key>.mp3`；打开文章（OpenAI 声音时）批量查这篇的所有段并写 `articles/<urlHash>.json` 清单；新生成的语音后台上传。生词本是 `WikiReader Cache/vocab.json` 一个文件，和 Chrome 插件共用（格式见 `docs/shared-vocab-format.md`），App 回到前台、收藏/删除后几秒同步，只走 Drive、不花钱。这些音频的自动行为在设置 → Google Drive 有两个开关（"Check Drive First"、"Back Up New Audio"，默认开）。手动入口（+ 菜单的 Google Drive 页、多选底栏、文章属性页）：从 Drive 下载只取 Drive 上已有的、不调 OpenAI；备份只传 Drive 缺的。只传音频和清单，不传邮箱。格式见 `docs/shared-tts-cache-format.md`，与 Chrome 插件共用。
 - English Reader 网站（2026-11-05，用户自己的网站，源码在云主机 `vultr_machine:/root/claude/english_site`，本机 `~/Desktop/claude/english_site` 是过时的副本）：
-  - `english.thrones.wang/api/app/v1/articles`（目录）和 `/articles/<id>`（详情），只读、公开；User-Agent 用 `WikiReader/0.1 (iOS app)`，不带邮箱。
+  - `english.thrones.wang/api/app/v1/articles`（目录）、`/articles/<id>`（详情）和 `/categories`（分类列表，网站可以不提供），只读、公开；User-Agent 用 `WikiReader/0.1 (iOS app)`，不带邮箱。
+  - 文章封面图（网站提供时）从 `audio.thrones.wang/img/` 加载，列表里用 600px 的小图。
   - 同步目录的时机：书库切到 English Reader、App 回到前台（这两种最多 10 分钟一次）、下拉刷新。按变更序号增量取，只拿上次以后的变化。打开文章时取详情；网站改过正文才会重新取。
   - 朗读网站文章时，从 `audio.thrones.wang`（Cloudflare R2）取网站列出的音频片段。免费，排在本机缓存之后、Drive 和 OpenAI 之前；网站没列出的片段不会去请求。
+  - 整篇下载网站文章的音频（属性页、网站卡片长按菜单、分类页菜单）只从网站取，不调 OpenAI，不花钱；弹窗说明时长，不弹费用。
   - 接口要求见 `docs/site-api-for-ios.md`，网站的回复在云主机的 `docs/from-ios/REPLY.md`。
 - AI 讲解（词典界面的 AI 按钮）：只在我点按钮时请求 `api.openai.com/v1/chat/completions`，一次只发被查的单词和它所在的句子，不发全文，不预取，不自动触发；用的是设置页保存的同一个 OpenAI Key。
 - 词典页（点词弹出）：离线词库 ECDICT 在 App 里，不联网。打开词典页时请求 `en.wiktionary.org/api/rest_v1/page/definition/<词>` 取英文释义，只发被查的单词（不发句子），结果缓存在本地，失败静默；点喇叭时请求 `upload.wikimedia.org` 上的真人录音 mp3（`En-us-<词>.ogg` 的转码版），只发单词，结果缓存，没有录音就用系统声音。这两个都是 Wikimedia 的服务，带同样的 User-Agent。**不要把 User-Agent 里的邮箱发给 Wikimedia 以外的任何服务**（dictionaryapi.dev 试过，服务端常 522，已放弃）。
