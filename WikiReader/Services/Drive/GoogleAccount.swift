@@ -31,6 +31,9 @@ final class GoogleAccount {
     /// A refresh in progress, shared by everyone who needs a token meanwhile.
     @ObservationIgnored private var refreshing: Task<String, Error>?
     @ObservationIgnored private var presenter: SignInPresenter?
+    /// Called when a sign-in is for a different Google account than the last one: what was learned about the other
+    /// account's Drive (folder ids, the audio index) must not be used for this one.
+    @ObservationIgnored var onAccountChange: (() -> Void)?
 
     static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
@@ -47,9 +50,20 @@ final class GoogleAccount {
         self.defaults = defaults
         self.transport = transport
         state = refreshTokenStore.read() == nil ? .signedOut : .signedIn(email: defaults.string(forKey: SettingsKeys.googleAccountEmail))
+        // Sign-ins from before the last account was remembered: the one signed in now is it.
+        if defaults.string(forKey: SettingsKeys.googleLastAccount) == nil, let email = defaults.string(forKey: SettingsKeys.googleAccountEmail) {
+            defaults.set(email, forKey: SettingsKeys.googleLastAccount)
+        }
     }
 
     var isSignedIn: Bool { state != .signedOut }
+
+    /// The signed-in account's address, lowercased: what the word book is kept apart by. Nil when signed out, or
+    /// when Google didn't say (then nothing is told apart).
+    var accountID: String? {
+        guard case .signedIn(let email?) = state, !email.isEmpty else { return nil }
+        return email.lowercased()
+    }
 
     /// The iOS OAuth client of the user's "WikiReader" Google Cloud project, the one the Chrome extension's client is
     /// in too (drive.file only shows files made by clients of the same project). Public by design.
@@ -94,10 +108,16 @@ final class GoogleAccount {
         }
         let email = response.idToken.flatMap(GoogleOAuth.email(fromIDToken:))
         defaults.set(email, forKey: SettingsKeys.googleAccountEmail)
+        let previous = defaults.string(forKey: SettingsKeys.googleLastAccount)
+        if let email { defaults.set(email, forKey: SettingsKeys.googleLastAccount) }
         accessToken = (response.accessToken, .now.addingTimeInterval(TimeInterval(response.expiresIn)))
         problem = nil
         state = .signedIn(email: email)
         Log.app.info("Signed in to Google")  // never log tokens or the address
+        if let previous, let email, previous.lowercased() != email.lowercased() {
+            Log.app.info("Signed in as a different Google account than before")
+            onAccountChange?()
+        }
     }
 
     /// Forgets the sign-in here and asks Google to revoke it (best effort: offline, it simply lapses).

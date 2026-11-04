@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 import OSLog
@@ -8,6 +9,9 @@ import OSLog
 ///
 /// Saving a word records the sentence and article it was found in. Removing a word, from anywhere, deletes it for
 /// good on every device (a tombstone): the book is global, and "I know this one now" is the same as deleting it.
+///
+/// A book belongs to one Google account (`owner`, the first one it is synced with), so two accounts' words never
+/// mix: signing in as someone else sets this book aside and brings out that account's own (`belong(to:)`).
 @Observable
 final class VocabularyBook {
     static let shared = VocabularyBook()
@@ -15,6 +19,9 @@ final class VocabularyBook {
     private(set) var file: VocabFile
     /// Bumped by every change, so the reader marks the text again and the sync knows there is something to send.
     private(set) var version = 0
+    /// The Google account (lowercased address) this book is kept in step with; nil until the first sync. Words saved
+    /// while signed out belong to it too. Kept beside the book, not in it: the book's file is what goes to Drive.
+    private(set) var owner: String?
     /// Called after a change made here (not after a sync brought one in), to schedule a sync.
     @ObservationIgnored var onLocalChange: (() -> Void)?
 
@@ -30,17 +37,73 @@ final class VocabularyBook {
         self.fileURL = fileURL
         self.now = now
         self.lemmaOf = lemmaOf
-        if let data = try? Data(contentsOf: fileURL) {
-            do {
-                file = try VocabFile.decode(data)
-            } catch {
-                // Kept aside rather than overwritten, so nothing is lost for good.
-                Log.app.error("Vocabulary: unreadable book set aside: \(error.localizedDescription, privacy: .public)")
-                try? FileManager.default.moveItem(at: fileURL, to: fileURL.deletingPathExtension().appendingPathExtension("unreadable.json"))
-                file = VocabFile()
-            }
-        } else {
-            file = VocabFile()
+        file = Self.read(fileURL) ?? VocabFile()
+        owner = (try? String(contentsOf: Self.ownerURL(of: fileURL), encoding: .utf8))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// The book in `url`, or nil if there is none. An unreadable one is set aside rather than overwritten, so
+    /// nothing is lost for good.
+    private static func read(_ url: URL) -> VocabFile? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        do {
+            return try VocabFile.decode(data)
+        } catch {
+            Log.app.error("Vocabulary: unreadable book set aside: \(error.localizedDescription, privacy: .public)")
+            try? FileManager.default.moveItem(at: url, to: url.deletingPathExtension().appendingPathExtension("unreadable.json"))
+            return nil
+        }
+    }
+
+    private static func ownerURL(of fileURL: URL) -> URL {
+        fileURL.appendingPathExtension("owner")
+    }
+
+    /// Where another account's book waits while this one is in use: `Vocabulary-<hash of the account>.json`.
+    func setAsideURL(for account: String) -> URL {
+        let hash = SHA256.hash(data: Data(account.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+        let name = fileURL.deletingPathExtension().lastPathComponent
+        return fileURL.deletingLastPathComponent().appending(path: "\(name)-\(hash).json")
+    }
+
+    // MARK: - Accounts
+
+    /// Makes this the book of `account` (a lowercased address), before syncing with that account's Drive. The first
+    /// account keeps the book as it is. Another one gets its own: the book it had here before, or an empty one, while
+    /// the current book is set aside for its owner to get back. Returns whether the book was swapped.
+    @discardableResult
+    func belong(to account: String) -> Bool {
+        guard owner != account else { return false }
+        guard let previous = owner else {
+            setOwner(account)
+            Log.app.info("Vocabulary: the book now belongs to the signed-in Google account")
+            return false
+        }
+        do {
+            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try file.encoded().write(to: setAsideURL(for: previous), options: .atomic)
+        } catch {
+            // Not swapped: better to keep syncing the old book than to lose it.
+            Log.app.error("Vocabulary: couldn't set the book aside: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+        let waiting = setAsideURL(for: account)
+        file = Self.read(waiting) ?? VocabFile()
+        try? FileManager.default.removeItem(at: waiting)
+        setOwner(account)
+        Log.app.info("Vocabulary: another Google account; its own book is in use (\(self.file.entries.count) words)")
+        changed(locally: false)
+        return true
+    }
+
+    private func setOwner(_ account: String) {
+        owner = account
+        do {
+            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(account.utf8).write(to: Self.ownerURL(of: fileURL), options: .atomic)
+        } catch {
+            Log.app.error("Vocabulary: couldn't save the book's account: \(error.localizedDescription, privacy: .public)")
         }
     }
 

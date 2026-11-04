@@ -131,6 +131,29 @@ struct GoogleAccountTests {
         #expect(try await account.validAccessToken() == "a2")
     }
 
+    @Test func signingInAsSomeoneElseIsNoticed() throws {
+        let (account, store, _) = makeAccount { _ in (500, "{}") }
+        defer { try? store.delete() }
+        var changes = 0
+        account.onAccountChange = { changes += 1 }
+        func signIn(_ email: String) throws {
+            let payload = GoogleOAuth.base64URL(Data(#"{"email":"\#(email)"}"#.utf8))
+            try account.finishSignIn(.init(accessToken: "a1", expiresIn: 3600, refreshToken: "r1", idToken: "h.\(payload).s"))
+        }
+
+        try signIn("me@example.com")
+        #expect(changes == 0)
+        #expect(account.accountID == "me@example.com")
+        account.signOut()
+        #expect(account.accountID == nil)
+        try signIn("Me@Example.com")  // the same account
+        #expect(changes == 0)
+        account.signOut()
+        try signIn("other@example.com")
+        #expect(changes == 1)
+        #expect(account.accountID == "other@example.com")
+    }
+
     @Test func aRefreshTokenGoogleNoLongerAcceptsSignsOut() async throws {
         let (account, store, _) = makeAccount { _ in (400, #"{"error":"invalid_grant"}"#) }
         defer { try? store.delete() }

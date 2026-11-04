@@ -37,6 +37,9 @@ private struct RootView: View {
                 // few seconds after each change.
                 VocabLemmas.shared.load()
                 VocabularyBook.shared.onLocalChange = { VocabSync.shared.scheduleSync() }
+                // Signed in as someone else: forget the other account's Drive folders and audio index (the word
+                // book swaps to that account's own at its next sync).
+                GoogleAccount.shared.onAccountChange = { DriveAudioStore.shared.reset() }
             }
             .onChange(of: appearance) { _, new in new.apply() }
             // Coming to the front (launch included): words saved on other devices or in Chrome come in.

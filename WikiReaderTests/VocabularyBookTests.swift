@@ -111,6 +111,33 @@ struct VocabularyBookTests {
         #expect(book.count == 0)
     }
 
+    @Test func eachGoogleAccountHasItsOwnBookAndGetsItBack() throws {
+        let book = makeBook()
+        book.save(word: "verdict", term: "verdict", sentence: "V.", url: paris, title: "Paris")
+        // The first account takes the book as it is (words saved before signing in included).
+        #expect(!book.belong(to: "me@example.com"))
+        #expect(book.owner == "me@example.com")
+        book.delete(key: "verdict")
+        book.save(word: "siege", term: "siege", sentence: "S.", url: paris, title: "Paris")
+
+        // Someone else signs in: an empty book of their own, mine set aside.
+        #expect(book.belong(to: "other@example.com"))
+        #expect(book.count == 0)
+        #expect(book.file.deleted.isEmpty)
+        book.save(word: "tabloid", term: "tabloid", sentence: "T.", url: rome, title: "Rome")
+        #expect(FileManager.default.fileExists(atPath: book.setAsideURL(for: "me@example.com").path()))
+
+        // Back to me, after a restart even: my words and my deletion, not theirs.
+        let again = makeBook()
+        #expect(again.owner == "other@example.com")
+        #expect(again.belong(to: "me@example.com"))
+        #expect(again.keys == ["siege"])
+        #expect(again.file.deleted["verdict"] != nil)
+        #expect(!FileManager.default.fileExists(atPath: again.setAsideURL(for: "me@example.com").path()))
+        #expect(again.belong(to: "other@example.com"))
+        #expect(again.keys == ["tabloid"])
+    }
+
     @Test func theMatcherMarksSavedWordsAndTheirOtherForms() {
         let book = makeBook()
         book.save(word: "studies", term: "studies", sentence: "S.", url: paris, title: "Paris")
@@ -136,12 +163,39 @@ struct VocabSyncTests {
         return VocabularyBook(fileURL: fileURL, now: { clock.now }, lemmaOf: { _ in nil })
     }
 
-    private func makeSync(_ book: VocabularyBook, root: String) -> VocabSync {
-        let drive = drive, clock = clock
+    private func makeSync(_ book: VocabularyBook, root: String, drive: FakeDrive? = nil, account: String? = nil) -> VocabSync {
+        let drive = drive ?? self.drive, clock = clock
         return VocabSync(
             book: book, client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
-            isSignedIn: { true }, rootFolder: { root }, now: { clock.now }
+            isSignedIn: { true }, account: { account }, rootFolder: { root }, now: { clock.now }
         )
+    }
+
+    @Test func twoGoogleAccountsNeverGetEachOthersWords() async throws {
+        let mine = drive, theirs = FakeDrive()
+        let myRoot = await mine.add(name: DriveAudioStore.rootName, parent: "root", mimeType: "application/vnd.google-apps.folder")
+        let theirRoot = await theirs.add(name: DriveAudioStore.rootName, parent: "root", mimeType: "application/vnd.google-apps.folder")
+        let now = VocabFormat.milliseconds(clock.now)
+        let theirFile = VocabFile(entries: [VocabEntry(key: "tabloid", term: "tabloid", forms: ["tabloid"], createdAt: now, updatedAt: now, contexts: [])])
+        _ = await theirs.add(name: VocabSync.fileName, parent: theirRoot, mimeType: "application/json", data: try theirFile.encoded())
+
+        let book = makeBook()
+        book.save(word: "verdict", term: "verdict", sentence: "V.", url: url, title: "Paris")
+        await makeSync(book, root: myRoot, drive: mine, account: "me@example.com").sync()
+        #expect(try await remoteFile().entries.map(\.key) == ["verdict"])
+
+        // Signed in as them: their words only, in their Drive only.
+        clock.advance()
+        await makeSync(book, root: theirRoot, drive: theirs, account: "them@example.com").sync()
+        #expect(book.keys == ["tabloid"])
+        let theirRemote = try VocabFile.decode(#require(await theirs.file(named: VocabSync.fileName)).data)
+        #expect(theirRemote.entries.map(\.key) == ["tabloid"])
+
+        // Back as me: my book, and my Drive still without theirs.
+        clock.advance()
+        await makeSync(book, root: myRoot, drive: mine, account: "me@example.com").sync()
+        #expect(book.keys == ["verdict"])
+        #expect(try await remoteFile().entries.map(\.key) == ["verdict"])
     }
 
     private func remoteFile() async throws -> VocabFile {

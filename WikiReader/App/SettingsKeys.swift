@@ -32,6 +32,8 @@ nonisolated enum SettingsKeys {
     static let googleClientID = "googleClientID"
     /// The signed-in Google account's address, shown in Settings only.
     static let googleAccountEmail = "googleAccountEmail"
+    /// The address of the last Google account signed in, kept after signing out, to notice signing in as someone else.
+    static let googleLastAccount = "googleLastAccount"
     /// Upload to Google Drive over cellular and Low Data Mode too; off (the default) waits for Wi-Fi.
     static let driveUploadAnyNetwork = "driveUploadAnyNetwork"
     /// Look for audio in Google Drive before generating it with OpenAI. On when absent.

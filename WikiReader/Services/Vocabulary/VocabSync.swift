@@ -8,6 +8,9 @@ import OSLog
 /// A sync downloads the file, merges it with this iPhone's book, keeps the result here, and uploads it only if it
 /// differs from what was there: usually two or three requests. It runs when the app comes to the front, a few
 /// seconds after a word is saved or deleted (several changes, one sync), after signing in, and from Settings.
+///
+/// Each Google account has its own book: before a sync the book is made the signed-in account's
+/// (`VocabularyBook.belong(to:)`), so signing in as someone else never merges one person's words into another's Drive.
 @Observable
 final class VocabSync {
     static let shared = VocabSync()
@@ -30,6 +33,7 @@ final class VocabSync {
     @ObservationIgnored private let book: VocabularyBook
     @ObservationIgnored private let client: DriveClient
     @ObservationIgnored private let isSignedIn: () -> Bool
+    @ObservationIgnored private let account: () -> String?
     @ObservationIgnored private let rootFolder: () async throws -> String
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var running: Task<Void, Never>?
@@ -40,12 +44,14 @@ final class VocabSync {
         book: VocabularyBook = .shared,
         client: DriveClient = DriveClient(token: { force in try await GoogleAccount.shared.validAccessToken(force: force) }),
         isSignedIn: @escaping () -> Bool = { GoogleAccount.shared.isSignedIn },
+        account: @escaping () -> String? = { GoogleAccount.shared.accountID },
         rootFolder: @escaping () async throws -> String = { try await DriveAudioStore.shared.layout().root },
         now: @escaping () -> Date = Date.init
     ) {
         self.book = book
         self.client = client
         self.isSignedIn = isSignedIn
+        self.account = account
         self.rootFolder = rootFolder
         self.now = now
     }
@@ -82,6 +88,7 @@ final class VocabSync {
 
     private func syncOnce() async {
         state = .syncing
+        if let account = account() { book.belong(to: account) }
         do {
             let root = try await rootFolder()
             let id = try await client.files(named: [Self.fileName], in: root)[Self.fileName]

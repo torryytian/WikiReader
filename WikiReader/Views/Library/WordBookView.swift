@@ -71,7 +71,8 @@ struct WordBookView: View {
         case .idle, .syncing:
             return "Syncing with Google Drive…"
         case .synced:
-            return "Synced with Google Drive and the Chrome extension. Deleting a word deletes it there too."
+            let who = account.accountID.map { " (\($0))" } ?? ""
+            return "Synced with Google Drive\(who) and the Chrome extension. Deleting a word deletes it there too."
         case .waitingForChrome:
             return "The word book in Google Drive is in the Chrome extension's old format. It syncs once the extension is updated."
         case .failed(let message):
