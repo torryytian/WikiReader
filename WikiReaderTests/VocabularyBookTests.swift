@@ -163,11 +163,11 @@ struct VocabSyncTests {
         return VocabularyBook(fileURL: fileURL, now: { clock.now }, lemmaOf: { _ in nil })
     }
 
-    private func makeSync(_ book: VocabularyBook, root: String, drive: FakeDrive? = nil, account: String? = nil) -> VocabSync {
+    private func makeSync(_ book: VocabularyBook, root: String, other: String? = nil, drive: FakeDrive? = nil, account: String? = nil) -> VocabSync {
         let drive = drive ?? self.drive, clock = clock
         return VocabSync(
             book: book, client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
-            isSignedIn: { true }, account: { account }, rootFolder: { root }, now: { clock.now }
+            isSignedIn: { true }, account: { account }, folders: { (root, other) }, now: { clock.now }
         )
     }
 
@@ -279,6 +279,39 @@ struct VocabSyncTests {
         await sync.sync()
         #expect(sync.state == .synced)
         #expect(await writes() == 0)
+    }
+
+    /// While both shared folders exist (docs/shared-drive-layout.md §4 stage 2 ⑤), a book a device still on the old
+    /// folder wrote there is merged in; only the folder in use is written, the old book is left as it was.
+    @Test func aBookLeftInTheOtherFolderIsMergedInAndLeftAlone() async throws {
+        let root = await drive.add(name: DriveAudioStore.sharedRootName, parent: "root", mimeType: DriveClient.folderType)
+        let old = await drive.add(name: DriveAudioStore.rootName, parent: "root", mimeType: DriveClient.folderType)
+        let now = VocabFormat.milliseconds(clock.now)
+        let current = VocabFile(entries: [VocabEntry(key: "verdict", term: "verdict", forms: ["verdict"], createdAt: now - 9000, updatedAt: now - 9000, contexts: [])])
+        _ = await drive.add(name: VocabSync.fileName, parent: root, mimeType: "application/json", data: try current.encoded())
+        var stray = VocabFile(
+            entries: [VocabEntry(key: "tabloid", term: "tabloid", forms: ["tabloid"], createdAt: now - 5000, updatedAt: now - 5000, contexts: [])],
+            deleted: ["siege": now - 1000]
+        )
+        stray.updatedBy = "chrome"
+        let strayData = try stray.encoded()
+        _ = await drive.add(name: VocabSync.fileName, parent: old, mimeType: "application/json", data: strayData)
+
+        let book = makeBook()
+        clock.now -= 10
+        book.save(word: "siege", term: "siege", sentence: "S.", url: url, title: "Paris")
+        clock.advance(20)
+        let sync = makeSync(book, root: root, other: old)
+        await sync.sync()
+
+        #expect(sync.state == .synced)
+        #expect(Set(book.keys) == ["verdict", "tabloid"])
+        let files = await drive.files.filter { $0.name == VocabSync.fileName }
+        let written = try VocabFile.decode(try #require(files.first { $0.parent == root }).data)
+        #expect(Set(written.entries.map(\.key)) == ["verdict", "tabloid"])
+        #expect(written.deleted["siege"] == now - 1000)
+        #expect(files.first { $0.parent == old }?.data == strayData)
+        #expect(files.count == 2)
     }
 }
 

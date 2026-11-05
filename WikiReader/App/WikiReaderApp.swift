@@ -46,6 +46,9 @@ private struct RootView: View {
             // articles on English Reader (at most every ten minutes).
             .onChange(of: scenePhase, initial: true) { _, phase in
                 guard phase == .active else { return }
+                // The site may have moved the shared Drive folder meanwhile: decide again which one to use (at most
+                // every few minutes), before the word book's sync asks for it.
+                DriveAudioStore.shared.appBecameActive()
                 Task { await VocabSync.shared.sync() }
                 Task { await SiteLibrary.shared.sync(ifDue: true) }
             }

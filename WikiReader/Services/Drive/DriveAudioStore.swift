@@ -18,6 +18,24 @@ extension RemoteAudioSource {
     var looksUpBeforeGenerating: Bool { isEnabled }
 }
 
+/// An article as the Drive backup sees it.
+nonisolated struct DriveArticle: Sendable {
+    var title: String
+    var url: String
+    var blocksData: Data
+    /// From the English Reader site: no `<urlHash>.json` for it (see `DriveAudioStore.noteArticle`).
+    var isFromSite = false
+}
+
+extension Article {
+    var driveArticle: DriveArticle {
+        DriveArticle(
+            title: title, url: sourceURL.absoluteString, blocksData: blocksData,
+            isFromSite: !DriveAudioStore.listsArticle(self)
+        )
+    }
+}
+
 /// The audio cache shared through Google Drive with other devices and the Chrome extension
 /// (format: docs/shared-tts-cache-format.md). Audio is looked for here after this iPhone's own cache and before
 /// OpenAI; audio generated here is uploaded in the background; each article gets a manifest.
@@ -40,22 +58,70 @@ extension RemoteAudioSource {
 final class DriveAudioStore: RemoteAudioSource {
     static let shared = DriveAudioStore()
 
+    /// The folder the apps create and use until the site moves everything (docs/shared-drive-layout.md §2).
     static let rootName = "WikiReader Cache"
+    /// The site's folder, the one place for everything once its `format.json` says version 2. Only the site creates
+    /// it and writes that file; the apps never do.
+    static let sharedRootName = "English Reader"
     static let audioFolder = "audio"
     static let articlesFolder = "articles"
     static let formatFile = "format.json"
+    /// What this app writes into a `WikiReader Cache/` it creates.
     static let formatContents: [String: Any] = ["formatVersion": 1, "key": "ios-v1"]
     static let indexFreshness: TimeInterval = 2 * 60
+    /// Which folder to use is looked up again when the app comes to the front, if it was decided longer ago than this.
+    static let layoutFreshness: TimeInterval = 5 * 60
     static let uploadConcurrency = 2
     static let maxRetryDelay: Duration = .seconds(300)
 
     struct Layout: Equatable {
         var root: String
+        /// `rootName` or `sharedRootName`.
+        var rootName: String
         var audio: String
         var articles: String
+        /// The other of the two folders while both exist (before the site's move, or after it until the old one is
+        /// deleted): looked in for audio and the word book, never written.
+        var otherRoot: String?
+        /// Its audio folder, when it has one of its own.
+        var otherAudio: String?
     }
 
-    /// The audio folder's contents as last seen, kept on disk between launches.
+    /// What a folder's `format.json` says.
+    nonisolated enum FolderFormat: Equatable, Sendable {
+        /// No `format.json`.
+        case none
+        /// `WikiReader Cache/` as the apps write it: version 1.
+        case legacy
+        /// `English Reader/` once the site has moved everything into it: version 2.
+        case shared
+        /// `WikiReader Cache/` after the move: version 2 with `movedTo`.
+        case moved
+        /// Anything else, described for the error.
+        case unknown(String)
+
+        init(_ object: [String: Any]?) {
+            let version = object?["formatVersion"] as? Int
+            let key = object?["key"] as? String
+            switch (version, key) {
+            case (1, "ios-v1"): self = .legacy
+            case (2, "ios-v1"): self = object?["movedTo"] is String ? .moved : .shared
+            default: self = .unknown("formatVersion \(version.map(String.init) ?? "?"), key \(key ?? "?")")
+            }
+        }
+
+        var description: String {
+            switch self {
+            case .none: "no format.json"
+            case .legacy: "formatVersion 1, key ios-v1"
+            case .shared: "formatVersion 2, key ios-v1"
+            case .moved: "formatVersion 2, key ios-v1, moved"
+            case .unknown(let found): found
+            }
+        }
+    }
+
+    /// The audio folders' contents as last seen, kept on disk between launches.
     struct AudioIndex: Codable, Equatable {
         /// The audio folder this describes; a different one (another account) starts over.
         var folder: String?
@@ -63,6 +129,10 @@ final class DriveAudioStore: RemoteAudioSource {
         var files: [String: String] = [:]
         /// The newest creation time seen, where the next look starts.
         var syncedThrough: String?
+        /// The same for the other folder's audio folder (`Layout.otherAudio`), while there is one.
+        var otherFolder: String?
+        var otherFiles: [String: String] = [:]
+        var otherSyncedThrough: String?
         /// The articles folder's manifests, file ids by file name, as of the last sync.
         var manifests: [String: String] = [:]
         /// What this iPhone last wrote into each manifest (a digest of everything but the time), so an unchanged
@@ -73,14 +143,39 @@ final class DriveAudioStore: RemoteAudioSource {
             self.folder = folder
         }
 
-        // Indexes saved before manifests were tracked lack those fields.
+        // Indexes saved before manifests (or the other folder) were tracked lack those fields.
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             folder = try container.decodeIfPresent(String.self, forKey: .folder)
             files = try container.decodeIfPresent([String: String].self, forKey: .files) ?? [:]
             syncedThrough = try container.decodeIfPresent(String.self, forKey: .syncedThrough)
+            otherFolder = try container.decodeIfPresent(String.self, forKey: .otherFolder)
+            otherFiles = try container.decodeIfPresent([String: String].self, forKey: .otherFiles) ?? [:]
+            otherSyncedThrough = try container.decodeIfPresent(String.self, forKey: .otherSyncedThrough)
             manifests = try container.decodeIfPresent([String: String].self, forKey: .manifests) ?? [:]
             manifestDigests = try container.decodeIfPresent([String: String].self, forKey: .manifestDigests) ?? [:]
+        }
+
+        /// The key's file in either audio folder.
+        func file(for key: String) -> String? {
+            files[key] ?? otherFiles[key]
+        }
+
+        /// Adds listed audio files (of the other folder's audio folder with `toOther`) and moves the place where the
+        /// next look starts on to the newest.
+        mutating func add(_ listed: [DriveClient.ListedFile], toOther: Bool = false) {
+            for file in listed where file.name.hasSuffix(".mp3") {
+                let key = String(file.name.dropLast(4))
+                let created = file.createdTime ?? ""
+                // Two devices uploading the same audio leave two copies; keep the one already known.
+                if toOther {
+                    if otherFiles[key] == nil { otherFiles[key] = file.id }
+                    if created > (otherSyncedThrough ?? "") { otherSyncedThrough = created }
+                } else {
+                    if files[key] == nil { files[key] = file.id }
+                    if created > (syncedThrough ?? "") { syncedThrough = created }
+                }
+            }
         }
     }
 
@@ -109,6 +204,9 @@ final class DriveAudioStore: RemoteAudioSource {
     /// The latest backup asked for by hand, until its finished summary is dismissed.
     private(set) var backupRun: BackupRun?
 
+    /// The Drive folder in use (`rootName` or `sharedRootName`), once known, for Settings.
+    private(set) var folderName: String?
+
     @ObservationIgnored private let client: DriveClient
     @ObservationIgnored private let isSignedIn: () -> Bool
     @ObservationIgnored private let cache: SpeechAudioCache
@@ -120,9 +218,16 @@ final class DriveAudioStore: RemoteAudioSource {
     @ObservationIgnored private let keepAwake: (Bool) -> Void
     @ObservationIgnored private let looksUpFirst: () -> Bool
     @ObservationIgnored private let backsUpAutomatically: () -> Bool
+    /// Whether the English Reader site serves this key's audio: the site keeps the original on Drive itself, and what
+    /// this iPhone has of it is the site's compressed copy, which must not go into Drive's folder of originals.
+    @ObservationIgnored private let isSiteAudio: (String) -> Bool
+    @ObservationIgnored private let layoutRecheck: TimeInterval
     /// The pieces of `backupRun` still to go up.
     @ObservationIgnored private var runKeys: Set<String> = []
     @ObservationIgnored private var layoutTask: Task<Layout, Error>?
+    /// When `layoutTask` started, so coming to the front can look again after `layoutFreshness`.
+    @ObservationIgnored private var layoutStarted: Date?
+    @ObservationIgnored private var lastLayout: Layout?
     @ObservationIgnored private var index: AudioIndex
     @ObservationIgnored private var lastSync: Date?
     @ObservationIgnored private var syncTask: Task<Void, Error>?
@@ -148,7 +253,9 @@ final class DriveAudioStore: RemoteAudioSource {
         onAccessLost: @escaping () -> Void = { GoogleAccount.shared.driveAccessMissing() },
         keepAwake: @escaping (Bool) -> Void = { ScreenAwake.set("drive upload", $0) },
         looksUpFirst: @escaping () -> Bool = { SettingsKeys.isOn(SettingsKeys.driveLookUpFirst) },
-        backsUpAutomatically: @escaping () -> Bool = { SettingsKeys.isOn(SettingsKeys.driveAutoBackUp) }
+        backsUpAutomatically: @escaping () -> Bool = { SettingsKeys.isOn(SettingsKeys.driveAutoBackUp) },
+        isSiteAudio: @escaping (String) -> Bool = { SiteLibrary.shared.audioURL(forKey: $0) != nil },
+        layoutRecheck: TimeInterval = DriveAudioStore.layoutFreshness
     ) {
         self.client = client
         self.isSignedIn = isSignedIn
@@ -161,6 +268,8 @@ final class DriveAudioStore: RemoteAudioSource {
         self.keepAwake = keepAwake
         self.looksUpFirst = looksUpFirst
         self.backsUpAutomatically = backsUpAutomatically
+        self.isSiteAudio = isSiteAudio
+        self.layoutRecheck = layoutRecheck
         pendingUploads = (try? JSONDecoder().decode([String].self, from: Data(contentsOf: queueFile))) ?? []
         index = (try? JSONDecoder().decode(AudioIndex.self, from: Data(contentsOf: indexFile))) ?? AudioIndex()
     }
@@ -178,6 +287,9 @@ final class DriveAudioStore: RemoteAudioSource {
     func reset() {
         layoutTask?.cancel()
         layoutTask = nil
+        layoutStarted = nil
+        lastLayout = nil
+        folderName = nil
         index = AudioIndex()
         lastSync = nil
         try? FileManager.default.removeItem(at: indexFile)
@@ -190,34 +302,88 @@ final class DriveAudioStore: RemoteAudioSource {
 
     // MARK: - The shared folder
 
-    /// `WikiReader Cache/` with its `audio/` and `articles/` folders and `format.json`, found or created once.
+    /// The folders in use, found (or, the first time on an account, created) once, and looked up again when the app
+    /// comes to the front (`appBecameActive`), since the site may have moved everything in the meantime.
     func layout() async throws -> Layout {
         if let layoutTask { return try await layoutTask.value }
         let client = client
-        let task = Task { () throws -> Layout in
-            let root: String
-            if let found = try await client.folder(named: Self.rootName, in: "root") {
-                root = found
-                try await Self.checkFormat(in: root, client: client)
-            } else {
-                root = try await client.createFolder(named: Self.rootName, in: "root")
-                Log.app.info("Created the Drive folder \(Self.rootName, privacy: .public)")
-            }
-            if try await client.files(named: [Self.formatFile], in: root).isEmpty {
-                let data = try JSONSerialization.data(withJSONObject: Self.formatContents, options: [.sortedKeys])
-                _ = try await client.upload(name: Self.formatFile, data: data, mimeType: "application/json", in: root)
-            }
-            async let audio = Self.subfolder(Self.audioFolder, in: root, client: client)
-            async let articles = Self.subfolder(Self.articlesFolder, in: root, client: client)
-            return try await Layout(root: root, audio: audio, articles: articles)
-        }
+        let task = Task { () throws -> Layout in try await Self.findLayout(client: client) }
         layoutTask = task
+        layoutStarted = .now
         do {
-            return try await task.value
+            let layout = try await task.value
+            if let lastLayout, lastLayout != layout {
+                Log.app.info("Drive: now using \(layout.rootName, privacy: .public)")
+                lastSync = nil  // list the (maybe different) folders again before trusting "not on Drive"
+            }
+            lastLayout = layout
+            folderName = layout.rootName
+            return layout
         } catch {
-            layoutTask = nil  // try again next time
+            if layoutTask == task { layoutTask = nil }  // try again next time
             throw error
         }
+    }
+
+    /// Coming to the front: which folder to use is decided again before Drive is next used, unless that was just done.
+    func appBecameActive() {
+        guard let layoutStarted, Date.now.timeIntervalSince(layoutStarted) >= layoutRecheck else { return }
+        layoutTask = nil
+        self.layoutStarted = nil
+    }
+
+    /// Which folder to use (docs/shared-drive-layout.md §2): `English Reader/` once the site has moved everything into it
+    /// (its `format.json` says version 2, or the old folder's says where it went); until then `WikiReader Cache/`,
+    /// created with a version 1 `format.json` on an account that has neither. Only the site creates `English Reader/`
+    /// and writes its version 2: if a listing ever missed `WikiReader Cache/`, an app writing it would switch every
+    /// device to an empty folder, which then pays OpenAI again.
+    static func findLayout(client: DriveClient) async throws -> Layout {
+        async let sharedFound = client.folder(named: sharedRootName, in: "root")
+        async let legacyFound = client.folder(named: rootName, in: "root")
+        let shared = try await sharedFound
+        let legacy = try await legacyFound
+        async let sharedFormatRead = format(in: shared, client: client)
+        async let legacyFormatRead = format(in: legacy, client: client)
+        let sharedFormat = try await sharedFormatRead
+        let legacyFormat = try await legacyFormatRead
+
+        let root: String, name: String, other: String?
+        if let shared, sharedFormat == .shared || legacyFormat == .moved {
+            (root, name, other) = (shared, sharedRootName, legacy)
+        } else if let legacy {
+            switch legacyFormat {
+            case .none, .legacy:
+                if legacyFormat == .none { try await writeFormat(in: legacy, client: client) }
+                (root, name, other) = (legacy, rootName, shared)
+            case .moved:
+                throw DriveError.unsupportedFormat("\(rootName) says it moved to \(sharedRootName), which isn't in Drive")
+            case .shared, .unknown:
+                // Exactly what the Chrome extension refuses too, so neither writes into a folder the other refuses.
+                throw DriveError.unsupportedFormat(legacyFormat.description)
+            }
+        } else {
+            let created = try await client.createFolder(named: rootName, in: "root")
+            Log.app.info("Created the Drive folder \(rootName, privacy: .public)")
+            try await writeFormat(in: created, client: client)
+            (root, name, other) = (created, rootName, shared)
+        }
+
+        let otherAudio: String? = if let other { try await client.folder(named: audioFolder, in: other) } else { nil }
+        // An audio folder missing here while the other folder has one is being moved by the site right now (it moves
+        // the whole folder): use that one rather than starting an empty one.
+        let audio: String
+        if let found = try await client.folder(named: audioFolder, in: root) {
+            audio = found
+        } else if let otherAudio {
+            audio = otherAudio
+        } else {
+            audio = try await client.createFolder(named: audioFolder, in: root)
+        }
+        let articles = try await subfolder(articlesFolder, in: root, client: client)
+        return Layout(
+            root: root, rootName: name, audio: audio, articles: articles,
+            otherRoot: other, otherAudio: otherAudio == audio ? nil : otherAudio
+        )
     }
 
     private static func subfolder(_ name: String, in root: String, client: DriveClient) async throws -> String {
@@ -225,16 +391,15 @@ final class DriveAudioStore: RemoteAudioSource {
         return try await client.createFolder(named: name, in: root)
     }
 
-    /// Refuses a folder written in a format this version doesn't know, rather than mixing caches.
-    private static func checkFormat(in root: String, client: DriveClient) async throws {
-        guard let id = try await client.files(named: [formatFile], in: root)[formatFile] else { return }
-        let object = try? JSONSerialization.jsonObject(with: try await client.download(fileID: id)) as? [String: Any]
-        let version = object?["formatVersion"] as? Int
-        let key = object?["key"] as? String
-        // Exactly what the Chrome extension accepts too, so neither writes into a folder the other refuses.
-        guard version == 1, key == "ios-v1" else {
-            throw DriveError.unsupportedFormat("formatVersion \(version.map(String.init) ?? "?"), key \(key ?? "?")")
-        }
+    /// What `folder`'s `format.json` says (`.none` without a folder or a file).
+    private static func format(in folder: String?, client: DriveClient) async throws -> FolderFormat {
+        guard let folder, let id = try await client.files(named: [formatFile], in: folder)[formatFile] else { return .none }
+        return FolderFormat(try? JSONSerialization.jsonObject(with: try await client.download(fileID: id)) as? [String: Any])
+    }
+
+    private static func writeFormat(in folder: String, client: DriveClient) async throws {
+        let data = try JSONSerialization.data(withJSONObject: formatContents, options: [.sortedKeys])
+        _ = try await client.upload(name: formatFile, data: data, mimeType: "application/json", in: folder)
     }
 
     // MARK: - Finding audio
@@ -252,13 +417,18 @@ final class DriveAudioStore: RemoteAudioSource {
             let layout = try await layout()
             let audio = layout.audio
             if index.folder != audio { index = AudioIndex(folder: audio) }
-            let since = index.syncedThrough.flatMap { Self.rfc3339(minus: 60, from: $0) }
-            let listed = try await client.listFolder(audio, createdAfter: since)
-            for file in listed where file.name.hasSuffix(".mp3") {
-                let key = String(file.name.dropLast(4))
-                // Two devices uploading the same audio leave two copies; keep the one already known.
-                if index.files[key] == nil { index.files[key] = file.id }
-                if let created = file.createdTime, created > (index.syncedThrough ?? "") { index.syncedThrough = created }
+            let listed = try await Self.list(audio, after: index.syncedThrough, client: client)
+            index.add(listed)
+            // While both folders exist, audio in the other one counts too (the site moves the audio folder whole, so
+            // usually there is only one).
+            if index.otherFolder != layout.otherAudio {
+                index.otherFolder = layout.otherAudio
+                index.otherFiles = [:]
+                index.otherSyncedThrough = nil
+            }
+            if let otherAudio = layout.otherAudio {
+                let listedOther = try await Self.list(otherAudio, after: index.otherSyncedThrough, client: client)
+                index.add(listedOther, toOther: true)
             }
             // Manifests are few and replaced in place (their creation time doesn't move), so list them all.
             var manifests: [String: String] = [:]
@@ -280,6 +450,13 @@ final class DriveAudioStore: RemoteAudioSource {
         }
     }
 
+    /// Lists the audio files created in `folder` since `syncedThrough` (a minute's overlap allows for clocks and Drive's
+    /// ordering).
+    private static func list(_ folder: String, after syncedThrough: String?, client: DriveClient) async throws -> [DriveClient.ListedFile] {
+        try await client.listFolder(folder, createdAfter: syncedThrough.flatMap { rfc3339(minus: 60, from: $0) })
+    }
+
+
     /// For callers about to need these keys: the index answers for all of them at once, so it is only brought up to date.
     func prepareIndex(keys: [String]) async {
         await syncIndex()
@@ -287,7 +464,7 @@ final class DriveAudioStore: RemoteAudioSource {
 
     /// Whether the key's audio is on Drive, as far as is known (nil: the index isn't fresh enough to say "no").
     func isOnDrive(_ key: String) -> Bool? {
-        if index.files[key] != nil { return true }
+        if index.file(for: key) != nil { return true }
         guard let lastSync, Date.now.timeIntervalSince(lastSync) < Self.indexFreshness else { return nil }
         return false
     }
@@ -296,7 +473,7 @@ final class DriveAudioStore: RemoteAudioSource {
         guard isEnabled else { return nil }
         let key = SpeechAudioCache.key(for: request)
         if isOnDrive(key) == nil { await syncIndex() }
-        guard let id = index.files[key] else { return nil }
+        guard let id = index.file(for: key) else { return nil }
         do {
             let data = try await client.download(fileID: id)
             let url = try cache.store(data, for: request)
@@ -306,7 +483,8 @@ final class DriveAudioStore: RemoteAudioSource {
             return url
         } catch DriveError.http(status: 404, _) {
             // Deleted on Drive since it was indexed.
-            index.files[key] = nil
+            if index.files[key] == id { index.files[key] = nil }
+            if index.otherFiles[key] == id { index.otherFiles[key] = nil }
             saveIndex()
             return nil
         } catch {
@@ -336,10 +514,11 @@ final class DriveAudioStore: RemoteAudioSource {
         enqueue([SpeechAudioCache.key(for: request)])
     }
 
-    /// Queues audio in this iPhone's cache for upload; keys already on Drive or queued are skipped.
+    /// Queues audio in this iPhone's cache for upload; keys already on Drive or queued are skipped, and so is audio the
+    /// English Reader site serves (it keeps the originals on Drive; this iPhone only has its compressed copy).
     func enqueue(_ keys: [String]) {
         var queued = Set(pendingUploads)
-        let new = keys.filter { index.files[$0] == nil && queued.insert($0).inserted }
+        let new = keys.filter { index.file(for: $0) == nil && !isSiteAudio($0) && queued.insert($0).inserted }
         guard !new.isEmpty else { return }
         pendingUploads += new
         saveQueue()
@@ -376,7 +555,7 @@ final class DriveAudioStore: RemoteAudioSource {
                     await syncIndex()
                     guard lastSync != nil else { throw DriveError.network("couldn't list the Drive folder") }
                 }
-                if index.files[key] == nil {
+                if index.file(for: key) == nil {
                     index.files[key] = try await client.upload(name: key + ".mp3", data: data, mimeType: "audio/mpeg", in: audio)
                     uploadedCount += 1
                     saveIndex()
@@ -436,11 +615,13 @@ final class DriveAudioStore: RemoteAudioSource {
     /// Records an article being read or downloaded with `voice`: looks its pieces up on Drive and writes its manifest
     /// if it changed. Written again once queued uploads finish, so `complete` catches up. With automatic backup off
     /// nothing is written (only a backup asked for lists an article), and with Drive not looked in either, nothing is done.
-    func noteArticle(title: String, url: String, blocks: [ContentBlock], voice: String) async {
+    /// - Parameter listsArticle: False for an article from the English Reader site: its text may have been edited
+    ///   there, and `<urlHash>.json` is only for text the shared cleaner took from that URL (the site lists its own).
+    func noteArticle(title: String, url: String, blocks: [ContentBlock], voice: String, listsArticle: Bool = true) async {
         guard isEnabled, !blocks.isEmpty else { return }
         let shares = backsUpAutomatically()
         guard shares || looksUpFirst() else { return }
-        guard shares else {
+        guard shares, listsArticle else {
             await syncIndex()
             return
         }
@@ -456,23 +637,32 @@ final class DriveAudioStore: RemoteAudioSource {
         }
     }
 
+    /// Writes `base` over what Drive has under its name (docs/shared-drive-layout.md §3): Drive's is read first, a manifest
+    /// made for another voice is left alone (its text is what that audio was made from), and fields this app doesn't
+    /// know are kept.
     private func writeManifest(_ base: DriveManifest) async {
         var manifest = base
-        manifest.complete = manifest.keys.allSatisfy { index.files[$0] != nil }
+        manifest.complete = manifest.keys.allSatisfy { index.file(for: $0) != nil }
         manifest.updatedAt = ISO8601DateFormatter().string(from: .now)
         let digest = manifest.contentDigest
+        let name = manifest.fileName
         // Written before with the same content and still there: nothing to do, and no request.
-        if index.manifestDigests[manifest.fileName] == digest, index.manifests[manifest.fileName] != nil { return }
+        if index.manifestDigests[name] == digest, index.manifests[name] != nil { return }
         do {
             let folder = try await layout().articles
-            if let id = index.manifests[manifest.fileName] {
-                try await client.replace(fileID: id, data: manifest.encoded(), mimeType: "application/json")
+            if let id = index.manifests[name] {
+                switch DriveManifest.write(manifest, over: try await client.download(fileID: id)) {
+                case .leave:
+                    Log.app.info("Drive: \(name, privacy: .public) is for another voice; left as it is")
+                case .replace(let data):
+                    try await client.replace(fileID: id, data: data, mimeType: "application/json")
+                case .create(let data):
+                    index.manifests[name] = try await upload(manifest, data: data, in: folder)
+                }
             } else {
-                index.manifests[manifest.fileName] = try await client.upload(
-                    name: manifest.fileName, data: manifest.encoded(), mimeType: "application/json", in: folder
-                )
+                index.manifests[name] = try await upload(manifest, data: manifest.encoded(), in: folder)
             }
-            index.manifestDigests[manifest.fileName] = digest
+            index.manifestDigests[name] = digest
             saveIndex()
             lastError = nil
         } catch DriveError.http(status: 404, _) {
@@ -484,10 +674,20 @@ final class DriveAudioStore: RemoteAudioSource {
         }
     }
 
+    /// A new manifest file, with the article's title as its Drive description and the public properties people and
+    /// the other apps can recognise it by (lookups go by file name only).
+    private func upload(_ manifest: DriveManifest, data: Data, in folder: String) async throws -> String {
+        let kind = URL(string: manifest.url)?.scheme == Article.importedScheme ? "imported" : "wikipedia"
+        return try await client.upload(
+            name: manifest.fileName, data: data, mimeType: "application/json", in: folder,
+            description: manifest.title, properties: manifest.driveProperties(kind: kind)
+        )
+    }
+
     // MARK: - Per article
 
     /// Keys known to be on Drive (from the local index).
-    var indexedKeys: Set<String> { Set(index.files.keys) }
+    var indexedKeys: Set<String> { Set(index.files.keys).union(index.otherFiles.keys) }
 
     /// Manifest file names known to be on Drive.
     var manifestNames: Set<String> { Set(index.manifests.keys) }
@@ -593,17 +793,15 @@ final class DriveAudioStore: RemoteAudioSource {
     /// - Parameter showsProgress: Asked for by hand: `backupRun` follows the pieces it queued.
     /// - Returns: What was found, or nil if Drive couldn't be listed (`lastError` says why).
     @discardableResult
-    func backUp(
-        _ articles: [(title: String, url: String, blocksData: Data)], voice: String, showsProgress: Bool = false
-    ) async -> BackupResult? {
+    func backUp(_ articles: [DriveArticle], voice: String, showsProgress: Bool = false) async -> BackupResult? {
         guard isEnabled else { return nil }
         let local = await Self.localKeys(of: articles.map(\.blocksData), cache: cache)
         await syncIndex(force: true)
         guard lastSync != nil else { return nil }
-        let missing = local.filter { index.files[$0] == nil }
+        let missing = local.filter { index.file(for: $0) == nil && !isSiteAudio($0) }
         if showsProgress, !missing.isEmpty { follow(missing) }
         enqueue(missing)
-        for article in articles {
+        for article in articles where !article.isFromSite {
             let blocks = Article.decodeBlocks(article.blocksData)
             let manifest = DriveManifest(title: article.title, url: article.url, blocks: blocks, voice: voice)
             notedArticles[manifest.fileName] = manifest
@@ -615,7 +813,7 @@ final class DriveAudioStore: RemoteAudioSource {
 
     /// `backUp` of the whole library, unless it ran in the last `backUpInterval` or automatic backup is off: for when
     /// the app opens or comes back to the library.
-    func backUpIfDue(_ articles: [(title: String, url: String, blocksData: Data)], voice: String) async {
+    func backUpIfDue(_ articles: [DriveArticle], voice: String) async {
         guard isBackingUpAutomatically else { return }
         if let lastBackUp, Date.now.timeIntervalSince(lastBackUp) < Self.backUpInterval { return }
         lastBackUp = .now
@@ -661,6 +859,11 @@ final class DriveAudioStore: RemoteAudioSource {
             }
         }
         return keys
+    }
+
+    /// Whether `article` may get a `<urlHash>.json` manifest (not one from the English Reader site).
+    static func listsArticle(_ article: Article) -> Bool {
+        article.origin != Article.siteOrigin
     }
 
     // MARK: - Errors

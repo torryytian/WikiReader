@@ -326,13 +326,13 @@
     - 网站文章一律 `site-<uuid>.json`，不占 `<urlHash>.json`。
     - 清单一篇一份，改写时保留不认识的字段。v2.3 按插件的意见又加了一条：不覆盖别的声音组合（组合相同才改写），因为清单冻结了生成时的文字，Wikipedia 改了文章也能复用已付费的音频。
   - 根目录那几个 `.wikireader` 是用户用分享面板经 Google Drive App 存进去的，`drive.file` 看不到，要用户自己在 Drive 网页里挪。
-  - **iOS 第 2 阶段要做的**（规范 §4，等用户点头再开始，会改联网行为，届时同步 CLAUDE.md 网络一节）：
+  - v2.4（站长定）：备份只由网站做，iPhone 不往 Drive 写备份（原来计划的 `ios_` 自动备份和"从 Drive 恢复"取消）；只有网站写 `English Reader/format.json` v2，App 从不建 `English Reader/`；第 3 阶段搬完、补扫、确认为空后删掉 `WikiReader Cache/`；权威版本改为网站仓库那份。
+  - **iOS 第 2 阶段代码已完成（同日晚，未装手机）**：`DriveAudioStore.findLayout`、`DriveManifest.write`、`VocabSync` 的 `folders`；测试 +13（共 612）。另外两点：搬到一半时（音频文件夹已移走、v2 还没写）用移过去的那个，不新建；Drive 的 `properties` 每条 key+value 最多 124 字节，标题会截断。第一次跑测试时 `index.files` 和 `index.syncedThrough` 同时作 `inout` 传入触发了运行时的"Fatal access conflict"（Swift 的独占访问检查），模拟器里的测试 App 反复崩溃、Mac 上一直弹"quit unexpectedly"，已改成 `AudioIndex` 的 mutating 方法。
+  - **原来列的第 2 阶段清单**（已按 v2.4 做完，备份两条已取消）：
     - 每次启动和回到前台重新判断根目录（认 `movedTo`）；
     - 清单先读再改再写，保留未知字段，声音组合不同就不写，写 description 和 `properties`；
     - 网站来的文章不写 `<urlHash>.json`：现在网站没音频的网站文章用 OpenAI 声音读时会按 `canonicalUrl` 写一份；
     - `vocab.json` 新旧两份合并；
-    - 自动备份到 `English Reader/backups/ios_<时间>.wikireader`，不带音频，有变化时最多一天一份，只清理自己的 `ios_` 文件；
-    - 加"从 Drive 恢复"入口。
   - 第 3 阶段（网站搬文件）要等 iOS 和插件的新版装到所有设备之后，由站长定时间。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）

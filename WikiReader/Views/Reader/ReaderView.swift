@@ -465,7 +465,10 @@ private struct ArticleReader: View {
         // comes from the site.
         if siteVoice == nil, engineChoice == .openAI, DriveAudioStore.shared.isEnabled {
             let (title, url, voice) = (article.title, article.sourceURL.absoluteString, openAIVoice)
-            Task { await DriveAudioStore.shared.noteArticle(title: title, url: url, blocks: blocks, voice: voice) }
+            let listsArticle = DriveAudioStore.listsArticle(article)
+            Task {
+                await DriveAudioStore.shared.noteArticle(title: title, url: url, blocks: blocks, voice: voice, listsArticle: listsArticle)
+            }
         }
         if startsPlaying { session.start(at: 0) }
     }

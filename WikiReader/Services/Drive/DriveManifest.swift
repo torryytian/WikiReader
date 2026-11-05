@@ -76,6 +76,51 @@ nonisolated struct DriveManifest: Codable, Equatable, Sendable {
         return SHA256.hash(data: copy.encoded()).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// How to write a manifest where Drive already has a file of that name (docs/shared-drive-layout.md §3).
+    enum Write: Equatable, Sendable {
+        /// Drive's is for another voice (its text is what that audio was made from), or in a newer format: left alone.
+        case leave
+        /// The file's new contents: Drive's, with this app's fields written over it and every other field kept.
+        case replace(Data)
+        /// Drive's says the article was deleted: a new file with this instead.
+        case create(Data)
+    }
+
+    static func write(_ manifest: DriveManifest, over existing: Data) -> Write {
+        let ours = manifest.encoded()
+        guard let theirs = try? JSONSerialization.jsonObject(with: existing) as? [String: Any] else { return .replace(ours) }
+        if theirs["deleted"] as? Bool == true { return .create(ours) }
+        if let version = theirs["formatVersion"] as? Int, version > manifest.formatVersion { return .leave }
+        guard theirs["model"] as? String == manifest.model, theirs["voice"] as? String == manifest.voice,
+              theirs["instructions"] as? String == manifest.instructions else { return .leave }
+        var merged = theirs
+        for (key, value) in (try? JSONSerialization.jsonObject(with: ours) as? [String: Any]) ?? [:] {
+            merged[key] = value
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: merged, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        else { return .replace(ours) }
+        return .replace(data)
+    }
+
+    /// The Drive file's public properties: for people and the other apps to recognise it; lookups go by file name.
+    /// - Parameter kind: `wikipedia` or `imported` (an article imported from a file on this iPhone).
+    func driveProperties(kind: String) -> [String: String] {
+        ["articleId": Self.urlHash(url), "title": Self.propertyValue(title, key: "title"), "kind": kind]
+    }
+
+    /// `value` cut to fit Drive's limit of 124 bytes of UTF-8 for a property's key and value together.
+    static func propertyValue(_ value: String, key: String) -> String {
+        var room = 124 - key.utf8.count
+        var result = ""
+        for character in value {
+            let size = String(character).utf8.count
+            guard size <= room else { break }
+            result.append(character)
+            room -= size
+        }
+        return result
+    }
+
     /// The same manifest apart from when it was written: whether writing it again would change anything.
     func sameContent(as other: DriveManifest) -> Bool {
         var a = self, b = other

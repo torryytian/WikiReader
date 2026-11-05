@@ -233,8 +233,7 @@ struct LibraryView: View {
                 // signed out) is queued. At most every ten minutes, so coming back from an article is cheap.
                 let drive = DriveAudioStore.shared
                 guard drive.isEnabled else { return }
-                let library = articles.map { (title: $0.title, url: $0.sourceURL.absoluteString, blocksData: $0.blocksData) }
-                await drive.backUpIfDue(library, voice: openAIVoice)
+                await drive.backUpIfDue(articles.map(\.driveArticle), voice: openAIVoice)
             }
             .sheet(isPresented: $isAddingArticle) {
                 AddArticleView { article in

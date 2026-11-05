@@ -207,6 +207,8 @@ actor FakeDrive {
         var mimeType: String
         var data: Data
         var createdTime: String
+        var description: String?
+        var properties: [String: String]?
     }
 
     private(set) var files: [File] = []
@@ -235,6 +237,10 @@ actor FakeDrive {
     }
 
     func remove(named name: String) { files.removeAll { $0.name == name } }
+    /// What the site does when it moves a folder: only the parent changes, the id stays.
+    func move(_ id: String, to parent: String) { files.indices.filter { files[$0].id == id }.forEach { files[$0].parent = parent } }
+    func setData(_ id: String, _ data: Data) { files.indices.filter { files[$0].id == id }.forEach { files[$0].data = data } }
+    func files(in parent: String) -> [File] { files.filter { $0.parent == parent } }
     func listCount() -> Int { requests.count { $0 == "GET /drive/v3/files" } }
     func uploadCount() -> Int { requests.count { $0 == "POST /upload/drive/v3/files" } }
 
@@ -283,6 +289,10 @@ actor FakeDrive {
             }
             let (metadata, data, mime) = Self.parseMultipart(request)
             let id = add(name: metadata["name"] as! String, parent: (metadata["parents"] as! [String])[0], mimeType: mime, data: data)
+            if let index = files.firstIndex(where: { $0.id == id }) {
+                files[index].description = metadata["description"] as? String
+                files[index].properties = metadata["properties"] as? [String: String]
+            }
             return reply(200, json(["id": id]))
         }
         if method == "PATCH", url.path.hasPrefix("/upload/drive/v3/files/") {
@@ -407,13 +417,17 @@ struct DriveAudioStoreTests {
         var awake: [Bool] = []
     }
 
-    private func makeStore(signedIn: Bool = true, lookUpFirst: Bool = true, autoBackUp: Bool = true) -> DriveAudioStore {
+    private func makeStore(
+        signedIn: Bool = true, lookUpFirst: Bool = true, autoBackUp: Bool = true,
+        siteAudio: Set<String> = [], layoutRecheck: TimeInterval = DriveAudioStore.layoutFreshness
+    ) -> DriveAudioStore {
         let drive = drive, network = network, access = access
         return DriveAudioStore(
             client: DriveClient(transport: { try await drive.handle($0) }, token: { _ in "t" }),
             isSignedIn: { signedIn }, cache: cache, queueFile: queueFile, indexFile: indexFile,
             retryDelay: .milliseconds(20), canUploadNow: { network.free }, onAccessLost: { access.lost += 1 },
-            keepAwake: { access.awake.append($0) }, looksUpFirst: { lookUpFirst }, backsUpAutomatically: { autoBackUp }
+            keepAwake: { access.awake.append($0) }, looksUpFirst: { lookUpFirst }, backsUpAutomatically: { autoBackUp },
+            isSiteAudio: { siteAudio.contains($0) }, layoutRecheck: layoutRecheck
         )
     }
 
@@ -667,7 +681,7 @@ struct DriveAudioStoreTests {
         try cache.store(Data("ID3 o".utf8), for: offline)
         let before = await drive.uploadCount()
 
-        let result = await store.backUp([(title: "T", url: url, blocksData: data)], voice: "alloy")
+        let result = await store.backUp([DriveArticle(title: "T", url: url, blocksData: data)], voice: "alloy")
         try await waitFor { store.pendingUploads.isEmpty && !store.isUploading && store.manifestNames.count == 1 }
 
         #expect(result == DriveAudioStore.BackupResult(onThisIPhone: 2, missing: 1))
@@ -700,7 +714,7 @@ struct DriveAudioStoreTests {
         let url = "https://en.wikipedia.org/wiki/T"
         let blocks: [ContentBlock] = [.paragraph("Generated here.")]
         let data = try JSONEncoder().encode(blocks)
-        let library = [(title: "T", url: url, blocksData: data)]
+        let library = [DriveArticle(title: "T", url: url, blocksData: data)]
         let store = makeStore(autoBackUp: false)
         let generated = request("Generated here.")
         try cache.store(Data("ID3 g".utf8), for: generated)
@@ -733,7 +747,7 @@ struct DriveAudioStoreTests {
         network.free = false  // held, so nothing goes up before Stop
         let store = makeStore()
 
-        await store.backUp([(title: "T", url: "https://en.wikipedia.org/wiki/T", blocksData: data)], voice: "alloy", showsProgress: true)
+        await store.backUp([DriveArticle(title: "T", url: "https://en.wikipedia.org/wiki/T", blocksData: data)], voice: "alloy", showsProgress: true)
         #expect(store.pendingUploads.count == 2)
         #expect(store.backupRun == DriveAudioStore.BackupRun(total: 2, done: 0))
         #expect(store.isWaitingForFreeNetwork)
@@ -809,6 +823,211 @@ struct DriveAudioStoreTests {
         manifest = try JSONDecoder().decode(DriveManifest.self, from: #require(await drive.file(named: name)).data)
         #expect(manifest.complete)
         #expect(await drive.count(named: name) == 1)
+    }
+
+    // MARK: - One folder for the site and the apps (docs/shared-drive-layout.md)
+
+    static let legacyFormat = #"{"formatVersion":1,"key":"ios-v1"}"#
+    static let sharedFormat = #"{"formatVersion":2,"key":"ios-v1","layout":"english-reader-drive/2"}"#
+    static let movedFormat = #"{"formatVersion":2,"key":"ios-v1","movedTo":"English Reader"}"#
+
+    private func folder(_ name: String, in parent: String = "root") async -> String {
+        await drive.add(name: name, parent: parent, mimeType: DriveClient.folderType)
+    }
+
+    @discardableResult
+    private func format(_ json: String, in folder: String) async -> String {
+        await drive.add(name: "format.json", parent: folder, mimeType: "application/json", data: Data(json.utf8))
+    }
+
+    @Test func theSitesFolderIsLeftAloneUntilItSaysVersion2() async throws {
+        let shared = await folder(DriveAudioStore.sharedRootName)
+        _ = await folder("articles", in: shared)
+        let legacy = await folder(DriveAudioStore.rootName)
+        await format(Self.legacyFormat, in: legacy)
+
+        let layout = try await makeStore().layout()
+        #expect(layout.root == legacy)
+        #expect(layout.rootName == DriveAudioStore.rootName)
+        #expect(layout.otherRoot == shared)
+        #expect(layout.otherAudio == nil)
+        #expect(await drive.files(in: shared).map(\.name) == ["articles"])  // nothing written into the site's folder
+    }
+
+    @Test func withoutTheOldFolderTheAppMakesItAndNeverWritesTheSitesVersion2() async throws {
+        let shared = await folder(DriveAudioStore.sharedRootName)
+        let layout = try await makeStore().layout()
+        let legacy = try #require(await drive.file(named: DriveAudioStore.rootName))
+        #expect(layout.root == legacy.id)
+        #expect(await drive.files(in: shared).isEmpty)
+        let written = try #require(await drive.files(in: legacy.id).first { $0.name == "format.json" })
+        #expect(DriveAudioStore.FolderFormat(try JSONSerialization.jsonObject(with: written.data) as? [String: Any]) == .legacy)
+    }
+
+    @Test func afterTheMoveTheSitesFolderIsUsedWithTheSameAudio() async throws {
+        let shared = await folder(DriveAudioStore.sharedRootName)
+        let sharedArticles = await folder("articles", in: shared)
+        let legacy = await folder(DriveAudioStore.rootName)
+        let legacyFormatFile = await format(Self.legacyFormat, in: legacy)
+        let audio = await folder("audio", in: legacy)
+        _ = await folder("articles", in: legacy)
+        let old = request("Paid for once.")
+        _ = await drive.add(name: SpeechAudioCache.key(for: old) + ".mp3", parent: audio, data: Data("ID3 old".utf8))
+        let store = makeStore(layoutRecheck: 0)
+        await store.syncIndex()
+        #expect(store.isOnDrive(SpeechAudioCache.key(for: old)) == true)
+        #expect(store.folderName == DriveAudioStore.rootName)
+
+        // The site moves the audio folder whole, writes its version 2 last, and marks the old folder moved.
+        await drive.move(audio, to: shared)
+        await format(Self.sharedFormat, in: shared)
+        await drive.setData(legacyFormatFile, Data(Self.movedFormat.utf8))
+
+        // Coming to the front: the site's folder is used, the audio already indexed is still known.
+        store.appBecameActive()
+        let layout = try await store.layout()
+        #expect(layout.root == shared)
+        #expect(layout.audio == audio)
+        #expect(layout.articles == sharedArticles)
+        #expect(layout.otherRoot == legacy)
+        #expect(store.folderName == DriveAudioStore.sharedRootName)
+        await store.syncIndex()
+        #expect(store.isOnDrive(SpeechAudioCache.key(for: old)) == true)
+
+        // New audio goes into the moved folder; no folder is made anywhere.
+        let made = request("Made after the move.")
+        try cache.store(Data("ID3 new".utf8), for: made)
+        store.didGenerate(made, in: cache)
+        try await waitFor { store.pendingUploads.isEmpty && !store.isUploading }
+        #expect(await drive.file(named: SpeechAudioCache.key(for: made) + ".mp3")?.parent == audio)
+        #expect(await drive.count(named: "audio") == 1)
+        #expect(await drive.count(named: DriveAudioStore.rootName) == 1)
+        #expect(Set(await drive.files(in: legacy).map(\.name)) == ["format.json", "articles"])
+    }
+
+    @Test func aFolderMarkedMovedWithoutTheSitesFolderIsRefused() async throws {
+        let legacy = await folder(DriveAudioStore.rootName)
+        await format(Self.movedFormat, in: legacy)
+        await #expect(throws: DriveError.self) { try await makeStore().layout() }
+        #expect(await drive.count(named: DriveAudioStore.sharedRootName) == 0)
+    }
+
+    @Test func inTheMiddleOfTheMoveTheMovedAudioFolderIsUsedNotANewOne() async throws {
+        let shared = await folder(DriveAudioStore.sharedRootName)
+        let legacy = await folder(DriveAudioStore.rootName)
+        await format(Self.legacyFormat, in: legacy)
+        let audio = await folder("audio", in: shared)  // already moved; the site hasn't written its version 2 yet
+        let layout = try await makeStore().layout()
+        #expect(layout.root == legacy)
+        #expect(layout.audio == audio)
+        #expect(layout.otherAudio == nil)
+        #expect(await drive.count(named: "audio") == 1)
+    }
+
+    @Test func whileBothFoldersHaveAudioBothAreLookedIn() async throws {
+        let shared = await folder(DriveAudioStore.sharedRootName)
+        await format(Self.sharedFormat, in: shared)
+        let newAudio = await folder("audio", in: shared)
+        let legacy = await folder(DriveAudioStore.rootName)
+        await format(Self.movedFormat, in: legacy)
+        let oldAudio = await folder("audio", in: legacy)  // made by a device that wasn't updated
+        let stray = request("Uploaded by an old device.")
+        _ = await drive.add(name: SpeechAudioCache.key(for: stray) + ".mp3", parent: oldAudio, data: Data("ID3 stray".utf8))
+
+        let store = makeStore()
+        let layout = try await store.layout()
+        #expect(layout.audio == newAudio)
+        #expect(layout.otherAudio == oldAudio)
+        let url = await store.fetch(stray, into: cache)
+        #expect(try Data(contentsOf: #require(url)) == Data("ID3 stray".utf8))
+        store.enqueue([SpeechAudioCache.key(for: stray)])
+        #expect(store.pendingUploads.isEmpty)  // already on Drive: not uploaded again
+    }
+
+    @Test func aManifestIsReadBeforeItIsRewrittenAndKeepsWhatTheAppDoesNotKnow() async throws {
+        let store = makeStore()
+        let articles = try await store.layout().articles
+        let url = "https://en.wikipedia.org/wiki/COVID-19"
+        let name = DriveManifest.urlHash(url) + ".json"
+        let base = DriveManifest(title: "COVID-19", url: url, blocks: [.paragraph("Old text.")], voice: "alloy")
+        var theirs = try #require(try JSONSerialization.jsonObject(with: base.encoded()) as? [String: Any])
+        theirs["updatedBy"] = "web"
+        theirs["chunkExtras"] = ["k": ["ms": 1200]]
+        theirs["source"] = ["kind": "wikipedia", "revision": 7]
+        _ = await drive.add(name: name, parent: articles, mimeType: "application/json", data: try JSONSerialization.data(withJSONObject: theirs))
+
+        await store.noteArticle(title: "COVID-19", url: url, blocks: [.paragraph("New text.")], voice: "alloy")
+
+        let file = try #require(await drive.file(named: name))
+        let written = try #require(try JSONSerialization.jsonObject(with: file.data) as? [String: Any])
+        #expect(written["updatedBy"] as? String == "ios")
+        #expect((written["chunks"] as? [[String: Any]])?.compactMap { $0["text"] as? String } == ["New text."])
+        #expect((written["source"] as? [String: Any])?["revision"] as? Int == 7)
+        #expect((written["chunkExtras"] as? [String: Any])?["k"] != nil)
+        #expect(await drive.count(named: name) == 1)
+    }
+
+    @Test func aManifestForAnotherVoiceIsLeftAlone() async throws {
+        let store = makeStore()
+        let articles = try await store.layout().articles
+        let url = "https://en.wikipedia.org/wiki/Paris"
+        let name = DriveManifest.urlHash(url) + ".json"
+        let theirs = DriveManifest(title: "Paris", url: url, blocks: [.paragraph("Frozen text.")], voice: "marin").encoded()
+        _ = await drive.add(name: name, parent: articles, mimeType: "application/json", data: theirs)
+
+        await store.noteArticle(title: "Paris", url: url, blocks: [.paragraph("Newer text.")], voice: "alloy")
+        #expect(await drive.file(named: name)?.data == theirs)
+        #expect(await drive.count(named: name) == 1)
+
+        // Not downloaded again on the next visit.
+        let downloads = await drive.requests.count { $0.hasPrefix("GET /drive/v3/files/") }
+        await store.noteArticle(title: "Paris", url: url, blocks: [.paragraph("Newer text.")], voice: "alloy")
+        #expect(await drive.requests.count { $0.hasPrefix("GET /drive/v3/files/") } == downloads)
+    }
+
+    @Test func aDeletedManifestIsReplacedByANewFile() {
+        let url = "https://en.wikipedia.org/wiki/Paris"
+        let ours = DriveManifest(title: "Paris", url: url, blocks: [.paragraph("P.")], voice: "alloy")
+        let deleted = Data(#"{"deleted":true,"model":"gpt-4o-mini-tts","voice":"alloy"}"#.utf8)
+        #expect(DriveManifest.write(ours, over: deleted) == .create(ours.encoded()))
+        let newer = Data(#"{"formatVersion":3,"model":"gpt-4o-mini-tts","voice":"alloy"}"#.utf8)
+        #expect(DriveManifest.write(ours, over: newer) == .leave)
+    }
+
+    @Test func aNewManifestCarriesTheTitleAndPropertiesForPeople() async throws {
+        let url = "https://en.wikipedia.org/wiki/Paris"
+        await makeStore().noteArticle(title: "Paris", url: url, blocks: [.paragraph("P.")], voice: "alloy")
+        let file = try #require(await drive.file(named: DriveManifest.urlHash(url) + ".json"))
+        #expect(file.description == "Paris")
+        #expect(file.properties == ["articleId": DriveManifest.urlHash(url), "title": "Paris", "kind": "wikipedia"])
+    }
+
+    @Test func propertyValuesFitDrivesLimit() {
+        let cut = DriveManifest.propertyValue(String(repeating: "é", count: 100), key: "title")  // 2 bytes each
+        #expect(cut.utf8.count == 118)  // 124 - "title"
+        #expect(DriveManifest.propertyValue("Paris", key: "title") == "Paris")
+    }
+
+    @Test func anArticleFromTheSiteGetsNoURLManifestAndTheSitesAudioStaysOffDrive() async throws {
+        // The site's canonical address for an article it took from Wikipedia is the Wikipedia address.
+        let url = "https://en.wikipedia.org/wiki/COVID-19"
+        let fromSite = request("Edited on the site.")
+        let generated = request("Generated here.")
+        try cache.store(Data("ID3 site".utf8), for: fromSite)
+        try cache.store(Data("ID3 paid".utf8), for: generated)
+        let blocks: [ContentBlock] = [.paragraph("Edited on the site."), .paragraph("Generated here.")]
+        let store = makeStore(siteAudio: [SpeechAudioCache.key(for: fromSite)])
+
+        await store.noteArticle(title: "COVID-19", url: url, blocks: blocks, voice: "alloy", listsArticle: false)
+        let result = await store.backUp(
+            [DriveArticle(title: "COVID-19", url: url, blocksData: try JSONEncoder().encode(blocks), isFromSite: true)], voice: "alloy"
+        )
+        try await waitFor { store.pendingUploads.isEmpty && !store.isUploading }
+
+        #expect(result?.missing == 1)
+        #expect(await drive.count(named: SpeechAudioCache.key(for: generated) + ".mp3") == 1)  // paid for here: backed up
+        #expect(await drive.count(named: SpeechAudioCache.key(for: fromSite) + ".mp3") == 0)  // the site's copy: not
+        #expect(await drive.count(named: DriveManifest.urlHash(url) + ".json") == 0)
     }
 }
 

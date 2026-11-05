@@ -26,7 +26,10 @@ enum LibraryActions {
             plan.markOnDrive { drive.isOnDrive($0) == true }
             for article in articles {
                 Task {
-                    await drive.noteArticle(title: article.title, url: article.sourceURL.absoluteString, blocks: article.blocks, voice: openAIVoice)
+                    await drive.noteArticle(
+                        title: article.title, url: article.sourceURL.absoluteString, blocks: article.blocks, voice: openAIVoice,
+                        listsArticle: DriveAudioStore.listsArticle(article)
+                    )
                 }
             }
         }
@@ -87,8 +90,7 @@ enum LibraryActions {
     static func backUpToDrive(_ articles: [Article]) async -> AudioDownloadPrompt? {
         let drive = DriveAudioStore.shared
         guard drive.isEnabled else { return .driveNotConnected }
-        let library = articles.map { (title: $0.title, url: $0.sourceURL.absoluteString, blocksData: $0.blocksData) }
-        guard let result = await drive.backUp(library, voice: openAIVoice, showsProgress: true) else {
+        guard let result = await drive.backUp(articles.map(\.driveArticle), voice: openAIVoice, showsProgress: true) else {
             return .notice(title: "Google Drive Unavailable", message: drive.lastError ?? "Google Drive couldn't be reached.")
         }
         guard result.missing == 0 else { return nil }

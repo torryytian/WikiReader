@@ -147,14 +147,21 @@ nonisolated struct DriveClient: Sendable {
     }
 
     /// Uploads a new file into `folder` and returns its id.
-    func upload(name: String, data: Data, mimeType: String, in folder: String) async throws(DriveError) -> String {
+    /// - Parameters:
+    ///   - description: Drive's "description" of the file, shown in its details (an article's title, for people).
+    ///   - properties: Public key-value properties, readable by any app that can see the file.
+    func upload(
+        name: String, data: Data, mimeType: String, in folder: String,
+        description: String? = nil, properties: [String: String]? = nil
+    ) async throws(DriveError) -> String {
         let boundary = "wikireader-\(UUID().uuidString)"
         var request = URLRequest(url: Self.url(Self.uploadAPI, ["uploadType": "multipart", "fields": "id"]))
         request.httpMethod = "POST"
         request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Self.multipartBody(
-            metadata: ["name": name, "parents": [folder]], data: data, mimeType: mimeType, boundary: boundary
-        )
+        var metadata: [String: Any] = ["name": name, "parents": [folder]]
+        if let description { metadata["description"] = description }
+        if let properties { metadata["properties"] = properties }
+        request.httpBody = Self.multipartBody(metadata: metadata, data: data, mimeType: mimeType, boundary: boundary)
         request.timeoutInterval = 120
         return try decode(Created.self, from: await send(request)).id
     }

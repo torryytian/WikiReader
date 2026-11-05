@@ -2,8 +2,10 @@ import Foundation
 import Observation
 import OSLog
 
-/// Keeps the saved-word book the same here, on other devices and in the Chrome extension, through
-/// `WikiReader Cache/vocab.json` on Google Drive (docs/shared-vocab-format.md §7). Free: Drive only.
+/// Keeps the saved-word book the same here, on other devices and in the Chrome extension, through `vocab.json` in the
+/// shared Drive folder (`WikiReader Cache/`, or `English Reader/` once the site has moved everything there:
+/// docs/shared-vocab-format.md §7, docs/shared-drive-layout.md). Free: Drive only. While both folders exist, a book in
+/// the other one is merged in too, and only the folder in use is written.
 ///
 /// A sync downloads the file, merges it with this iPhone's book, keeps the result here, and uploads it only if it
 /// differs from what was there: usually two or three requests. It runs when the app comes to the front, a few
@@ -34,7 +36,8 @@ final class VocabSync {
     @ObservationIgnored private let client: DriveClient
     @ObservationIgnored private let isSignedIn: () -> Bool
     @ObservationIgnored private let account: () -> String?
-    @ObservationIgnored private let rootFolder: () async throws -> String
+    /// The Drive folder in use, and the other one while both exist.
+    @ObservationIgnored private let folders: () async throws -> (root: String, other: String?)
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var running: Task<Void, Never>?
     @ObservationIgnored private var again = false
@@ -45,14 +48,17 @@ final class VocabSync {
         client: DriveClient = DriveClient(token: { force in try await GoogleAccount.shared.validAccessToken(force: force) }),
         isSignedIn: @escaping () -> Bool = { GoogleAccount.shared.isSignedIn },
         account: @escaping () -> String? = { GoogleAccount.shared.accountID },
-        rootFolder: @escaping () async throws -> String = { try await DriveAudioStore.shared.layout().root },
+        folders: @escaping () async throws -> (root: String, other: String?) = {
+            let layout = try await DriveAudioStore.shared.layout()
+            return (layout.root, layout.otherRoot)
+        },
         now: @escaping () -> Date = Date.init
     ) {
         self.book = book
         self.client = client
         self.isSignedIn = isSignedIn
         self.account = account
-        self.rootFolder = rootFolder
+        self.folders = folders
         self.now = now
     }
 
@@ -90,7 +96,7 @@ final class VocabSync {
         state = .syncing
         if let account = account() { book.belong(to: account) }
         do {
-            let root = try await rootFolder()
+            let (root, other) = try await folders()
             let id = try await client.files(named: [Self.fileName], in: root)[Self.fileName]
             var remote: VocabFile?
             if let id {
@@ -106,12 +112,22 @@ final class VocabSync {
                 remote = file
             }
 
+            // A book left in the other folder (written by a device still on it): merged in, never written.
+            var stray: VocabFile?
+            if let other, let strayID = try await client.files(named: [Self.fileName], in: other)[Self.fileName] {
+                let file = try? VocabFile.decode(try await client.download(fileID: strayID))
+                if file?.formatVersion == VocabFile.currentVersion { stray = file }
+            }
+
             let local = book.file
-            if remote == nil && local.entries.isEmpty && local.deleted.isEmpty {
+            if remote == nil && stray == nil && local.entries.isEmpty && local.deleted.isEmpty {
                 finish()
                 return
             }
             var merged = VocabFormat.merge(local, remote, now: VocabFormat.milliseconds(now()), by: "ios")
+            if let stray {
+                merged = VocabFormat.merge(merged, stray, now: VocabFormat.milliseconds(now()), by: "ios")
+            }
             // Changed here while Drive was being asked: merge that in too (merging is order-free and idempotent).
             if book.file != local {
                 merged = VocabFormat.merge(book.file, merged, now: VocabFormat.milliseconds(now()), by: "ios")
