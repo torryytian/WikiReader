@@ -335,7 +335,7 @@
     - `vocab.json` 新旧两份合并；
   - 第 3 阶段（网站搬文件）要等 iOS 和插件的新版装到所有设备之后，由站长定时间。
 - **访问凭证、试读、音频改名（同日深夜，网站 API 文档 §10，未装手机）**：
-  - 站长决定没登录只能试读（默认 20%），App 带站长签发的凭证读全文；网站的总开关现在是关的，站长 11-07 前后在手机上验证后才打开。线上 `access` 字段还没出现，随便填的凭证也返回 200（开关关着时大概不校验），所以"凭证被拒"只在单元测试里验证过。
+  - 站长决定没登录只能试读（默认 20%），App 带站长签发的凭证读全文；网站的总开关现在是关的，站长 11-07 前后在手机上验证后才打开。§10 当晚稍后上线：凭证不管开关开没开都校验（`er_bogus` → 401 `invalid_token`，已用 curl 核对），详情总带 `access`（开关关着时是 `full`，没有 `preview`；打开且没凭证时是 `preview`，一定带 `{percent, shown, total}`）。音频仍在 audio.thrones.wang，文件名是 40 位的密钥摘要。App 里的试读界面要等站长打开开关后在真机上看。
   - 做法：`KeychainStore.siteToken`；`SiteClient` 带 `Authorization`，401 → `.invalidToken`，429 按 `Retry-After` 重试；`SiteLibrary` 的 `Link.preview` 记试读，试读的文章每次打开都重取，全文永远不会被试读替换；`tokenRefused` 给设置页显示"Not accepted"；设置页新的 English Reader 一节；卡片"Preview, first 20%"；阅读页打开试读文章时提示。
   - **网站的音频改成压缩版后 App 原来不会用**：旧规则只用 `sourceIdentical: true` 的朗读，网站今天改成 48k（false），旧代码会当作网站没有音频、改用 Drive 或 OpenAI（要花钱）。按 §4.2 改成照常播放、不进 Drive。手机上还没装过带网站的版本，没受影响。
   - 音频文件名改成网站用密钥算的：App 本来就用接口给的 `url`；新加：某个地址 404 时重新取这篇的详情换新地址再试一次（`SiteLibrary.refreshAudio(forKey:)`）。
