@@ -1,6 +1,6 @@
 # 统一的 Google Drive 数据规范 v2
 
-> 状态：**已定稿 v2.2（2026-11-05）**，iOS 和插件的评审都已并入（见文末「修订记录」）。权威版本是 iOS 仓库的 `docs/shared-drive-layout.md`，网站（`docs/shared-storage/drive-layout-v2.md`）和插件照抄；§6 第 2、4、5 条待站长定，定了再改这里。网站端 Claude 起草。站长已定：**唯一的根目录叫 `English Reader`**，就用网站现在已经整理好的目录结构，三端都往这里收。
+> 状态：**已定稿 v2.3（2026-11-05）**，iOS 和插件的评审都已并入（见文末「修订记录」）。权威版本是 iOS 仓库的 `docs/shared-drive-layout.md`，网站（`docs/shared-storage/drive-layout-v2.md`）和插件照抄；§6 第 2、4、5 条待站长定，定了再改这里。网站端 Claude 起草。站长已定：**唯一的根目录叫 `English Reader`**，就用网站现在已经整理好的目录结构，三端都往这里收。
 > 起因：站长希望网站、iPhone、Chrome 插件是同一个项目的三个客户端，**用同一份数据源**；Drive 上的数据要能做持久化：任何一端（包括网站的服务器）没了，都能从 Drive 恢复。
 > 现行规范 `shared-tts-cache-format.md`（ios-v1）、`shared-vocab-format.md`（v2）里的**算法全部不变**：音频 key、切块、正文清洗、URL 规范化、生词格式都照旧，已经付费生成的音频一个都不作废。本提案只改"文件放在哪、文章清单里多写什么"。
 > 确认后，权威版本放进 iOS 仓库（和另外两份共享规范放在一起），网站和插件照抄。
@@ -97,7 +97,8 @@ English Reader/                          ← 三端唯一的根目录（同名�
   - 网站自己的文章只有网站写。
   - Wikipedia 清单（`<urlHash>.json`）谁生成了音频谁写。
   - 改写清单时，必须**先读、再改、再写**，保留自己不认识的字段。（现状：插件和 iPhone 都整份重写、不保留未知字段；第 2 阶段两端都改成保留。）
-  - **一篇只有一份清单，最后写的算**：清单只是索引。读的一方发现清单里的声音组合和自己的不一样，就自己抽文本、算 key（v1 实际就是这样，并没有「不覆盖其他声音组合」的规则）。
+  - **一篇只有一份清单，不覆盖别的声音组合**：写之前先读已有的清单，它的 model、voice、instructions 和自己的不同，就**不写**；相同才改写，最后写的算。理由：清单里冻结的是生成音频那一刻的文字，Wikipedia 以后改了文章，插件和 iPhone 仍能靠它复用已付费的音频；被别的组合盖掉，改过的段落 key 就变了，要重新付费。读的一方发现清单里的声音组合和自己的不同，就自己抽文本、算 key。（v1 没有「不覆盖」这条，v2.3 起三端都遵守。）
+  - 网站已经写过 4 份 `<urlHash>.json`（`updatedBy: "web"`：COVID-19、Cultural Revolution、Australia、United States），文字是清洗器原样抽出的，保留原名、不改名。站长编辑过的文章，网站不再更新它的 `<urlHash>.json`，编辑后的文字只写进 `site-<uuid>.json`。
   - 网站文章的 `blocks`、`chunkExtras` 要写全：网站没了的那天，iPhone 可以直接靠它们恢复文章。
 - 有了 v2 清单，**插件也能读到网站上传的演讲**：文本在 `blocks`，音频在 `recordings/<key>.mp3`，跟读高亮用 `chunkExtras` 里的 `wordStartsMs`。iPhone 暂时仍从网站接口取网站文章和录音（不读 `recordings/`），见 §6。
 
@@ -107,8 +108,8 @@ English Reader/                          ← 三端唯一的根目录（同名�
 |---|---|---|---|
 | 0（已完成） | 网站 | 网站自己的数据整理进 `English Reader/` | 无 |
 | 1 | 网站 | 网站自己的文章存档改成 §3 的格式和命名（一律 `site-<uuid>.json`，说明里写标题，`properties` 写附加信息），仍放在 `English Reader/articles/`。**不往 `WikiReader Cache/articles/` 里补字段**：插件和 iPhone 现在每次整份重写清单，补进去的字段会被抹掉，这一步推到第 3 阶段 | 无 |
-| 2 | iOS、插件 | ① 按 §2「用哪个根目录」判断，每次启动 / 回到前台都重新判断；② **只要 `WikiReader Cache/` 还在，查找时新旧两处都查**，一条查询即可：`('<新audio>' in parents or '<recordings>' in parents or '<旧audio>' in parents) and (name='k1.mp3' or …)`；写入只写当前根目录；③ 清单按文件名找，先读再改再写，保留未知字段；（iOS）网站来的文章不写 `<urlHash>.json`（现在网站还没有音频的网站文章用 OpenAI 声音读时会按它的 `canonicalUrl` 写一份，第 2 阶段停掉；手机上还没装过带网站的版本，实际没发生过）；④（插件）删除改成软删除；⑤ `vocab.json` 优先新位置，发现新旧两份就按 v2 规则合并；⑥（iOS）自动备份到 `English Reader/backups/ios_<时间>.wikireader`（不带音频，内容有变化时最多一天一份）和「从 Drive 恢复」入口；⑦ 认 `WikiReader Cache/format.json` 里的 `movedTo` | 发版即可，旧版本照常工作 |
-| 3 | 网站，在两端新版都装到站长所有设备、站长确认、且手机没在用 OpenAI 生成朗读时 | **搬文件夹，不搬文件**（只改 parent，ID 不变）：① 把 `WikiReader Cache/audio` 这个文件夹**整个**移进 `English Reader/`，成为 `English Reader/audio/`。不能逐个移文件：iPhone 的音频索引只看新创建的文件，移进它已索引过的文件夹的文件永远看不到，会以为没有、重新付费生成；② 把 `WikiReader Cache/articles/*` 逐个移进 `English Reader/articles/`（目标文件夹已存在；iPhone、插件每次都重新列清单，没问题）；③ 两份 `vocab.json` 合并后写到 `English Reader/vocab.json`；④ **最后**写 `English Reader/format.json` v2；⑤ `WikiReader Cache/` **不删**，留着空文件夹，把它的 `format.json` 改成 `{"formatVersion":2,"key":"ios-v1","movedTo":"English Reader"}`：没升级的旧客户端遇到 v2 会明确报错、停用 Drive，而不会因为找不到文件夹另建一个、让数据分叉；新客户端看到 `movedTo` 就切过去 | 旧客户端停用 Drive 并报错（旧版 iPhone 显示 "The Drive folder holds a different cache format"，不会提示升级），不会分叉；但它缺的段会照常用 OpenAI 生成、花钱，所以必须先把所有设备升级 |
+| 2 | iOS、插件 | ① 按 §2「用哪个根目录」判断，每次启动 / 回到前台都重新判断；② **只要 `WikiReader Cache/` 还在，查找时新旧两处都查**，一条查询即可：`('<新audio>' in parents or '<recordings>' in parents or '<旧audio>' in parents) and (name='k1.mp3' or …)`；写入只写当前根目录；③ 清单按文件名找，先读再改再写，保留未知字段，声音组合不同就不写（§3）；（iOS）网站来的文章不写 `<urlHash>.json`（现在网站还没有音频的网站文章用 OpenAI 声音读时会按它的 `canonicalUrl` 写一份，第 2 阶段停掉；手机上还没装过带网站的版本，实际没发生过）；④（插件）删除改成软删除；⑤ `vocab.json` 优先新位置，发现新旧两份就按 v2 规则合并；⑥（iOS）自动备份到 `English Reader/backups/ios_<时间>.wikireader`（不带音频，内容有变化时最多一天一份）和「从 Drive 恢复」入口；⑦ 认 `WikiReader Cache/format.json` 里的 `movedTo` | 发版即可，旧版本照常工作 |
+| 3 | 网站，在两端新版都装到站长所有设备（每台电脑的插件版本在插件设置页「诊断」里看）、站长确认、且手机没在用 OpenAI 生成朗读时 | **搬文件夹，不搬文件**（只改 parent，ID 不变）：① 把 `WikiReader Cache/audio` 这个文件夹**整个**移进 `English Reader/`，成为 `English Reader/audio/`。不能逐个移文件：iPhone 的音频索引只看新创建的文件，移进它已索引过的文件夹的文件永远看不到，会以为没有、重新付费生成；② 把 `WikiReader Cache/articles/*` 逐个移进 `English Reader/articles/`（目标文件夹已存在；iPhone、插件每次都重新列清单，没问题）；③ 两份 `vocab.json` 合并后写到 `English Reader/vocab.json`；④ **最后**写 `English Reader/format.json` v2；⑤ `WikiReader Cache/` **不删**，留着空文件夹，把它的 `format.json` 改成 `{"formatVersion":2,"key":"ios-v1","movedTo":"English Reader"}`：没升级的旧客户端遇到 v2 会明确报错、停用 Drive，而不会因为找不到文件夹另建一个、让数据分叉；新客户端看到 `movedTo` 就切过去；⑥ 搬完过几天，网站再扫一次 `WikiReader Cache/`：新出现的 `vocab.json` 合并过去，新出现的清单移过去 | 旧版 iPhone 下次启动时停用 Drive 并报错（显示 "The Drive folder holds a different cache format"，不会提示升级），不会分叉，但它缺的段会照常用 OpenAI 生成、花钱；搬的那一刻正开着的旧版 iPhone 会一直用内存里的旧文件夹 ID，直到下次启动。**旧版插件拦不住**：它只在第一次连接时读 format.json，之后一直用存下的文件夹 ID，会继续往旧的 `articles/` 和 `vocab.json` 写（音频文件夹是整个移走的、ID 不变，它写的音频反而落在新位置）。所以必须先把所有设备升级，⑥ 的补扫收拾漏网的 |
 | 4 | 站长 | 根目录下的 `WikiReader-<日期>.wikireader` 是在 iPhone 上手动导出、经 Google Drive App 存进去的，本项目的 OAuth 客户端看不到、也挪不动（`drive.file` 权限）。站长愿意的话在 Drive 网页里手动拖进 `English Reader/backups/`，或者留着不管 | 无 |
 
 ## 5. 不变的东西
@@ -132,3 +133,4 @@ English Reader/                          ← 三端唯一的根目录（同名�
 - **v2.1（2026-11-05，并入插件端评审）**：第 3 阶段改成整个文件夹搬（原来逐个搬文件，会让存了旧文件夹 ID 的插件一直查空文件夹，以为没有音频、重新付费生成）；第 2 阶段新旧两处同时查找；旧文件夹进回收站，不永久删除；第 1 阶段不再往 `WikiReader Cache/articles/` 补字段（会被整份重写抹掉）；清单 `formatVersion` 保持 1；有 URL 的文章一律 `<urlHash>.json`，网站自己的文章 `site-<uuid>.json`；用 `properties`，不用 `appProperties`；写明位置、由谁创建、新装时谁来建；`vocab.json` 两份合并；`WikiReader Cache/format.json` 永不改；插件「删除」改软删除、插件备份两条待站长定。
 - **v2.2（2026-11-05，并入 iOS 端评审）**：`WikiReader Cache/` 搬空后不删，改成带 `movedTo` 的 v2 `format.json`（旧版 iPhone 找不到文件夹会另建一个，数据分叉）；`audio` 必须整个文件夹移动（iPhone 的音频索引是增量的）；网站文章（包括来自 Wikipedia 的）一律 `site-<uuid>.json`，不写 `urlHash`（文字可能编辑过，不能冒充清洗器抽出的清单）；查找只靠文件名；清单「一篇一份、最后写的算」；根目录判断规则写全；iPhone 不读 `recordings/`；iPhone 根目录的旧备份由站长手动处理。
 - **v2.2 定稿（2026-11-05，iOS 确认时的文字修正，规则不变）**：§3 的例子改成一篇网站文章（原来 `url` 写的是 Wikipedia 地址、`articleId` 是 urlHash，和 `site-<uuid>.json` 的规则对不上），`source` 加上 `url`；`kind` 加 `imported`（iPhone 本机导入文章）；第 2 阶段③加 iOS 一条：网站来的文章不写 `<urlHash>.json`；第 3 阶段写明旧版 iPhone 的报错原文、不会提示升级、缺的段会付费生成。
+- **v2.3（2026-11-05，插件端第二轮）**：§3 加「不覆盖别的声音组合的清单」（组合相同才改写，最后写的算），第 2 阶段③同步；§3 写明网站已写的 4 份 `<urlHash>.json` 保留原名，站长编辑后的文字只进 `site-<uuid>.json`；第 3 阶段写明旧版插件拦不住 `movedTo`（只在第一次连接时读 format.json），搬的那一刻正开着的旧版 iPhone 也要到下次启动才停，所以先在每台电脑确认插件版本，搬完过几天网站再补扫一次 `WikiReader Cache/`。
