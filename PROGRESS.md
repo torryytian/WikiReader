@@ -334,6 +334,12 @@
     - 网站来的文章不写 `<urlHash>.json`：现在网站没音频的网站文章用 OpenAI 声音读时会按 `canonicalUrl` 写一份；
     - `vocab.json` 新旧两份合并；
   - 第 3 阶段（网站搬文件）要等 iOS 和插件的新版装到所有设备之后，由站长定时间。
+- **访问凭证、试读、音频改名（同日深夜，网站 API 文档 §10，未装手机）**：
+  - 站长决定没登录只能试读（默认 20%），App 带站长签发的凭证读全文；网站的总开关现在是关的，站长 11-07 前后在手机上验证后才打开。线上 `access` 字段还没出现，随便填的凭证也返回 200（开关关着时大概不校验），所以"凭证被拒"只在单元测试里验证过。
+  - 做法：`KeychainStore.siteToken`；`SiteClient` 带 `Authorization`，401 → `.invalidToken`，429 按 `Retry-After` 重试；`SiteLibrary` 的 `Link.preview` 记试读，试读的文章每次打开都重取，全文永远不会被试读替换；`tokenRefused` 给设置页显示"Not accepted"；设置页新的 English Reader 一节；卡片"Preview, first 20%"；阅读页打开试读文章时提示。
+  - **网站的音频改成压缩版后 App 原来不会用**：旧规则只用 `sourceIdentical: true` 的朗读，网站今天改成 48k（false），旧代码会当作网站没有音频、改用 Drive 或 OpenAI（要花钱）。按 §4.2 改成照常播放、不进 Drive。手机上还没装过带网站的版本，没受影响。
+  - 音频文件名改成网站用密钥算的：App 本来就用接口给的 `url`；新加：某个地址 404 时重新取这篇的详情换新地址再试一次（`SiteLibrary.refreshAudio(forKey:)`）。
+  - 测试 +6，共 618 个全过。截图看过设置页 English Reader 一节和卡片上的 Preview 标签（临时启动参数，已删）。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
 - **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。

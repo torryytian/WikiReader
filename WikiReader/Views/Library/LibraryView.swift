@@ -627,7 +627,8 @@ struct LibraryView: View {
         return SiteArticleRow.State(
             audioFraction: rowID.map { audioFractions[$0] ?? 0 },
             isOpening: openingSiteID == summary.id,
-            isDownloading: rowID.map { downloader.isDownloading($0) } ?? false
+            isDownloading: rowID.map { downloader.isDownloading($0) } ?? false,
+            preview: site.links[summary.id]?.preview
         )
     }
 

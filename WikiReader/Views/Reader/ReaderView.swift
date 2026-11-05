@@ -460,6 +460,10 @@ private struct ArticleReader: View {
         }
         self.session = session
         nowPlaying = NowPlayingController(session: session, blocks: blocks, title: article.title)
+        // English Reader sent only the beginning (no access token): say so; Settings has where to put one.
+        if let preview = SiteLibrary.shared.preview(forArticleURL: article.sourceURL) {
+            showMessage(symbol: "lock", text: preview.percent.map { "Preview: the first \($0)%" } ?? "Preview: the beginning only")
+        }
         // With an OpenAI voice and Google Drive, look the article's audio up on Drive at once (so each paragraph
         // doesn't wait to ask) and list the article there for other devices. Not for the site's narration: it
         // comes from the site.

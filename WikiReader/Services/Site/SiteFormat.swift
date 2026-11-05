@@ -128,12 +128,26 @@ nonisolated struct SiteCategoryList: Decodable, Sendable {
     var categories: [SiteCategoryInfo]
 }
 
-/// An article in full: its text in blocks, and where each piece of its narration is.
+/// An article in full: its text in blocks, and where each piece of its narration is. Or only its beginning, when the
+/// site is set to show readers without an access token a preview (docs/site-api-for-ios.md §10).
 nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
     var summary: SiteArticleSummary
     var attribution: Attribution?
     var narration: Narration?
     var blocks: [Block]
+    /// `full`, or `preview`: only the first blocks (and their narration) are here. Missing from sites before access
+    /// tokens: the whole article.
+    var access: String?
+    var preview: Preview?
+
+    var isPreview: Bool { access == "preview" }
+
+    nonisolated struct Preview: Codable, Equatable, Sendable {
+        var percent: Int?
+        /// Words included, and in the whole article.
+        var shown: Int?
+        var total: Int?
+    }
 
     nonisolated struct Attribution: Decodable, Equatable, Sendable {
         var text: String?
@@ -144,8 +158,9 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         var voice: String
         var instructions: String?
         var profile: String?
-        /// The files on the site are byte for byte what OpenAI returned (the same as Drive's). Only such files are
-        /// taken as this app's own cached audio: they may be backed up to Drive from here.
+        /// The files on the site are byte for byte what OpenAI returned (the same as Drive's); false since the site
+        /// serves compressed copies (2026-11-05). Either way they play from this app's cache under the piece's key, and
+        /// neither is ever uploaded to Drive from here (`DriveAudioStore` skips audio the site serves).
         var sourceIdentical: Bool?
     }
 
@@ -169,7 +184,7 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         var wordStartsMs: [Int]?
     }
 
-    private enum Keys: String, CodingKey { case attribution, narration, blocks }
+    private enum Keys: String, CodingKey { case attribution, narration, blocks, access, preview }
 
     init(from decoder: Decoder) throws {
         summary = try SiteArticleSummary(from: decoder)
@@ -177,6 +192,8 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         attribution = try container.decodeIfPresent(Attribution.self, forKey: .attribution)
         narration = try container.decodeIfPresent(Narration.self, forKey: .narration)
         blocks = try container.decode([Block].self, forKey: .blocks)
+        access = try container.decodeIfPresent(String.self, forKey: .access)
+        preview = try container.decodeIfPresent(Preview.self, forKey: .preview)
     }
 
     /// The text as this app reads it: the readable blocks, a heading or a paragraph each (lists, quotes and the like
@@ -189,11 +206,10 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
     }
 
     /// The audio files the site has for this article, by this app's cache key. Only pieces whose key is the one this
-    /// app gives their text in the narration's voice (so a mix-up on the site can never play the wrong sentence, and
-    /// the reader finds them), and only files that are OpenAI's originals (`sourceIdentical`) or a speaker's own
-    /// recording (never backed up to Drive: Drive only takes OpenAI voices).
+    /// app gives their text in the narration's voice: so a mix-up on the site can never play the wrong sentence, the
+    /// reader finds them, and a narration made some other way (another model) is never taken for this app's.
     var audioFiles: [String: URL] {
-        guard let narration, isUsable(narration) else { return [:] }
+        guard let narration else { return [:] }
         var files: [String: URL] = [:]
         for block in blocks {
             for chunk in block.chunks ?? [] {
@@ -206,7 +222,7 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
 
     /// When each word starts, by cache key, for the pieces of `audioFiles` that come with it (recordings).
     var wordStarts: [String: [Int]] {
-        guard let narration, isUsable(narration) else { return [:] }
+        guard let narration else { return [:] }
         var starts: [String: [Int]] = [:]
         for block in blocks {
             for chunk in block.chunks ?? [] {
@@ -223,10 +239,6 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         return blocks.flatMap { $0.chunks ?? [] }.count { chunk in
             chunk.url != nil && Self.key(of: chunk, in: narration) != chunk.key
         }
-    }
-
-    private func isUsable(_ narration: Narration) -> Bool {
-        narration.sourceIdentical == true || OpenAISpeechEngine.isRecording(narration.voice)
     }
 
     /// The key this app gives a piece's text in the narration's voice. The same as the site's when the narration's

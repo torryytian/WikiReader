@@ -99,13 +99,17 @@ struct SiteFormatTests {
         #expect(decoded.mismatchedChunks == 1)
     }
 
-    @Test func recordingsCutUpByTheSiteAreNotTakenAsCachedAudio() throws {
-        // An uploaded recording's pieces are re-encoded, not OpenAI's originals (the site's reply, §2.4).
+    @Test func compressedCopiesOfTheNarrationArePlayedToo() throws {
+        // Since 2026-11-05 the site serves compressed copies (`sourceIdentical: false`, §4.2): they play like the
+        // originals; that they never go to Drive from here is DriveAudioStore's test.
         var detail = try SiteFixture.json("site_article_paradox")
+        let originals = try SiteClient.decodeArticle(SiteFixture.data(detail)).audioFiles
         var narration = detail["narration"] as! [String: Any]
         narration["sourceIdentical"] = false
+        narration["profile"] = "mp3-48k"
         detail["narration"] = narration
-        #expect(try SiteClient.decodeArticle(SiteFixture.data(detail)).audioFiles.isEmpty)
+        #expect(!originals.isEmpty)
+        #expect(try SiteClient.decodeArticle(SiteFixture.data(detail)).audioFiles == originals)
     }
 }
 
@@ -132,8 +136,11 @@ actor FakeSite {
         return (body, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": type])!)
     }
 
-    nonisolated var client: SiteClient {
-        SiteClient(baseURL: URL(string: "https://site.test")!) { request in await self.handle(request) }
+    /// Without an access token unless given one (never the one in this simulator's Keychain).
+    nonisolated var client: SiteClient { client(token: nil) }
+
+    nonisolated func client(token: String?) -> SiteClient {
+        SiteClient(baseURL: URL(string: "https://site.test")!, transport: { request in await self.handle(request) }, token: { token })
     }
 }
 
@@ -391,6 +398,168 @@ struct SiteAudioTests {
         #expect(await SiteAudioSource(library: library, retryDelay: .zero, transport: gone.transport).fetch(other, into: cache) == nil)
         #expect(await gone.requested.count == 1)
         #expect(cache.cachedFile(for: other) == nil)
+    }
+
+    @Test func aFileMovedOnTheSiteIsFoundAgainAtItsNewAddress() async throws {
+        let (library, blocks) = try await libraryWithTheEssay()
+        let request = OpenAISpeechEngine.request(for: blocks[2].text, voice: "alloy")
+        let key = SpeechAudioCache.key(for: request)
+        let old = try #require(library.audioURL(forKey: key)).absoluteString
+        let moved = old.replacingOccurrences(of: "/audio/", with: "/audio/renamed/")
+
+        // The site renamed its files (§10.4): the article now lists new addresses, the old one answers 404.
+        var detail = try SiteFixture.json("site_article_paradox")
+        detail["blocks"] = (detail["blocks"] as! [[String: Any]]).map { block in
+            var block = block
+            if let chunks = block["chunks"] as? [[String: Any]] {
+                block["chunks"] = chunks.map { chunk in
+                    var chunk = chunk
+                    if let url = chunk["url"] as? String { chunk["url"] = url.replacingOccurrences(of: "/audio/", with: "/audio/renamed/") }
+                    return chunk
+                }
+            }
+            return block
+        }
+        await site.answer("/api/app/v1/articles/\(SiteFixture.essayID)", try SiteFixture.data(detail))
+        let host = FakeAudioHost(statuses: [404, 200])
+
+        let file = await SiteAudioSource(library: library, retryDelay: .zero, transport: host.transport).fetch(request, into: cache)
+        #expect(file != nil)
+        #expect(await host.requested.map(\.absoluteString) == [old, moved])
+        #expect(library.audioURL(forKey: key)?.absoluteString == moved)
+    }
+}
+
+/// Access tokens and previews (docs/site-api-for-ios.md §10).
+@MainActor
+struct SiteAccessTests {
+    let site = FakeSite()
+    let directory = URL.temporaryDirectory.appending(path: "SiteAccess-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let detailPath = "/api/app/v1/articles/\(SiteFixture.essayID)"
+
+    private func library(token: String? = nil) async throws -> SiteLibrary {
+        await site.answer("/api/app/v1/articles?since=0&limit=200", try SiteFixture.page(try SiteFixture.items(), latest: 4, maxSeq: 4))
+        let library = SiteLibrary(directory: directory, client: site.client(token: token))
+        await library.sync()
+        return library
+    }
+
+    private func makeContext() throws -> ModelContext {
+        ModelContext(try ModelContainer(for: Article.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+    }
+
+    /// The essay as the site sends it to a reader without a token while its limit is on: the first blocks only.
+    private func previewOfTheEssay(contentVersion: String? = nil) throws -> Data {
+        var detail = try SiteFixture.json("site_article_paradox")
+        detail["blocks"] = Array((detail["blocks"] as! [[String: Any]]).prefix(3))
+        detail["access"] = "preview"
+        detail["preview"] = ["percent": 20, "shown": 112, "total": 556]
+        if let contentVersion { detail["contentVersion"] = contentVersion }
+        return try SiteFixture.data(detail)
+    }
+
+    private func detailRequests() async -> Int {
+        await site.paths.count { $0 == detailPath }
+    }
+
+    @Test func theTokenIsSentAsABearerHeaderAndOnlyWhenThereIsOne() async throws {
+        _ = try await library(token: " er_abc\n")
+        #expect(await !site.requests.isEmpty)
+        #expect(await site.requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer er_abc" })
+
+        let bare = FakeSite()
+        await bare.answer("/api/app/v1/articles?since=0&limit=200", try SiteFixture.page([], latest: 0, maxSeq: 0))
+        _ = try await bare.client(token: nil).catalog(since: 0)
+        _ = try await bare.client(token: "").catalog(since: 0)
+        #expect(await bare.requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == nil })
+    }
+
+    @Test func aRefusedTokenIsReportedNotDroppedToTryAgain() async throws {
+        await site.answer("/api/app/v1/articles?since=0&limit=200", Data(#"{"error":{"code":"invalid_token"}}"#.utf8), status: 401)
+        let library = SiteLibrary(directory: directory, client: site.client(token: "er_revoked"))
+        await library.sync()
+        #expect(library.state == .failed(SiteError.invalidToken.message))
+        #expect(library.tokenRefused)
+        #expect(await site.requests.count == 1)
+
+        // A token the site takes again (as after pasting a new one): the warning goes.
+        await site.answer("/api/app/v1/categories", try Fixture.data("site_categories"))
+        await library.checkToken()
+        #expect(!library.tokenRefused)
+    }
+
+    @Test func rateLimitedRequestsWaitAsToldAndTryAgain() async throws {
+        actor Counter {
+            var count = 0
+            func next() -> Int { count += 1; return count }
+        }
+        let empty = try SiteFixture.page([], latest: 0, maxSeq: 0)
+        func client(limitedTimes: Int, retryAfter: String) -> (SiteClient, Counter) {
+            let counter = Counter()
+            let client = SiteClient(baseURL: URL(string: "https://site.test")!, transport: { request in
+                let status = await counter.next() <= limitedTimes ? 429 : 200
+                let headers = ["Content-Type": "application/json", "Retry-After": retryAfter]
+                return (status == 200 ? empty : Data(), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: headers)!)
+            }, token: { "er_x" })
+            return (client, counter)
+        }
+
+        let (twice, twiceCount) = client(limitedTimes: 2, retryAfter: "0")
+        #expect(try await twice.catalog(since: 0).items.isEmpty)
+        #expect(await twiceCount.count == 3)
+
+        let (always, alwaysCount) = client(limitedTimes: 10, retryAfter: "0")
+        await #expect(throws: SiteError.rateLimited) { try await always.catalog(since: 0) }
+        #expect(await alwaysCount.count == 3)
+
+        // Told to wait longer than is worth it: gives up at once.
+        let (long, longCount) = client(limitedTimes: 10, retryAfter: "3600")
+        await #expect(throws: SiteError.rateLimited) { try await long.catalog(since: 0) }
+        #expect(await longCount.count == 1)
+    }
+
+    @Test func aPreviewIsKeptAsOneAndTheWholeArticleReplacesItWhenTheSiteSendsIt() async throws {
+        let library = try await library()
+        await site.answer(detailPath, try previewOfTheEssay())
+        let context = try makeContext()
+        let summary = try #require(library.article(id: SiteFixture.essayID))
+        let previewBlocks = try SiteClient.decodeArticle(try previewOfTheEssay()).contentBlocks
+
+        let article = try await library.open(summary, in: context)
+        #expect(article.blocks == previewBlocks)
+        #expect(library.preview(forArticleURL: article.sourceURL)?.percent == 20)
+        #expect(library.links[SiteFixture.essayID]?.preview?.total == 556)
+
+        // Opened again, same version: asked again since it is only a preview, and now the site sends it all.
+        await site.answer(detailPath, try Fixture.data("site_article_paradox"))
+        let whole = try await library.open(summary, in: context)
+        #expect(whole === article)
+        #expect(article.blocks.count == 13)
+        #expect(library.preview(forArticleURL: article.sourceURL) == nil)
+        #expect(await detailRequests() == 2)
+
+        // Whole now: opened again without asking.
+        _ = try await library.open(summary, in: context)
+        #expect(await detailRequests() == 2)
+    }
+
+    @Test func aWholeArticleKeptHereIsNeverSwappedForAPreview() async throws {
+        let library = try await library()
+        await site.answer(detailPath, try Fixture.data("site_article_paradox"))
+        let context = try makeContext()
+        var summary = try #require(library.article(id: SiteFixture.essayID))
+        let article = try await library.open(summary, in: context)
+        #expect(article.blocks.count == 13)
+
+        // The site's limit comes on and the article changes: only a preview comes back.
+        await site.answer(detailPath, try previewOfTheEssay(contentVersion: "v2"))
+        summary.contentVersion = "v2"
+        #expect(try await library.open(summary, in: context) === article)
+        #expect(article.blocks.count == 13)
+        #expect(library.preview(forArticleURL: article.sourceURL) == nil)
+        // Its entry still says the old version, so the site is asked again next time.
+        _ = try await library.open(summary, in: context)
+        #expect(await detailRequests() == 3)
     }
 }
 

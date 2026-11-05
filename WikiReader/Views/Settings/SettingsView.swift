@@ -20,6 +20,9 @@ struct SettingsView: View {
     @State private var path: [SettingsPage]
     @State private var voices: [VoiceInfo] = []
     @State private var hasOpenAIKey = false
+    @State private var hasSiteToken = KeychainStore.siteToken.read() != nil
+    @State private var siteTokenInput = ""
+    @State private var site = SiteLibrary.shared
 
     /// - Parameter opensVoicePage: Start on the voice page, for when reading failed and the fix is a voice or key.
     init(opensVoicePage: Bool = false) {
@@ -32,6 +35,7 @@ struct SettingsView: View {
                 appearanceSection
                 voiceSection
                 googleDriveSection
+                englishReaderSection
                 dictionarySection
                 backupSection
                 diagnosticsSection
@@ -121,6 +125,57 @@ struct SettingsView: View {
             }
         } footer: {
             Text("Share generated OpenAI audio with your other devices and the Chrome extension.")
+        }
+    }
+
+    // MARK: - English Reader
+
+    private var englishReaderSection: some View {
+        Section {
+            if hasSiteToken {
+                LabeledContent("Access Token") {
+                    if site.tokenRefused {
+                        Label("Not accepted", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("Saved")
+                    }
+                }
+                Button("Remove Token", role: .destructive) {
+                    try? KeychainStore.siteToken.delete()
+                    hasSiteToken = false
+                    Log.app.info("English Reader access token removed")
+                }
+            } else {
+                SecureField("Access token (er_…)", text: $siteTokenInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit(saveSiteToken)
+                Button("Save Token", action: saveSiteToken)
+                    .disabled(siteTokenInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        } header: {
+            Text("English Reader")
+        } footer: {
+            if hasSiteToken && site.tokenRefused {
+                Text("English Reader refused this token: it may have been revoked or have expired. Remove it and paste a new one.")
+            } else {
+                Text("Without an access token English Reader may show only the beginning of each article. Make one on the site's admin page (Access Tokens) and paste it here. It is kept in this iPhone's Keychain and sent only to english.thrones.wang.")
+            }
+        }
+    }
+
+    private func saveSiteToken() {
+        let token = siteTokenInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+        do {
+            try KeychainStore.siteToken.save(token)
+            hasSiteToken = true
+            siteTokenInput = ""
+            Log.app.info("English Reader access token saved")  // never log the token itself
+            Task { await site.checkToken() }
+        } catch {
+            Log.app.error("Saving the English Reader token failed: \(String(describing: error), privacy: .public)")
         }
     }
 

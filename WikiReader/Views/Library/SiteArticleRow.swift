@@ -9,6 +9,8 @@ struct SiteArticleRow: View {
         var audioFraction: Double?
         var isOpening = false
         var isDownloading = false
+        /// Only the beginning was sent (no access token): the share of the article it is, if the site said.
+        var preview: SiteArticleDetail.Preview?
     }
 
     let summary: SiteArticleSummary
@@ -85,6 +87,9 @@ struct SiteArticleRow: View {
         guard let fraction = state.audioFraction else { return nil }
         let percent = Int((fraction * 100).rounded(.down))
         if state.isDownloading { return Label("Downloading \(percent)%", systemImage: "arrow.down.circle") }
+        if let preview = state.preview {
+            return Label(preview.percent.map { "Preview, first \($0)%" } ?? "Preview", systemImage: "lock")
+        }
         if fraction >= 1 { return Label("Audio downloaded", systemImage: "headphones") }
         if fraction > 0 { return Label("Audio \(percent)% on this iPhone", systemImage: "headphones") }
         return Label("Opened", systemImage: "book")

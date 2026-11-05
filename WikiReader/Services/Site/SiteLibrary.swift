@@ -33,6 +33,9 @@ final class SiteLibrary {
         var ownsText: Bool
         /// Where the text comes from and its license, as the site words it.
         var attribution: String?
+        /// Only the beginning was sent (the site's preview, for readers without an access token): fetched again each
+        /// time it is opened, so an access token added since brings the rest.
+        var preview: SiteArticleDetail.Preview?
     }
 
     /// Bumped whenever `SiteArticleSummary` learns a field. Summaries kept by an older version lack it, and the site
@@ -58,6 +61,8 @@ final class SiteLibrary {
     private(set) var links: [String: Link] = [:]
     /// The site's categories, by number: descriptions and the order it wants (empty until it lists them).
     private(set) var categoryInfo: [Int: SiteCategoryInfo] = [:]
+    /// The site refused the access token saved in Settings (revoked or expired) the last time it was asked.
+    private(set) var tokenRefused = false
 
     @ObservationIgnored private var stored: Stored
     /// Narration files on the site, by cache key: for the articles opened here.
@@ -68,6 +73,8 @@ final class SiteLibrary {
     @ObservationIgnored private let client: SiteClient
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var running: Task<Void, Never>?
+    /// Pieces whose file was missing (404) and whose article was fetched again for new addresses, this launch.
+    @ObservationIgnored private var refreshedKeys: Set<String> = []
 
     /// The catalog is checked at most this often when the app comes to the front (pulling to refresh always checks).
     static let minimumInterval: TimeInterval = 10 * 60
@@ -159,12 +166,14 @@ final class SiteLibrary {
             }
             stored.summaryVersion = Self.summaryVersion
             save()
+            noteToken(nil)
             await syncCategories()
             publish()
             lastSynced = now()
             state = .synced
             Log.app.info("English Reader: catalog synced (\(changed) changes, \(self.stored.articles.count) articles)")
         } catch let error as SiteError {
+            noteToken(error)
             state = .failed(error.message)
             Log.app.error("English Reader: catalog sync failed: \(error.message, privacy: .public)")
         } catch {
@@ -186,6 +195,28 @@ final class SiteLibrary {
         }
     }
 
+    /// Notes whether the site accepted the access token, from a request's outcome.
+    private func noteToken(_ error: SiteError?) {
+        if error == .invalidToken {
+            tokenRefused = true
+        } else if error == nil {
+            tokenRefused = false
+        }
+    }
+
+    /// Asks the site once with the access token now in Settings: `tokenRefused` says what it answered.
+    func checkToken() async {
+        do throws(SiteError) {
+            let list = try await client.categories()
+            stored.categories = Dictionary(list.map { ($0.id, $0) }) { first, _ in first }
+            noteToken(nil)
+        } catch .notFound {
+            noteToken(nil)
+        } catch {
+            noteToken(error)
+        }
+    }
+
     /// Categories with their articles, in the site's order when it gives one.
     var categories: [(category: SiteCategory, articles: [SiteArticleSummary])] {
         SiteCategories.group(articles, info: categoryInfo)
@@ -204,20 +235,31 @@ final class SiteLibrary {
 
     /// The `Article` for a catalog entry, made or brought up to date from the site's detail: the one opened before,
     /// or a Wikipedia article already added by hand (its text is left as it is), or a new one. Without a connection,
-    /// one opened before still opens.
+    /// one opened before still opens. Only a preview (no access token, docs/site-api-for-ios.md §10): it is kept as one
+    /// and fetched again next time; a whole article kept here is never swapped for a preview.
     func open(_ summary: SiteArticleSummary, in context: ModelContext) async throws(SiteError) -> Article {
         let link = stored.links[summary.id]
         let existing = Self.article(at: link?.articleURL ?? summary.canonicalUrl, in: context)
         // A recording opened with a version that couldn't play it is fetched again, for its audio.
         let missesRecording = link?.voice == nil && summary.audio?.voice.map(OpenAISpeechEngine.isRecording) == true
-        if let existing, let link, link.contentVersion == summary.contentVersion, !missesRecording { return existing }
+        if let existing, let link, link.contentVersion == summary.contentVersion, !missesRecording, link.preview == nil {
+            return existing
+        }
 
         let detail: SiteArticleDetail
         do {
             let fetched = try await client.article(id: summary.id)
             detail = fetched.detail
+            noteToken(nil)
+            if detail.isPreview, let existing, let link, link.preview == nil {
+                // The site's limit came on, or the token went: keep the whole article from before (its entry is left
+                // as it was, so it is asked for again next time).
+                Log.app.info("English Reader: the site sent only a preview; keeping the whole article from before")
+                return existing
+            }
             keepDetail(fetched.data, id: summary.id)
         } catch {
+            noteToken(error)
             if let existing { return existing }
             throw error
         }
@@ -249,8 +291,10 @@ final class SiteLibrary {
         stored.links[summary.id] = Link(
             articleURL: article.sourceURL, contentVersion: detail.summary.contentVersion,
             voice: files.isEmpty ? nil : detail.narration?.voice, ownsText: ownsText,
-            attribution: detail.attribution?.text
+            attribution: detail.attribution?.text,
+            preview: detail.isPreview ? (detail.preview ?? SiteArticleDetail.Preview()) : nil
         )
+        if detail.isPreview { Log.app.info("English Reader: only a preview of this article (no access token)") }
         // The detail is newer than the catalog entry: keep what it says.
         stored.articles[summary.id] = detail.summary
         save()
@@ -280,6 +324,11 @@ final class SiteLibrary {
         stored.links.values.first { $0.articleURL == url }?.voice
     }
 
+    /// What the site sent of an article opened from it, when it was only a preview.
+    func preview(forArticleURL url: URL) -> SiteArticleDetail.Preview? {
+        stored.links.values.first { $0.articleURL == url }?.preview
+    }
+
     /// Whether an article is read from its speaker's own recording on the site.
     func isRecording(articleURL url: URL) -> Bool {
         narrationVoice(forArticleURL: url).map(OpenAISpeechEngine.isRecording) ?? false
@@ -299,6 +348,32 @@ final class SiteLibrary {
 
     func audioURL(forKey key: String) -> URL? {
         audio[key]
+    }
+
+    /// A narration file the site no longer has at its address (404: the site renames its files now and then): the
+    /// article with the piece is fetched again and its files' new addresses kept. Returns the piece's address now, if
+    /// it changed. At most once per piece each launch.
+    func refreshAudio(forKey key: String) async -> URL? {
+        guard refreshedKeys.insert(key).inserted, let old = audio[key] else { return nil }
+        let needle = Data(key.utf8)
+        for id in stored.links.keys {
+            guard let data = try? Data(contentsOf: directory.appending(path: "Articles/\(id).json")),
+                  data.range(of: needle) != nil else { continue }
+            do throws(SiteError) {
+                let fetched = try await client.article(id: id)
+                noteToken(nil)
+                audio.merge(fetched.detail.audioFiles) { _, new in new }
+                wordTimes.merge(fetched.detail.wordStarts) { _, new in new }
+                if !fetched.detail.isPreview { keepDetail(fetched.data, id: id) }
+                save()
+                Log.app.info("English Reader: fetched an article again for its narration's new addresses")
+            } catch {
+                noteToken(error)
+                return nil
+            }
+            return audio[key] == old ? nil : audio[key]
+        }
+        return nil
     }
 
     /// When each word of a recording's piece starts, in milliseconds, if the site measured it.
