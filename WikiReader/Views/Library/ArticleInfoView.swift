@@ -46,6 +46,9 @@ struct ArticleInfoView: View {
     /// The voice its audio is counted in: the site's, else the OpenAI voice chosen in Settings.
     private var voice: String { siteVoice ?? openAIVoice }
 
+    /// Read from its speaker's own recording, which only English Reader has (never Drive).
+    private var isRecording: Bool { siteVoice.map(OpenAISpeechEngine.isRecording) ?? false }
+
     var body: some View {
         NavigationStack {
             List {
@@ -79,7 +82,7 @@ struct ArticleInfoView: View {
                 voice: voice, done: downloader.donePieces, version: audioVersion,
                 pending: drive.pendingUploads.count, signedIn: account.isSignedIn
             )) {
-                if drive.isEnabled {
+                if drive.isEnabled, !isRecording {
                     await drive.syncIndex()
                     backup = await DriveAudioStore.backup(
                         url: article.sourceURL.absoluteString, blocksData: article.blocksData, voice: voice,
@@ -184,10 +187,19 @@ struct ArticleInfoView: View {
         if note.isEmpty {
             note = summary.license.map { "From English Reader. License: \(Self.licenseName($0))." } ?? "From English Reader."
         }
-        if let cover = summary.cover, let credit = cover.credit {
-            note += "\nPicture: \(credit)" + (cover.license.map { ", \($0)" } ?? "") + "."
+        if let cover = summary.cover, let credit = Self.pictureCredit(cover) {
+            note += "\nPicture: \(credit)"
         }
         return note
+    }
+
+    /// "Pinpin, CC BY-SA 3.0, via Wikimedia Commons." The site's credit for a Commons picture names its license
+    /// already; only one that doesn't gets it added.
+    static func pictureCredit(_ cover: SiteArticleSummary.Cover) -> String? {
+        guard let credit = cover.credit?.trimmingCharacters(in: .whitespaces), !credit.isEmpty else { return nil }
+        var text = credit
+        if let license = cover.license, !credit.localizedCaseInsensitiveContains(license) { text += ", \(license)" }
+        return text.hasSuffix(".") ? text : text + "."
     }
 
     /// "CC-BY-SA-4.0" → "CC BY-SA 4.0"; the site's own ids in words.
@@ -196,6 +208,7 @@ struct ArticleInfoView: View {
         case "original": "original writing"
         case "public-domain": "public domain"
         case "permission": "used with permission"
+        case "publicly-available": "publicly available, copyright with its owner"
         default: id.hasPrefix("CC") ? id.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "BY SA", with: "BY-SA").replacingOccurrences(of: "BY NC", with: "BY-NC") : id
         }
     }
@@ -338,13 +351,16 @@ struct ArticleInfoView: View {
                     .frame(maxWidth: .infinity)
             }
         } header: {
-            Text("Audio · \(voice.capitalized)")
+            Text("Audio · \(OpenAISpeechEngine.displayName(of: voice))")
         } footer: {
             Text(audioFooter)
         }
     }
 
     private var audioFooter: String {
+        if isRecording {
+            return "The speaker's own recording, from English Reader, for listening offline. Downloading it is free. Times are estimates."
+        }
         if siteVoice != nil {
             return "English Reader's narration on this iPhone, for listening offline. Downloading it is free. Times are estimates."
         }
@@ -359,7 +375,8 @@ struct ArticleInfoView: View {
 
     @ViewBuilder
     private var driveSection: some View {
-        if account.isSignedIn {
+        // A recording isn't shared through Drive (it's free from English Reader, and not OpenAI's audio).
+        if account.isSignedIn, !isRecording {
             Section {
                 BackupStatusLine(backup: backup)
                     .font(.subheadline)

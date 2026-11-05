@@ -40,6 +40,7 @@ nonisolated struct CategoryTheme: Equatable, Sendable {
     private static let rules: [(prefixes: [String], theme: CategoryTheme)] = [
         (["tech", "comput", "internet", "digital", "artificial", "ai", "robot"], known["technology"]!),
         (["sport", "fitness", "olymp"], CategoryTheme(top: 0xFB923C, bottom: 0xB91C1C, symbol: "figure.run")),
+        (["speech", "speak", "talk", "talks", "address", "lecture", "commencement", "ted"], CategoryTheme(top: 0xF0ABFC, bottom: 0x86198F, symbol: "mic.fill")),
         (["business", "econom", "financ", "money", "work", "career"], CategoryTheme(top: 0x34D399, bottom: 0x0F766E, symbol: "chart.line.uptrend.xyaxis")),
         (["music", "song"], CategoryTheme(top: 0xC084FC, bottom: 0x6D28D9, symbol: "music.note")),
         (["film", "movie", "cinema", "tv", "television"], CategoryTheme(top: 0xF87171, bottom: 0x7F1D1D, symbol: "film.fill")),

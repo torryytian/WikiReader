@@ -164,6 +164,9 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         /// Missing until the site has the audio.
         var url: URL?
         var ms: Int?
+        /// A recording's piece: when each of its words starts, in milliseconds from the start of the piece, as
+        /// speech recognition heard them (in the order of the site's word splitting).
+        var wordStartsMs: [Int]?
     }
 
     private enum Keys: String, CodingKey { case attribution, narration, blocks }
@@ -185,32 +188,50 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         }
     }
 
-    /// The audio files the site has for this article, by this app's cache key. Only pieces whose key really is the
-    /// key of their text (so a mix-up on the site can never play the wrong sentence), and only files that are the
-    /// originals (`sourceIdentical`).
+    /// The audio files the site has for this article, by this app's cache key. Only pieces whose key is the one this
+    /// app gives their text in the narration's voice (so a mix-up on the site can never play the wrong sentence, and
+    /// the reader finds them), and only files that are OpenAI's originals (`sourceIdentical`) or a speaker's own
+    /// recording (never backed up to Drive: Drive only takes OpenAI voices).
     var audioFiles: [String: URL] {
-        guard let narration, narration.sourceIdentical == true else { return [:] }
+        guard let narration, isUsable(narration) else { return [:] }
         var files: [String: URL] = [:]
         for block in blocks {
             for chunk in block.chunks ?? [] {
-                guard let url = chunk.url else { continue }
-                let request = OpenAISpeechRequest(
-                    model: narration.model, voice: narration.voice, input: chunk.text, instructions: narration.instructions
-                )
-                guard SpeechAudioCache.key(for: request) == chunk.key else { continue }
+                guard let url = chunk.url, Self.key(of: chunk, in: narration) == chunk.key else { continue }
                 files[chunk.key] = url
             }
         }
         return files
     }
 
+    /// When each word starts, by cache key, for the pieces of `audioFiles` that come with it (recordings).
+    var wordStarts: [String: [Int]] {
+        guard let narration, isUsable(narration) else { return [:] }
+        var starts: [String: [Int]] = [:]
+        for block in blocks {
+            for chunk in block.chunks ?? [] {
+                guard chunk.url != nil, let times = chunk.wordStartsMs, Self.key(of: chunk, in: narration) == chunk.key else { continue }
+                starts[chunk.key] = times
+            }
+        }
+        return starts
+    }
+
     /// Pieces listed with a file whose key doesn't match their text: logged, so a site bug shows up.
     var mismatchedChunks: Int {
         guard let narration else { return 0 }
         return blocks.flatMap { $0.chunks ?? [] }.count { chunk in
-            chunk.url != nil && SpeechAudioCache.key(for: OpenAISpeechRequest(
-                model: narration.model, voice: narration.voice, input: chunk.text, instructions: narration.instructions
-            )) != chunk.key
+            chunk.url != nil && Self.key(of: chunk, in: narration) != chunk.key
         }
+    }
+
+    private func isUsable(_ narration: Narration) -> Bool {
+        narration.sourceIdentical == true || OpenAISpeechEngine.isRecording(narration.voice)
+    }
+
+    /// The key this app gives a piece's text in the narration's voice. The same as the site's when the narration's
+    /// model and instructions are the ones this app uses for that voice.
+    private static func key(of chunk: Chunk, in narration: Narration) -> String {
+        SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: chunk.text, voice: narration.voice))
     }
 }

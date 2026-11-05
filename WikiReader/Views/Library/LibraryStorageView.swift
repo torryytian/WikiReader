@@ -9,6 +9,7 @@ struct LibraryStorageView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(SettingsKeys.openAIVoice) private var openAIVoice = OpenAISpeechEngine.defaultVoice
     @State private var downloader = AudioDownloader.shared
+    @State private var site = SiteLibrary.shared
 
     @State private var usage: LibraryAudioUsage?
     @State private var totals: Totals?
@@ -58,8 +59,11 @@ struct LibraryStorageView: View {
             .task(id: articles.count) {
                 totals = await Self.totals(of: articles.map(\.blocksData), savedWords: VocabularyBook.shared.count)
             }
-            .task(id: MeasureInput(count: articles.count, voice: openAIVoice, done: downloader.donePieces, version: version)) {
-                usage = await ArticleAudio.usage(ofBlocksData: articles.map(\.blocksData), voice: openAIVoice)
+            .task(id: MeasureInput(count: articles.count, voice: openAIVoice, done: downloader.donePieces, version: version, siteLinks: site.links.count)) {
+                usage = await ArticleAudio.usage(
+                    ofBlocksData: articles.map(\.blocksData), voice: openAIVoice,
+                    narrations: articles.map { site.narrationVoice(forArticleURL: $0.sourceURL) }
+                )
             }
             .audioDownloadPrompt($downloadPrompt)
             .confirmationDialog(cleanupTitle, isPresented: Binding(get: { cleanup != nil }, set: { if !$0 { cleanup = nil } }), titleVisibility: .visible, presenting: cleanup) { kind in
@@ -77,6 +81,12 @@ struct LibraryStorageView: View {
         var voice: String
         var done: Int
         var version: Int
+        var siteLinks: Int
+    }
+
+    /// The articles the OpenAI voice reads: not the ones English Reader narrates, whose audio is free from the site.
+    private var generatedArticles: [Article] {
+        articles.filter { site.narrationVoice(forArticleURL: $0.sourceURL) == nil }
     }
 
     @concurrent
@@ -122,7 +132,7 @@ struct LibraryStorageView: View {
 
                 if usage.missingPieces > 0 && !downloader.isRunning {
                     Button {
-                        Task { downloadPrompt = await LibraryActions.downloadPrompt(for: articles) }
+                        Task { downloadPrompt = await LibraryActions.downloadPrompt(for: generatedArticles) }
                     } label: {
                         Label {
                             VStack(alignment: .leading, spacing: 2) {
@@ -151,6 +161,9 @@ struct LibraryStorageView: View {
         Section {
             if let usage {
                 LabeledContent("\(openAIVoice.capitalized) Voice", value: AudioFormat.bytes(usage.voiceBytes))
+                if usage.siteBytes > 0 {
+                    LabeledContent("From English Reader", value: AudioFormat.bytes(usage.siteBytes))
+                }
                 cleanupRow("Other Voices", bytes: usage.otherVoiceBytes, kind: .otherVoices)
                 cleanupRow("Not Used by Any Article", bytes: usage.unusedBytes, kind: .unused)
                 LabeledContent("Total", value: AudioFormat.bytes(usage.totalBytes))

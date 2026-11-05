@@ -12,6 +12,17 @@ final class OpenAISpeechEngine: SpeechEngine {
     nonisolated static let defaultVoice = "marin"
     nonisolated static let voices = ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
     nonisolated static let instructions = "Read like a clear, natural audiobook narrator, at a steady, moderate pace."
+    /// What English Reader calls the "model" of a speaker's own recording, cut into pieces that are named like OpenAI
+    /// audio (docs/site-api-for-ios.md, the site's reply §2.4). Its voices are `rec-<hash of the recording>`.
+    nonisolated static let recordingModel = "upload"
+
+    /// A recording's "voice" on English Reader rather than an OpenAI voice.
+    nonisolated static func isRecording(_ voice: String) -> Bool { voice.hasPrefix("rec-") }
+
+    /// "Alloy"; "Original Recording" for a speaker's own recording.
+    nonisolated static func displayName(of voice: String) -> String {
+        isRecording(voice) ? "Original Recording" : voice.capitalized
+    }
 
     var onEvent: ((SpeechEvent) -> Void)?
 
@@ -25,6 +36,8 @@ final class OpenAISpeechEngine: SpeechEngine {
     private let stallCheck: Duration?
     private let log: PlaybackLog
     private let generations: SpeechGenerations
+    /// When each word of a piece starts, in milliseconds, if known (a recording's, measured by English Reader).
+    private let wordStarts: (OpenAISpeechRequest) -> [Int]?
 
     /// Generation in progress, by cache key: `speak` and `prepare` share one request per text.
     private var inFlight: [String: Task<Result<URL, OpenAITTSError>, Never>] = [:]
@@ -74,9 +87,11 @@ final class OpenAISpeechEngine: SpeechEngine {
         tickInterval: Duration = .milliseconds(80),
         stallCheck: Duration? = .milliseconds(500),
         log: PlaybackLog = .standard,
-        generations: SpeechGenerations = .shared
+        generations: SpeechGenerations = .shared,
+        wordStarts: @escaping (OpenAISpeechRequest) -> [Int]? = { _ in nil }
     ) {
         self.generations = generations
+        self.wordStarts = wordStarts
         self.voice = voice
         self.client = client
         self.cache = cache
@@ -213,7 +228,7 @@ final class OpenAISpeechEngine: SpeechEngine {
     /// Opens a chunk's audio, seeked to `offset` (relative to the chunk text) if given.
     private func load(_ url: URL, text: String, startingAt offset: Int?, into playback: Playback) async throws {
         let clip = try await makeClip(url)
-        let timeline = WordTimeline(text: text)
+        let timeline = WordTimeline(text: text, startsMs: wordStarts(request(for: text)), duration: clip.duration)
         clip.rate = Float(playback.rate.rawValue)
         if let offset, offset > 0 {
             clip.currentTime = timeline.fraction(atOffset: offset) * clip.duration
@@ -226,7 +241,7 @@ final class OpenAISpeechEngine: SpeechEngine {
         playback.clip = clip
         playback.timeline = timeline
         if let note = clip.loudnessNote {
-            log.record("clip", "opened chunk \(playback.chunkIndex + 1)/\(playback.chunks.count) \(note)")
+            log.record("clip", "opened chunk \(playback.chunkIndex + 1)/\(playback.chunks.count) \(note)\(timeline.isMeasured ? " words=measured" : "")")
         }
     }
 
@@ -321,9 +336,13 @@ final class OpenAISpeechEngine: SpeechEngine {
     }
 
     /// The request that reads `text` with `voice`. Its cache name depends on every field, so anything that looks for
-    /// an article's audio (backup, the article info page, the batch download) builds requests here.
+    /// an article's audio (backup, the article info page, the batch download) builds requests here. A recording's
+    /// pieces are named the way English Reader names them: its model, its voice and no instructions.
     nonisolated static func request(for text: String, voice: String) -> OpenAISpeechRequest {
-        OpenAISpeechRequest(model: model, voice: voice, input: text, instructions: instructions)
+        if isRecording(voice) {
+            return OpenAISpeechRequest(model: recordingModel, voice: voice, input: text, instructions: "")
+        }
+        return OpenAISpeechRequest(model: model, voice: voice, input: text, instructions: instructions)
     }
 
     /// The cached audio for `text`, generating it at once if needed (this is what is being read, so it doesn't wait

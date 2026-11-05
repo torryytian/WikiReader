@@ -479,10 +479,15 @@ private struct ArticleReader: View {
     private func makeEngine() -> SpeechEngine {
         if let voice = siteVoice {
             // The site's narration, free, whatever voice Settings has. A piece the site lacks is generated only when
-            // an OpenAI voice is chosen in Settings (paid, as for any article); otherwise only Drive is asked.
+            // an OpenAI voice is chosen in Settings (paid, as for any article); otherwise only Drive is asked. A
+            // recording only ever comes from the site, with its words' real timing.
             usesCloudEngine = true
-            let mayPay = engineChoice == .openAI
-            return OpenAISpeechEngine(voice: voice, apiKey: { mayPay ? KeychainStore.openAIKey.read() : nil })
+            let mayPay = engineChoice == .openAI && !OpenAISpeechEngine.isRecording(voice)
+            let site = SiteLibrary.shared
+            return OpenAISpeechEngine(
+                voice: voice, apiKey: { mayPay ? KeychainStore.openAIKey.read() : nil },
+                wordStarts: { site.wordStarts(forKey: SpeechAudioCache.key(for: $0)) }
+            )
         }
         switch engineChoice {
         case .system:

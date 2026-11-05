@@ -105,6 +105,7 @@ enum LibraryActions {
         let ids = Set(articles.map(\.persistentModelID))
         let removed = articles.map(\.blocksData)
         let keeping = library.filter { !ids.contains($0.persistentModelID) }.map(\.blocksData)
+        let recordings = SiteLibrary.shared.recordingVoices(of: articles.map(\.sourceURL))
         for article in articles {
             Log.app.info("Deleting \(article.title, privacy: .public)\(withAudio ? " and its audio" : "", privacy: .public)")
             AudioDownloader.shared.cancel(article: article.persistentModelID)
@@ -117,7 +118,7 @@ enum LibraryActions {
         }
         guard withAudio else { return }
         Task {
-            let freed = await ArticleAudio.removeAudio(of: removed, keeping: keeping)
+            let freed = await ArticleAudio.removeAudio(of: removed, keeping: keeping, recordings: recordings)
             Log.app.info("Deleted \(freed) bytes of audio with the articles")
         }
     }
@@ -128,7 +129,8 @@ enum LibraryActions {
         let ids = Set(articles.map(\.persistentModelID))
         for id in ids { AudioDownloader.shared.cancel(article: id) }
         let keeping = library.filter { !ids.contains($0.persistentModelID) }.map(\.blocksData)
-        let freed = await ArticleAudio.removeAudio(of: articles.map(\.blocksData), keeping: keeping)
+        let recordings = SiteLibrary.shared.recordingVoices(of: articles.map(\.sourceURL))
+        let freed = await ArticleAudio.removeAudio(of: articles.map(\.blocksData), keeping: keeping, recordings: recordings)
         Log.app.info("Deleted \(freed) bytes of audio of \(articles.count) articles")
         return freed
     }
@@ -300,7 +302,7 @@ struct AudioDownloadStatusRow: View {
     private var progressText: String {
         let done = AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: downloader.doneCharacters))
         let total = AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: downloader.totalCharacters))
-        var text = "\(done) of \(total) · \(downloader.voice.capitalized) · screen stays on"
+        var text = "\(done) of \(total) · \(OpenAISpeechEngine.displayName(of: downloader.voice)) · screen stays on"
         if downloader.failedPieces > 0 { text += " · \(downloader.failedPieces) failed" }
         return text
     }

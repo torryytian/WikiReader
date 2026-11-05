@@ -76,14 +76,16 @@ nonisolated enum ArticleAudio {
         return status
     }
 
-    /// The audio files of `blocks`, in every voice, that no article in `keeping` uses too: what deleting the
-    /// article's audio removes.
-    static func files(of blocks: [ContentBlock], notUsedBy keeping: [[ContentBlock]], cache: SpeechAudioCache) -> [URL] {
+    /// The audio files of `blocks`, in every voice (and the `recordings` that read them), that no article in
+    /// `keeping` uses too: what deleting the article's audio removes.
+    static func files(
+        of blocks: [ContentBlock], notUsedBy keeping: [[ContentBlock]], recordings: [String] = [], cache: SpeechAudioCache
+    ) -> [URL] {
         let shared = keeping.reduce(into: Set<String>()) { $0.formUnion(inputs(of: $1)) }
         let files = AudioFiles(cache)
         var urls: [URL] = []
         for input in inputs(of: blocks) where !shared.contains(input) {
-            for voice in OpenAISpeechEngine.voices {
+            for voice in OpenAISpeechEngine.voices + recordings {
                 let url = cache.fileURL(for: OpenAISpeechEngine.request(for: input, voice: voice))
                 if files.sizes[url.lastPathComponent] != nil { urls.append(url) }
             }
@@ -92,13 +94,24 @@ nonisolated enum ArticleAudio {
     }
 
     /// How the whole audio folder is used by `library` (each article's blocks), with `voice` being the one chosen.
-    static func usage(of library: [[ContentBlock]], voice: String, cache: SpeechAudioCache) -> LibraryAudioUsage {
+    /// `narrations` has, for each article, English Reader's narration voice if it is read with that: such an article
+    /// counts in `siteBytes`, not in `voice`'s share, and its narration is neither another voice nor unused.
+    static func usage(of library: [[ContentBlock]], voice: String, narrations: [String?] = [], cache: SpeechAudioCache) -> LibraryAudioUsage {
         let files = AudioFiles(cache)
         var usage = LibraryAudioUsage()
         usage.totalBytes = files.sizes.values.reduce(0, +)
 
         var inputs = library.reduce(into: Set<String>()) { $0.formUnion(Self.inputs(of: $1)) }
-        for blocks in library {
+        var used = Set<String>()
+        for (index, blocks) in library.enumerated() {
+            if let narration = narrations.indices.contains(index) ? narrations[index] : nil {
+                for piece in pieces(of: blocks, voice: narration) {
+                    let name = cache.fileURL(for: piece.request).lastPathComponent
+                    guard let size = files.sizes[name], used.insert(name).inserted else { continue }
+                    usage.siteBytes += size
+                }
+                continue
+            }
             for piece in pieces(of: blocks, voice: voice) {
                 usage.totalCharacters += piece.characters
                 if files.sizes[cache.fileURL(for: piece.request).lastPathComponent] == nil {
@@ -109,7 +122,6 @@ nonisolated enum ArticleAudio {
         }
         inputs.insert(sampleText)
 
-        var used = Set<String>()
         for input in inputs {
             for other in OpenAISpeechEngine.voices {
                 let name = cache.fileURL(for: OpenAISpeechEngine.request(for: input, voice: other)).lastPathComponent
@@ -150,16 +162,21 @@ nonisolated enum ArticleAudio {
     }
 
     @concurrent
-    static func usage(ofBlocksData library: [Data], voice: String, cache: SpeechAudioCache = .standard) async -> LibraryAudioUsage {
-        usage(of: library.map(Article.decodeBlocks), voice: voice, cache: cache)
+    static func usage(
+        ofBlocksData library: [Data], voice: String, narrations: [String?] = [], cache: SpeechAudioCache = .standard
+    ) async -> LibraryAudioUsage {
+        usage(of: library.map(Article.decodeBlocks), voice: voice, narrations: narrations, cache: cache)
     }
 
-    /// Deletes the audio of `removed` articles that the `keeping` ones don't share. Returns the bytes freed.
+    /// Deletes the audio of `removed` articles (with the `recordings` that read them) that the `keeping` ones don't
+    /// share. Returns the bytes freed.
     @concurrent
     @discardableResult
-    static func removeAudio(of removed: [Data], keeping: [Data], cache: SpeechAudioCache = .standard) async -> Int64 {
+    static func removeAudio(
+        of removed: [Data], keeping: [Data], recordings: [String] = [], cache: SpeechAudioCache = .standard
+    ) async -> Int64 {
         let kept = keeping.map(Article.decodeBlocks)
-        let urls = removed.flatMap { files(of: Article.decodeBlocks($0), notUsedBy: kept, cache: cache) }
+        let urls = removed.flatMap { files(of: Article.decodeBlocks($0), notUsedBy: kept, recordings: recordings, cache: cache) }
         return remove(Array(Set(urls)))
     }
 
@@ -234,6 +251,8 @@ nonisolated struct LibraryAudioUsage: Sendable {
     var totalBytes: Int64 = 0
     /// The library's audio in the chosen voice (voice samples included).
     var voiceBytes: Int64 = 0
+    /// English Reader's narration (and recordings) of the articles read with it.
+    var siteBytes: Int64 = 0
     /// The library's audio in the other voices.
     var otherVoiceFiles: [URL] = []
     var otherVoiceBytes: Int64 = 0

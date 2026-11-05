@@ -75,6 +75,7 @@ struct SiteArticleRow: View {
         if let words = summary.wordCount, words > 0 { parts.append("\(words.formatted()) words") }
         if let audio = summary.audio, audio.readyChunks > 0, let ms = audio.readyMs {
             parts.append(Self.duration(ms))
+            if audio.voice.map(OpenAISpeechEngine.isRecording) == true { parts.append("Original audio") }
         }
         if parts.isEmpty { parts.append(summary.isWikipedia ? "Wikipedia" : "English Reader") }
         return parts.joined(separator: " · ")

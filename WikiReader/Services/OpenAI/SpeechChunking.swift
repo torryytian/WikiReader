@@ -34,22 +34,55 @@ nonisolated enum SpeechChunking {
     }
 }
 
-/// Estimates when each word is spoken in an audio clip whose only timing information is its duration.
+/// When each word is spoken in an audio clip.
 ///
 /// OpenAI returns no word timestamps, so time is shared out by word length, with extra weight
 /// for the pauses after punctuation. Good enough for highlighting; it can drift by a word or two.
+/// A recording on English Reader comes with each word's real start, which is used instead when it
+/// has as many words as this text does.
 nonisolated struct WordTimeline: Sendable {
     /// Words of the clip's text, as UTF-16 ranges in that text.
     let words: [NSRange]
-    /// Cumulative weight at the start of each word, normalized to 0..<1.
+    /// Where each word starts, as a fraction of the clip's duration (0..<1).
     private let starts: [Double]
+    /// The starts were measured rather than estimated.
+    let isMeasured: Bool
 
     init(text: String) {
-        let ns = text as NSString
+        let words = Self.words(of: text)
+        self.words = words
+        starts = Self.estimatedStarts(of: words, in: text as NSString)
+        isMeasured = false
+    }
+
+    /// With each word's start in milliseconds (`startsMs`) in a clip of `duration` seconds, when they match the words
+    /// of `text` one to one (the site splits words much as this app does, but not always alike); else estimated.
+    init(text: String, startsMs: [Int]?, duration: TimeInterval) {
+        let words = Self.words(of: text)
+        self.words = words
+        guard let startsMs, startsMs.count == words.count, !words.isEmpty, duration > 0 else {
+            starts = Self.estimatedStarts(of: words, in: text as NSString)
+            isMeasured = false
+            return
+        }
+        var starts: [Double] = []
+        var previous = 0.0
+        for ms in startsMs {
+            // Never backwards, never past the end.
+            previous = min(max(Double(ms) / 1000 / duration, previous), 1)
+            starts.append(previous)
+        }
+        self.starts = starts
+        isMeasured = true
+    }
+
+    private static func words(of text: String) -> [NSRange] {
         let tokenizer = NLTokenizer(unit: .word)
         tokenizer.string = text
-        let words = tokenizer.tokens(for: text.startIndex..<text.endIndex).map { NSRange($0, in: text) }
+        return tokenizer.tokens(for: text.startIndex..<text.endIndex).map { NSRange($0, in: text) }
+    }
 
+    private static func estimatedStarts(of words: [NSRange], in ns: NSString) -> [Double] {
         var weights: [Double] = []
         for (index, word) in words.enumerated() {
             let gapEnd = index + 1 < words.count ? words[index + 1].location : ns.length
@@ -63,8 +96,7 @@ nonisolated struct WordTimeline: Sendable {
             starts.append(cumulative / total)
             cumulative += weight
         }
-        self.words = words
-        self.starts = starts
+        return starts
     }
 
     /// Extra time, in characters, for the pause punctuation causes.

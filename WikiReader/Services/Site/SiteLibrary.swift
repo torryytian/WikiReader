@@ -35,7 +35,14 @@ final class SiteLibrary {
         var attribution: String?
     }
 
+    /// Bumped whenever `SiteArticleSummary` learns a field. Summaries kept by an older version lack it, and the site
+    /// only sends an article again when it changes, so the whole catalog is fetched once. 2: categories' numbers,
+    /// pictures (2026-11-05).
+    static let summaryVersion = 2
+
     private struct Stored: Codable {
+        /// The `summaryVersion` the kept summaries were made with (nil: before there was one).
+        var summaryVersion: Int?
         var epoch: String?
         var since = 0
         var articles: [String: SiteArticleSummary] = [:]
@@ -55,6 +62,8 @@ final class SiteLibrary {
     @ObservationIgnored private var stored: Stored
     /// Narration files on the site, by cache key: for the articles opened here.
     @ObservationIgnored private var audio: [String: URL]
+    /// When each word starts in the pieces of a recording, by cache key.
+    @ObservationIgnored private var wordTimes: [String: [Int]]
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let client: SiteClient
     @ObservationIgnored private let now: () -> Date
@@ -73,6 +82,7 @@ final class SiteLibrary {
         self.now = now
         stored = (try? JSONDecoder().decode(Stored.self, from: Data(contentsOf: directory.appending(path: "Catalog.json")))) ?? Stored()
         audio = (try? JSONDecoder().decode([String: URL].self, from: Data(contentsOf: directory.appending(path: "AudioIndex.json")))) ?? [:]
+        wordTimes = (try? JSONDecoder().decode([String: [Int]].self, from: Data(contentsOf: directory.appending(path: "WordTimes.json")))) ?? [:]
         fillInAttributions()
         publish()
     }
@@ -106,6 +116,15 @@ final class SiteLibrary {
         state = .syncing
         do {
             var since = stored.since
+            // The articles seen when everything is fetched again for fields this version adds (summaries kept by an
+            // older version dropped the ones it didn't know); the rest are dropped at the end. Until then the kept
+            // summaries stay, so a failure part-way loses nothing.
+            var refetched: Set<String>?
+            if stored.summaryVersion != Self.summaryVersion, since > 0 {
+                Log.app.info("English Reader: fetching the whole catalog again for fields this version adds")
+                since = 0
+                refetched = []
+            }
             var changed = 0
             while true {
                 let page = try await client.catalog(since: since)
@@ -116,21 +135,30 @@ final class SiteLibrary {
                     stored.epoch = page.epoch
                     since = 0
                     stored.since = 0
+                    refetched = nil
                     continue
                 }
                 stored.epoch = page.epoch
                 for item in page.items {
                     switch item {
-                    case .article(let article): stored.articles[article.id] = article
+                    case .article(let article):
+                        stored.articles[article.id] = article
+                        refetched?.insert(article.id)
                     case .removed(let id, _): stored.articles[id] = nil
                     }
                 }
                 changed += page.items.count
                 since = page.latest
-                stored.since = since
+                if refetched == nil { stored.since = since }
                 save()
                 if !page.hasMore || page.items.isEmpty { break }
             }
+            if let refetched {
+                stored.articles = stored.articles.filter { refetched.contains($0.key) }
+                stored.since = since
+            }
+            stored.summaryVersion = Self.summaryVersion
+            save()
             await syncCategories()
             publish()
             lastSynced = now()
@@ -180,7 +208,9 @@ final class SiteLibrary {
     func open(_ summary: SiteArticleSummary, in context: ModelContext) async throws(SiteError) -> Article {
         let link = stored.links[summary.id]
         let existing = Self.article(at: link?.articleURL ?? summary.canonicalUrl, in: context)
-        if let existing, let link, link.contentVersion == summary.contentVersion { return existing }
+        // A recording opened with a version that couldn't play it is fetched again, for its audio.
+        let missesRecording = link?.voice == nil && summary.audio?.voice.map(OpenAISpeechEngine.isRecording) == true
+        if let existing, let link, link.contentVersion == summary.contentVersion, !missesRecording { return existing }
 
         let detail: SiteArticleDetail
         do {
@@ -215,6 +245,7 @@ final class SiteLibrary {
             Log.app.error("English Reader: \(detail.mismatchedChunks) narration pieces don't match their text; not used")
         }
         audio.merge(files) { _, new in new }
+        wordTimes.merge(detail.wordStarts) { _, new in new }
         stored.links[summary.id] = Link(
             articleURL: article.sourceURL, contentVersion: detail.summary.contentVersion,
             voice: files.isEmpty ? nil : detail.narration?.voice, ownsText: ownsText,
@@ -249,12 +280,30 @@ final class SiteLibrary {
         stored.links.values.first { $0.articleURL == url }?.voice
     }
 
+    /// Whether an article is read from its speaker's own recording on the site.
+    func isRecording(articleURL url: URL) -> Bool {
+        narrationVoice(forArticleURL: url).map(OpenAISpeechEngine.isRecording) ?? false
+    }
+
+    /// The recordings' voices of the articles at `urls` (opened from the site and read from a recording).
+    func recordingVoices(of urls: [URL]) -> [String] {
+        let wanted = Set(urls)
+        return Array(Set(stored.links.values.compactMap { link in
+            wanted.contains(link.articleURL) ? link.voice.flatMap { OpenAISpeechEngine.isRecording($0) ? $0 : nil } : nil
+        }))
+    }
+
     // MARK: - Narration files
 
     var hasAudio: Bool { !audio.isEmpty }
 
     func audioURL(forKey key: String) -> URL? {
         audio[key]
+    }
+
+    /// When each word of a recording's piece starts, in milliseconds, if the site measured it.
+    func wordStarts(forKey key: String) -> [Int]? {
+        wordTimes[key]
     }
 
     // MARK: - Storage
@@ -276,6 +325,7 @@ final class SiteLibrary {
             encoder.outputFormatting = .sortedKeys
             try encoder.encode(stored).write(to: directory.appending(path: "Catalog.json"), options: .atomic)
             try encoder.encode(audio).write(to: directory.appending(path: "AudioIndex.json"), options: .atomic)
+            try encoder.encode(wordTimes).write(to: directory.appending(path: "WordTimes.json"), options: .atomic)
         } catch {
             Log.app.error("English Reader: saving the catalog failed: \(error.localizedDescription, privacy: .public)")
         }
