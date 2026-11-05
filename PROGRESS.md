@@ -319,6 +319,21 @@
   - 插图和表格（详情里已有数据）；
   - 建议站长给 19 篇演讲建一个 "Speeches" 分类（App 会自动配话筒封面）。
 - 后台检查网站回复的脚本在 scratchpad（`watch_site.sh`、`watch_site_extras2.sh`），每 30 分钟查一次。
+- **三端统一 Drive 目录（同日晚，规范已定稿，iOS 代码还没改）**：站长要网站、iPhone、插件共用一个 Drive 根目录 `English Reader/`。网站会话起草，iOS 和插件评审后定稿 v2.2，权威版本是 `docs/shared-drive-layout.md`。
+  - iOS 评审时提出、已写进规范的：
+    - 搬完不删 `WikiReader Cache/`，改成带 `movedTo` 的 v2 `format.json`。旧版 App 找不到文件夹会自己新建一个，数据就分叉了；遇到 v2 则会报错停用。
+    - `audio` 整个文件夹移动。iPhone 的音频索引按 `createdTime` 增量列，移动不改创建时间，逐个移进来的文件会看不到，然后重新付费生成。
+    - 网站文章一律 `site-<uuid>.json`，不占 `<urlHash>.json`。
+    - 清单"一篇一份、最后写的算"，改写时保留不认识的字段。
+  - 根目录那几个 `.wikireader` 是用户用分享面板经 Google Drive App 存进去的，`drive.file` 看不到，要用户自己在 Drive 网页里挪。
+  - **iOS 第 2 阶段要做的**（规范 §4，等用户点头再开始，会改联网行为，届时同步 CLAUDE.md 网络一节）：
+    - 每次启动和回到前台重新判断根目录（认 `movedTo`）；
+    - 清单先读再改再写，保留未知字段，写 description 和 `properties`；
+    - 网站来的文章不写 `<urlHash>.json`：现在网站没音频的网站文章用 OpenAI 声音读时会按 `canonicalUrl` 写一份；
+    - `vocab.json` 新旧两份合并；
+    - 自动备份到 `English Reader/backups/ios_<时间>.wikireader`，不带音频，有变化时最多一天一份，只清理自己的 `ios_` 文件；
+    - 加"从 Drive 恢复"入口。
+  - 第 3 阶段（网站搬文件）要等 iOS 和插件的新版装到所有设备之后，由站长定时间。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
 - **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。

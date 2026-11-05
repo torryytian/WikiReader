@@ -77,6 +77,8 @@ model 和 instructions 都是 §1.2 的值。
 
 ## 3. Drive 目录（沿用 Chrome SPEC §7.3）
 
+> 2026-11-05 起三端统一到 `English Reader/` 根目录（迁移完成前仍是下面这个）：目录、清单 v2 字段、迁移步骤见 `shared-drive-layout.md`。key 公式和切块不变。
+
 ```
 WikiReader Cache/
 ├── format.json          { "formatVersion": 1, "key": "ios-v1" }   ← 建议加 key 字段标明算法

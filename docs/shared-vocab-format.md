@@ -13,7 +13,7 @@
 
 ## 1. 位置与编码
 
-- Google Drive：`WikiReader Cache/vocab.json`，与 `format.json` 同级（目录结构见 `shared-tts-cache-format.md`）。同名文件有多个时用 `createdTime` 最早的一个。
+- Google Drive：`WikiReader Cache/vocab.json`，与 `format.json` 同级（目录结构见 `shared-tts-cache-format.md`）。同名文件有多个时用 `createdTime` 最早的一个。迁移到 `English Reader/` 之后是 `English Reader/vocab.json`，格式不变（见 `shared-drive-layout.md`）。
 - UTF-8、紧凑 JSON（不缩进）。所有时间都是 **Unix 毫秒整数**（Swift 端不要用 `JSONEncoder` 的默认日期编码）。
 - 读的时候，值为 `null` 的字段等同于没有这个字段；写的时候不写 `null`，没有就省略。
 - iOS 本机副本：`Application Support/Vocabulary.json`，结构与本文件完全相同。Chrome 本机存在 IndexedDB，同步时按本格式进出。
