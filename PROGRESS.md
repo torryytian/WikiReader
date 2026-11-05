@@ -260,7 +260,7 @@
   - 网站回复里要注意的几条：
     - ETag 要原样回传；
     - license 有 SPDX 编号的给 SPDX，其余是网站内部 id（`original` 等）；
-    - 上传真人录音的文章 `model: "upload"`、`sourceIdentical: false`，**iOS 第一期不用这类音频**（当作没有，走 Drive 或系统声音），目前线上也没有这类文章。
+    - 上传真人录音的文章 `model: "upload"`、`sourceIdentical: false`。第一期没用这类音频；同日下午网站发布了 19 篇演讲，已经支持（见本节末尾）。
 - **iOS 实现**：
   - `Services/Site/`：
     - `SiteFormat`：格式；校验每个片段的 key 确实是它文字的 key，只收 `sourceIdentical` 的文件；
@@ -301,11 +301,24 @@
   - **属性页**：网站文章的音频按网站的声音统计，显示 Open on English Reader 和 Open on Wikipedia 两个链接，以及网站给的署名和授权。署名记在 Link 里，旧记录启动时从缓存的详情补上。
   - **给网站的增补需求**（文档 §9，只加不改，已 scp）：每篇文章的封面图 `cover`、可选的分类列表 `/api/app/v1/categories`（简介、排序）。iOS 已经能读，网站加上就自动生效；分类列表接口返回 404 时安静跳过。用改过的模拟器数据看过封面图卡片。
   - 测试共 590 个，全部通过。
+  - **§9 漏传的教训**：§9 是追加在网站已经回复过的旧文件末尾的，网站会话没看到，回复"做完了"指的是第一批。新需求要放**单独的新文件**（这次补了 `docs/from-ios/REQUEST-2-covers-and-categories.md`），并请用户提醒网站会话。
+- **演讲录音（同日下午）**：网站发布了 19 篇名人演讲（授权 `publicly-available`，新的网站 id），朗读是演讲者本人的录音：
+  - 格式：`narration.model` 是 `upload`，声音 `rec-<录音 hash>`，instructions 为空；片段 key 仍是 ios-v1 公式，19 篇 979 个片段全部对得上。每个片段带 `wordStartsMs`（语音识别得到的每个词的开始时间），969 段的词数和 `NLTokenizer` 分的一致，其余 10 段（引号、缩写处分法不同）照旧估算。
+  - 做法：`OpenAISpeechEngine.request(for:voice:)` 见到 `rec-` 声音就用网站的 model 和空 instructions，所以所有按声音算缓存的地方（属性页、整篇下载、删除）不用改调用方式。`SpeechGenerations` 对录音只问网站，取不到报 `.notOnSite`，**不查 Drive、不调 OpenAI**；Drive 备份本来就只枚举 OpenAI 的 13 个声音，录音不会上传，属性页对录音文章不显示 Google Drive 一节。`WordTimeline` 有了"实测时间"的构造方式，`SiteLibrary` 把各片段的词时间存在 `Site/WordTimes.json`。
+  - 顺带修的：存储页把网站朗读（alloy 和录音）单独算成"From English Reader"，不再算进"其他声音"或"没有文章用的音频"（之前会被当成可以清理的）；"Download All Remaining Audio" 不再把网站文章算进去花钱生成；删除录音文章的音频会删掉录音；旧版本打开过、没记下录音声音的文章，下次打开会重新取一次详情。
+  - 新分类关键词：speech / talk / address / lecture / commencement / TED → 话筒封面。网站目前没给这 19 篇设分类，它们都在 Other 里。
+  - 测试 +7（`SiteRecordingTests`，fixture 是 Shakira 的演讲）。
+- **§9 上线（同日 16:00 左右）**：网站在 REPLY.md 末尾加了「§9 的回复」。封面图和分类列表都按 §9 的格式做了：
+  - 封面图：23 篇里 3 篇有（Australia、United States、COVID-19），演讲和原创文章没有插图，退回分类配色；
+  - 分类列表：目前只列出 2 个分类，其余 21 篇没有分类，都在 Other。站长在网站后台新加了分类管理页。
+  - iOS 不用改格式代码。抓了真实返回做 fixture（`site_catalog_covers.json`、`site_categories.json`）。
+  - 修了两个小问题：
+    - Commons 图片的署名里已经带授权，属性页不再重复写一遍。
+    - 早先版本存下的目录条目缺分类编号：那时 App 还不认识这个字段，存的时候丢了，而网站只重发有变化的条目，所以一直补不上，分类顺序因此没按网站的来。新加 `SiteLibrary.summaryVersion`：App 认识的字段变了，就整份目录重取一次（取完再删掉网站上已经没有的条目；中途失败也不丢已存的数据）。**以后给 `SiteArticleSummary` 加字段时要把它加 1。**
 - **下一步可做**：
   - 插图和表格（详情里已有数据）；
-  - 上传录音的文章：需要支持不同 model 的引擎，以及不上传 Drive 的单独缓存；
-  - 等网站回复 §9。
-- 后台检查网站回复的脚本在 scratchpad（`watch_site.sh`），这次第二轮（30 分钟）就等到了。
+  - 建议站长给 19 篇演讲建一个 "Speeches" 分类（App 会自动配话筒封面）。
+- 后台检查网站回复的脚本在 scratchpad（`watch_site.sh`、`watch_site_extras2.sh`），每 30 分钟查一次。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
 - **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。
