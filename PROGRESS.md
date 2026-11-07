@@ -342,6 +342,13 @@
   - 音频文件名改成网站用密钥算的：App 本来就用接口给的 `url`；新加：某个地址 404 时重新取这篇的详情换新地址再试一次（`SiteLibrary.refreshAudio(forKey:)`）。
   - 测试 +6，共 618 个全过。截图看过设置页 English Reader 一节和卡片上的 Preview 标签（临时启动参数，已删）。
 
+### English Reader 书架改成书封网格（2026-11-07，模拟器截图看过，未上真机）
+
+- 用户给了一张阅读 App 的截图（分类标签 + 一行 3 本书的封面 + 分组），说文章“全列出来往下拉太长了”，照那种排版来。只改 English Reader 一栏；My Articles 有左滑、多选，没动。只借排版，封面的纸色、书脊、图案、配色都是 App 自己的。
+- 做法（`Views/Library/SiteShelf.swift`）：`SiteShelfTabs`（For You + 分类，选中的会自动滚进视野）、`SiteBookCover`/`SiteBookCell`（竖版书封，宽高比 0.72，短标题取冒号前，状态用书签、话筒和底部小标注表示）、`SiteShelfHeading`（大标题 + See All）。`LibraryView.siteShelf` 拼起来：For You 依次是 Continue Reading（打开过的，按第一次打开时间）、Latest 6 本、每类补 3 本，同一篇不出现两次；分类标签就是原来分类页的内容（说明、难度筛选、排序和整类下载）。原来的分类页 `SiteCategoryView`、列表行 `SiteArticleRow`、分类大封面 `CategoryTile` 删掉了。
+- 坑：`List` 的每一组都有圆角裁切（行背景透明也一样），网格贴着行边会被切掉角，所以网格四周留了 `LibraryView.shelfInset`（10pt），标题和标签条跟着对齐。分组标题要用 `Color.primary` 而不是 `.primary`，后者在 section header 里是相对颜色，会变灰。
+- 验证：模拟器连真实网站截图看过 For You、Speeches、Places（浅色、深色）。没验证：真机上的点击、长按菜单、See All 跳转、标签滑动、下拉刷新。
+
 ### 单词本和网站实时互通（2026-11-07，已装手机，还没在手机上登录网站）
 
 用户问 iPhone 和网页的单词到底同不同步。当时的现状：有，但不是直连：iPhone、网站、插件都只读写 Drive 上的 `vocab.json`，要两边都连着 Drive，网站还要打开生词本页的开关（站长已打开，网站交接文档里"没打开"那句是旧的），变化要等各自下次同步。用户要"同一账号实时互通，一边加另一边有，一边删另一边清"，网站出了 `docs/vocab-sync-v1.md`（权威版本在网站仓库 `docs/app-api/`，这里是副本）。
