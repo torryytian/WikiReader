@@ -15,6 +15,7 @@ struct GoogleDriveSettingsView: View {
     @State private var drive = DriveAudioStore.shared
     @State private var downloader = AudioDownloader.shared
     @State private var vocabSync = VocabSync.shared
+    @State private var siteAccount = SiteAccount.shared
     @State private var book = VocabularyBook.shared
     @State private var isSigningIn = false
     @State private var signInError: String?
@@ -235,23 +236,29 @@ struct GoogleDriveSettingsView: View {
     private var wordBookSection: some View {
         Section {
             LabeledContent("Words", value: "\(book.count)")
-            LabeledContent("Sync", value: vocabSyncText)
-            Button {
-                Task { await vocabSync.sync() }
-            } label: {
-                HStack {
-                    Label("Sync Word Book Now", systemImage: "arrow.triangle.2.circlepath")
-                    if vocabSync.state == .syncing {
-                        Spacer()
-                        ProgressView()
+            if !siteAccount.keepsWordBook {
+                LabeledContent("Sync", value: vocabSyncText)
+                Button {
+                    Task { await vocabSync.sync() }
+                } label: {
+                    HStack {
+                        Label("Sync Word Book Now", systemImage: "arrow.triangle.2.circlepath")
+                        if vocabSync.state == .syncing {
+                            Spacer()
+                            ProgressView()
+                        }
                     }
                 }
+                .disabled(vocabSync.state == .syncing)
             }
-            .disabled(vocabSync.state == .syncing)
         } header: {
             Text("Word Book")
         } footer: {
-            Text("Saved words are one book shared with your other devices and the Chrome extension (vocab.json in the \(driveFolder) folder). It syncs when WikiReader comes to the front and a few seconds after you save or delete a word. Deleting a word deletes it everywhere.")
+            if siteAccount.keepsWordBook {
+                Text("You're signed in to English Reader, so saved words sync through the site instead of Drive. See Settings → English Reader.")
+            } else {
+                Text("Saved words are one book shared with your other devices and the Chrome extension (vocab.json in the \(driveFolder) folder). It syncs when WikiReader comes to the front and a few seconds after you save or delete a word. Deleting a word deletes it everywhere.")
+            }
         }
     }
 

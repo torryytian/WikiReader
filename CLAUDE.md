@@ -32,9 +32,9 @@ WikiReader/
   Services/     WikipediaClient、ArticleCleaner、SpeechEngine、DictionaryLookup、VoiceChoice
     Dictionary/ 离线词库（ECDICT）查询、Wiktionary 英文释义、真人发音
     Import/     导入本地文章：文本/Markdown、PDF、图片（OCR）、粘贴 → 标题和段落
-    Vocabulary/ 全局单词本：共享格式与合并、生词判断、本机存储、与 Drive（Chrome 插件）同步
+    Vocabulary/ 全局单词本：共享格式与合并、生词判断、本机存储、与网站同步（登录后）或与 Drive 同步（没登录时）
     Drive/      Google 登录、Drive 客户端、共享音频缓存
-    Site/       English Reader 网站（english.thrones.wang）：接口格式、目录增量同步、R2 上的朗读音频
+    Site/       English Reader 网站（english.thrones.wang）：接口格式、目录增量同步、R2 上的朗读音频、网站账号登录和生词本接口
     OpenAI/     朗读（TTS）、聊天请求层、单词讲解、翻译、缓存
   Views/        Library、Reader（阅读页、词典、翻译面板）、Settings
 WikiReaderTests/
@@ -86,7 +86,7 @@ docs/           会话记录
 - 访问 Wikipedia 的每个请求都带 User-Agent：`WikiReader/0.1 (personal app; contact: torryytian@gmail.com)`
 - 只在我添加文章时请求 Wikipedia，不预取、不批量抓。
 - 选用 OpenAI 朗读时，为当前段和它之后的几段请求 `api.openai.com` 生成音频：向后最多约 75 秒语音、最多 4 段（取先到者），最多同时 2 个预取请求；每次换位置（跳段、快进快退）都重新算，没轮到的不请求，停止朗读时丢掉排队的。生成结果缓存在本地，不重复请求（朗读和批量下载共用"正在生成"登记，同一段不会同时请求两次）。**批量生成整篇/多篇的语音只在我手动触发时进行**（多选后的 Download Audio、文库与存储页的 Download All Remaining Audio、文章属性页的 Download Remaining Audio），开始前先弹窗显示预计时长和费用，我确认后才开始；同时 2 个请求，Key 无效/没额度立即停，连续 4 段失败也停。请求超时、断网、5xx、429 时自动重试，最多共 3 次（401、没额度、请求被拒不重试）。
-- Google Drive（2026-11-01，设置 → Google Drive 登录后才启用）：`accounts.google.com`（登录页，系统登录弹窗）、`oauth2.googleapis.com`（换取/续期令牌、退出时吊销）、`www.googleapis.com`（Drive API，scope 只有 `drive.file` + `openid email`）。取 OpenAI 语音前先查 Drive 的 `audio/<key>.mp3`；打开文章（OpenAI 声音时）批量查这篇的所有段并写 `articles/<urlHash>.json` 清单（先读 Drive 上的再改写，保留不认识的字段，别的声音组合的不覆盖；网站来的文章不写）；新生成的语音后台上传（网站提供的音频不上传，那是网站的压缩版）。用哪个文件夹按 `docs/shared-drive-layout.md`（2026-11-05 三端定稿，权威版本在网站仓库）：网站把 `English Reader/format.json` 写成 v2（或 `WikiReader Cache/format.json` 写着 `movedTo`）后用 `English Reader/`，之前用 `WikiReader Cache/`；App 从不建 `English Reader/`、不写 v2；回到前台时最多每 5 分钟重新判断一次；两处都在时音频和生词本两处都查、只写当前的那处。生词本是 `vocab.json` 一个文件，和 Chrome 插件共用（格式见 `docs/shared-vocab-format.md`），App 回到前台、收藏/删除后几秒同步，只走 Drive、不花钱。这些音频的自动行为在设置 → Google Drive 有两个开关（"Check Drive First"、"Back Up New Audio"，默认开）。手动入口（+ 菜单的 Google Drive 页、多选底栏、文章属性页）：从 Drive 下载只取 Drive 上已有的、不调 OpenAI；备份只传 Drive 缺的。只传音频和清单，不传邮箱。格式见 `docs/shared-tts-cache-format.md`，与 Chrome 插件共用。
+- Google Drive（2026-11-01，设置 → Google Drive 登录后才启用）：`accounts.google.com`（登录页，系统登录弹窗）、`oauth2.googleapis.com`（换取/续期令牌、退出时吊销）、`www.googleapis.com`（Drive API，scope 只有 `drive.file` + `openid email`）。取 OpenAI 语音前先查 Drive 的 `audio/<key>.mp3`；打开文章（OpenAI 声音时）批量查这篇的所有段并写 `articles/<urlHash>.json` 清单（先读 Drive 上的再改写，保留不认识的字段，别的声音组合的不覆盖；网站来的文章不写）；新生成的语音后台上传（网站提供的音频不上传，那是网站的压缩版）。用哪个文件夹按 `docs/shared-drive-layout.md`（2026-11-05 三端定稿，权威版本在网站仓库）：网站把 `English Reader/format.json` 写成 v2（或 `WikiReader Cache/format.json` 写着 `movedTo`）后用 `English Reader/`，之前用 `WikiReader Cache/`；App 从不建 `English Reader/`、不写 v2；回到前台时最多每 5 分钟重新判断一次；两处都在时音频和生词本两处都查、只写当前的那处。没登录 English Reader 网站时，生词本是 `vocab.json` 一个文件，和 Chrome 插件共用（格式见 `docs/shared-vocab-format.md`），App 回到前台、收藏/删除后几秒同步，只走 Drive、不花钱；登录网站后生词本改走网站（见下一条），不再读写 `vocab.json`。这些音频的自动行为在设置 → Google Drive 有两个开关（"Check Drive First"、"Back Up New Audio"，默认开）。手动入口（+ 菜单的 Google Drive 页、多选底栏、文章属性页）：从 Drive 下载只取 Drive 上已有的、不调 OpenAI；备份只传 Drive 缺的。只传音频和清单，不传邮箱。格式见 `docs/shared-tts-cache-format.md`，与 Chrome 插件共用。
 - English Reader 网站（2026-11-05，用户自己的网站，源码在云主机 `vultr_machine:/root/claude/english_site`，本机 `~/Desktop/claude/english_site` 是过时的副本）：
   - `english.thrones.wang/api/app/v1/articles`（目录）、`/articles/<id>`（详情）和 `/categories`（分类列表，2026-11-05 上线；返回 404 时 App 安静跳过），只读；User-Agent 用 `WikiReader/0.1 (iOS app)`，不带邮箱。设置里存了访问凭证（站长在网站后台签发，存 Keychain，2026-11-05）时，这三个接口带 `Authorization: Bearer <凭证>`，只发给 english.thrones.wang，不发给音频的域名；没有凭证时网站可能只给试读（开头一部分），App 标"Preview"、每次打开都重新取，不会用试读替换已经存在本机的全文。401 提示重新填凭证（不去掉凭证重试），429 按 `Retry-After` 等待后重试（最多 3 次，等待超过 30 秒就放弃）。
   - 文章封面图（有插图的文章才有，2026-11-05 上线）从 `audio.thrones.wang/img/` 加载，列表里用 600px 的小图，属性页用大图。
@@ -94,6 +94,8 @@ docs/           会话记录
   - 朗读网站文章时，从 `audio.thrones.wang`（Cloudflare R2）取网站列出的音频片段。免费，排在本机缓存之后、Drive 和 OpenAI 之前；网站没列出的片段不会去请求。地址一律用接口给的 `chunks[].url`（网站的文件名是密钥算的，不能用 key 拼）；某个地址 404 时重新取一次这篇的详情、换新地址再试。网站给的是压缩版（`sourceIdentical: false`），照常播放，但不上传到 Drive。
   - 演讲这类"真人录音"文章（2026-11-05，网站的 `narration.model` 是 `upload`、声音是 `rec-…`）：录音只从网站取，取不到就报错，**不查 Drive、不调 OpenAI、不备份到 Drive**；逐词高亮用网站给的每个词的开始时间（`wordStartsMs`），词数和 App 自己分的对不上时照旧估算。
   - 整篇下载网站文章的音频（属性页、网站卡片长按菜单、分类页菜单）只从网站取，不调 OpenAI，不花钱；弹窗说明时长，不弹费用。
+  - 登录网站（2026-11-07，设置 → English Reader → Sign In）：系统登录弹窗打开 `english.thrones.wang/app/authorize`（网站自己的登录页，Google 或邮箱验证码），一次性授权码加 PKCE 换一把设备钥匙（`/api/app/v1/auth/token`），钥匙存 Keychain，App 不保存密码。设备钥匙就是这台手机的身份，只发给 english.thrones.wang；登录后文章接口也带它（优先于访问凭证）。401 时删钥匙，提示重新登录，词都留在本机。
+  - 生词本走网站（2026-11-07，规范 `docs/vocab-sync-v1.md`，评审见云主机 `docs/from-ios/REVIEW-vocab-sync-v1.md`）：登录后到主动退出之前，生词本只和 `/api/app/v1/vocab/*` 交换，发的是生词本词条（词、原句、文章标题和 URL），不含邮箱。App 在前台时每 30 秒问一次网站有什么变化（后台不问），本机改动约 5 秒后发出，切到后台时立刻发。失败按 2、4、8… 秒退避，最长 5 分钟。第一次登录、重新登录且本机有词、游标过期时要做全量同步：先把整本发给网站对比，用户选方向和方式、确认后才执行，要删网站上的词必须输入数量；不花钱。
   - 接口要求见 `docs/site-api-for-ios.md`，网站的回复在云主机的 `docs/from-ios/REPLY.md`。
 - AI 讲解（词典界面的 AI 按钮）：只在我点按钮时请求 `api.openai.com/v1/chat/completions`，一次只发被查的单词和它所在的句子，不发全文，不预取，不自动触发；用的是设置页保存的同一个 OpenAI Key。
 - 词典页（点词弹出）：离线词库 ECDICT 在 App 里，不联网。打开词典页时请求 `en.wiktionary.org/api/rest_v1/page/definition/<词>` 取英文释义，只发被查的单词（不发句子），结果缓存在本地，失败静默；点喇叭时请求 `upload.wikimedia.org` 上的真人录音 mp3（`En-us-<词>.ogg` 的转码版），只发单词，结果缓存，没有录音就用系统声音。这两个都是 Wikimedia 的服务，带同样的 User-Agent。**不要把 User-Agent 里的邮箱发给 Wikimedia 以外的任何服务**（dictionaryapi.dev 试过，服务端常 522，已放弃）。

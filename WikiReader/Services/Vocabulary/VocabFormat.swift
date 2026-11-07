@@ -116,6 +116,25 @@ nonisolated struct VocabEntry: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+nonisolated extension VocabEntry {
+    /// The longest sentence the site takes, in JavaScript's characters (UTF-16 units): docs/vocab-sync-v1.md §3.1.
+    static let siteSentenceLimit = 2000
+
+    /// This entry as it goes to the site. A sentence over the limit, which text without punctuation can make (a PDF, a
+    /// scan), would get the whole word refused, so it goes shortened; its id stays, so it remains the same sentence.
+    var forSite: VocabEntry {
+        var entry = self
+        for index in entry.contexts.indices where entry.contexts[index].sentence.utf16.count > Self.siteSentenceLimit {
+            var used = 0
+            entry.contexts[index].sentence = String(entry.contexts[index].sentence.prefix { character in
+                used += character.utf16.count
+                return used <= Self.siteSentenceLimit
+            })
+        }
+        return entry
+    }
+}
+
 /// The whole book, as in `vocab.json` (and this iPhone's copy of it).
 nonisolated struct VocabFile: Codable, Equatable, Sendable {
     static let currentVersion = 2

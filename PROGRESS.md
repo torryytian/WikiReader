@@ -266,6 +266,7 @@
     - `SiteFormat`：格式；校验每个片段的 key 确实是它文字的 key，只收 `sourceIdentical` 的文件；
     - `SiteClient`：只读；返回网页而不是 JSON 时报"被 bot 检查拦了"；
     - `SiteLibrary`：目录、文章链接、音频索引，存在 `Application Support/Site/` 的 JSON 里，不进 SwiftData；
+    - `SiteAccount`、`SiteVocabClient`、`SiteVocabFormat`（2026-11-07）：登录网站拿设备钥匙、生词本接口；同步引擎是 `Services/Vocabulary/VocabSiteSync`，界面是 `Views/Settings/SiteAccountRows`、`FullSyncView`。系统登录弹窗抽成了 `Services/WebSignInSheet`，Google 登录也用它；
     - `SiteAudioSource`：从 R2 取片段放进同一个缓存，5xx/429 重试，404 不重试。
   - `SpeechGenerations` 的取音频顺序：网站 → Drive → OpenAI。
   - 网站文章固定用网站的声音（alloy），和设置里选的声音无关。网站缺的片段，只有设置里选了 OpenAI 声音时才花钱生成。
@@ -340,6 +341,24 @@
   - **网站的音频改成压缩版后 App 原来不会用**：旧规则只用 `sourceIdentical: true` 的朗读，网站今天改成 48k（false），旧代码会当作网站没有音频、改用 Drive 或 OpenAI（要花钱）。按 §4.2 改成照常播放、不进 Drive。手机上还没装过带网站的版本，没受影响。
   - 音频文件名改成网站用密钥算的：App 本来就用接口给的 `url`；新加：某个地址 404 时重新取这篇的详情换新地址再试一次（`SiteLibrary.refreshAudio(forKey:)`）。
   - 测试 +6，共 618 个全过。截图看过设置页 English Reader 一节和卡片上的 Preview 标签（临时启动参数，已删）。
+
+### 单词本和网站实时互通（2026-11-07，代码完成，未上真机）
+
+用户问 iPhone 和网页的单词到底同不同步。当时的现状：有，但不是直连：iPhone、网站、插件都只读写 Drive 上的 `vocab.json`，要两边都连着 Drive，网站还要打开生词本页的开关（网站交接文档写着站长没开），变化要等各自下次同步。用户要"同一账号实时互通，一边加另一边有，一边删另一边清"，网站出了 `docs/vocab-sync-v1.md`（权威版本在网站仓库 `docs/app-api/`，这里是副本）。
+
+- **评审发现的问题**（全文在云主机 `docs/from-ios/REVIEW-vocab-sync-v1.md`，网站当天都采纳了并上线）：
+  - 原规范做不到"实时"：iPhone 开着 App 时不拉取，网页也不刷新。改成 App 前台每 30 秒拉取、网页聚焦时和每 60 秒刷新。免费开发者账号没有 APNs，只能轮询。
+  - 撤销会丢词：网站撤销时给"这次加上去的词"写删除记录，手机拉到后这些原本只在手机上的词就彻底没了。网站改成撤销从不删词。
+  - 预览里一条不合格的词条会让整个全量同步做不了：改成跳过、列进 `rejected`，这些词两边都不动，用 `book` 替换本机时要原样留下（`VocabSiteSync.keeping`）。
+  - iOS 16 起设备名都叫 "iPhone"，不能按名字去重：改成登录时带上次的 `device_id`（`SettingsKeys.siteDeviceID`，退出后也保留）。
+- **和规范不同的三处**（都不影响网站）：
+  - `clock_skew` 规范说"从队列拿掉"，那样用户改好时间也到不了网站。放进 `held`，提示检查时间，App 下次回到前台时再试。
+  - 推送结果规范说"用 entry 覆盖本机"，途中用户又改过的话会丢，所以一律走 v2 合并（`VocabularyBook.applyFromSite`），没改过时结果一样。
+  - 撤销规范说先恢复本机再调接口。我先调接口：失败的话什么都没动，可以重试。网站看不出差别。
+- **做法**：`SiteAccount`（登录、设备钥匙，Keychain）、`SiteVocabClient`（接口）、`VocabSiteSync`（待推送、游标、轮询、全量同步、撤销）。待推送只记"哪些词变了"，发送时取这个词当时的样子，一个词改多次只发一次。发出去的一批（`batch`）连同 `requestId` 落盘，没收到回应就原样重发，重启也一样。合并结果没变化时不碰生词本，否则阅读页每 30 秒重排一次高亮。
+- **和 Drive 的关系**：从登录到**主动退出**之间生词本都不走 Drive（`SiteAccount.keepsWordBook`），网站拒绝钥匙时也不回退，否则过期的 `vocab.json` 又会合并进来。`VocabSync` 的 Drive 代码不动，退出后接着用。
+- **全量同步的备份**：五种做法执行前都备份（`Vocabulary-before-full-sync.json`，下次全量同步时覆盖）。App 里只在结果页提供撤销；之后要撤销去网站账号页，网站撤销不动手机上的词。
+- **验证**：单元测试用 `FakeVocabSite`（`WikiReaderTests/VocabSiteSyncTests.swift`），逻辑照网站的 `vocabApi.ts` 写，两台设备对着它走规范 §10 的清单（+53 个测试，全部 671 个通过）。全量同步的三个画面用规范的 50/40 数据截图看过（浅色、深色）。网站源码逐项核对过返回格式。线上用 curl 核对过：没带钥匙和假钥匙 401、假授权码 400、App 拼的授权地址被接受并跳到登录页。**没验证**：真实登录、用真钥匙读写线上生词本、真机上的表现。联调覆盖类全量同步要用测试账号，别碰站长正在用的词本。
 
 ### 全局单词本，与 Chrome 插件同步（2026-11-03）
 - **用户的决定**：单词本是全局一本，不再按文章记录；两端（iOS、Chrome 插件）数据和判断逻辑一致；任何地方取消收藏 = 两端都删除；"已掌握"就是删除；阅读时所有生词都高亮，同一原形的其他变形用淡一些的样式提示。

@@ -72,6 +72,8 @@ final class SiteLibrary {
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let client: SiteClient
     @ObservationIgnored private let now: () -> Date
+    /// Tells the account a refused key was its device key; false if it has none, so the access token was refused.
+    @ObservationIgnored private let keyRefused: () -> Bool
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Pieces whose file was missing (404) and whose article was fetched again for new addresses, this launch.
     @ObservationIgnored private var refreshedKeys: Set<String> = []
@@ -82,11 +84,13 @@ final class SiteLibrary {
     init(
         directory: URL = URL.applicationSupportDirectory.appending(path: "Site", directoryHint: .isDirectory),
         client: SiteClient = SiteClient(),
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        keyRefused: @escaping () -> Bool = { SiteAccount.shared.keyRefused() }
     ) {
         self.directory = directory
         self.client = client
         self.now = now
+        self.keyRefused = keyRefused
         stored = (try? JSONDecoder().decode(Stored.self, from: Data(contentsOf: directory.appending(path: "Catalog.json")))) ?? Stored()
         audio = (try? JSONDecoder().decode([String: URL].self, from: Data(contentsOf: directory.appending(path: "AudioIndex.json")))) ?? [:]
         wordTimes = (try? JSONDecoder().decode([String: [Int]].self, from: Data(contentsOf: directory.appending(path: "WordTimes.json")))) ?? [:]
@@ -195,10 +199,10 @@ final class SiteLibrary {
         }
     }
 
-    /// Notes whether the site accepted the access token, from a request's outcome.
+    /// Notes whether the site accepted the device key or the access token, from a request's outcome.
     private func noteToken(_ error: SiteError?) {
         if error == .invalidToken {
-            tokenRefused = true
+            if !keyRefused() { tokenRefused = true }
         } else if error == nil {
             tokenRefused = false
         }

@@ -7,8 +7,11 @@ struct WordBookView: View {
     @State private var book = VocabularyBook.shared
     @State private var sync = VocabSync.shared
     @State private var account = GoogleAccount.shared
+    @State private var siteAccount = SiteAccount.shared
+    @State private var siteSync = VocabSiteSync.shared
     @State private var meanings = MeaningFetcher()
     @State private var searchText = ""
+    @State private var showsFullSync = false
 
     private var shown: [VocabEntry] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
@@ -21,6 +24,7 @@ struct WordBookView: View {
     var body: some View {
         NavigationStack {
             List {
+                siteSection
                 Section {
                     ForEach(shown) { entry in
                         NavigationLink {
@@ -51,7 +55,7 @@ struct WordBookView: View {
                     ContentUnavailableView.search(text: searchText)
                 }
             }
-            .refreshable { await sync.sync() }
+            .refreshable { await syncNow() }
             .navigationTitle("Word Book")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -59,11 +63,42 @@ struct WordBookView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { await sync.sync() }
+            .task { await syncNow() }
+            .sheet(isPresented: $showsFullSync) {
+                FullSyncView()
+            }
+        }
+    }
+
+    /// Only one of them does anything: the site if signed in there, otherwise Drive.
+    private func syncNow() async {
+        await siteSync.sync()
+        await sync.sync()
+    }
+
+    /// When English Reader needs something from the user before the two sides can stay in step.
+    @ViewBuilder
+    private var siteSection: some View {
+        switch siteSync.status {
+        case .needsSignIn:
+            Section {
+                SiteSignInButton(title: "Sign In to English Reader Again") { showsFullSync = true }
+            } footer: {
+                Text("Your words are safe here, but they aren't syncing with the website.")
+            }
+        case .needsFullSync:
+            Section {
+                Button("Compare with English Reader…") { showsFullSync = true }
+            } footer: {
+                Text("Your words here and on the website need comparing before they can stay in step.")
+            }
+        default:
+            EmptyView()
         }
     }
 
     private var syncText: String {
+        if siteAccount.keepsWordBook { return siteSyncText }
         guard account.isSignedIn else {
             return "Sign in to Google Drive in Settings to share these words with your other devices and the Chrome extension."
         }
@@ -77,6 +112,25 @@ struct WordBookView: View {
             return "The word book in Google Drive is in the Chrome extension's old format. It syncs once the extension is updated."
         case .failed(let message):
             return "Couldn't sync with Google Drive: \(message)"
+        }
+    }
+
+    private var siteSyncText: String {
+        if siteSync.clockLooksWrong {
+            return "English Reader refused a word dated in the future. Check this iPhone's date and time."
+        }
+        switch siteSync.status {
+        case .synced:
+            let who = siteAccount.user.map { " (\($0.email))" } ?? ""
+            return "In step with English Reader\(who). Deleting a word deletes it there too."
+        case .offline:
+            return "Offline. \(siteSync.statusText)."
+        case .failed(let message):
+            return "Couldn't sync with English Reader: \(message)"
+        case .needsSignIn, .needsFullSync:
+            return "Not syncing with the website for now."
+        case .syncing, .off:
+            return "Syncing with English Reader…"
         }
     }
 }

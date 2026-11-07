@@ -10,7 +10,7 @@ nonisolated enum SiteError: Error, Equatable {
     case badResponse(String)
     /// The site speaks a newer format than this version of the app.
     case newerFormat(Int)
-    /// The access token in Settings was refused: unknown, revoked or expired (401 `invalid_token`).
+    /// The device key or the access token in Settings was refused: unknown, revoked or expired (401 `invalid_token`).
     case invalidToken
     /// Too many requests with this access token (429), still after waiting as the site asked.
     case rateLimited
@@ -24,7 +24,7 @@ nonisolated enum SiteError: Error, Equatable {
         case .notJSON: "English Reader answered with a web page instead of data. Its bot check may be blocking the app."
         case .badResponse(let detail): "English Reader sent something this version can't read (\(detail))."
         case .newerFormat(let version): "English Reader uses a newer format (\(version)). Update WikiReader."
-        case .invalidToken: "English Reader didn't accept your access token: it may have been revoked or have expired. Paste a new one in Settings → English Reader."
+        case .invalidToken: "English Reader didn't accept this iPhone's sign-in or access token: it may have been revoked or have expired. Check Settings → English Reader."
         case .rateLimited: "Too many requests to English Reader with this access token. Try again in a minute."
         }
     }
@@ -32,8 +32,9 @@ nonisolated enum SiteError: Error, Equatable {
 
 /// Reads the English Reader site's app API (docs/site-api-for-ios.md): the catalog of published articles and each
 /// article's text and narration. Read-only: nothing about the user is sent (no address in the User-Agent, unlike
-/// Wikipedia's), only the access token the site's owner made for this app, when one is saved in Settings (§10). It
-/// goes to the site alone, never to the audio files' host.
+/// Wikipedia's), only this iPhone's device key when signed in (docs/vocab-sync-v1.md §1), otherwise the access token
+/// the site's owner made for this app, when one is saved in Settings (§10). Either goes to the site alone, never to
+/// the audio files' host.
 nonisolated struct SiteClient: Sendable {
     typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
@@ -49,8 +50,8 @@ nonisolated struct SiteClient: Sendable {
 
     var baseURL: URL = SiteClient.siteURL
     var transport: Transport = { try await SiteClient.session.data(for: $0) }
-    /// The access token from Settings, if any (`KeychainStore.siteToken`).
-    var token: @Sendable () -> String? = { KeychainStore.siteToken.read() }
+    /// The device key from signing in, or else the access token from Settings, if any.
+    var token: @Sendable () -> String? = { KeychainStore.siteDeviceKey.read() ?? KeychainStore.siteToken.read() }
     /// The longest wait a 429's `Retry-After` is followed for before giving up.
     var longestRetryWait: Duration = .seconds(30)
 

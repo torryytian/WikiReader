@@ -47,6 +47,11 @@ nonisolated enum SettingsKeys {
     /// How a category's English Reader articles are ordered (`SiteArticleOrder`).
     static let siteArticleOrder = "siteArticleOrder"
 
+    /// The English Reader account signed in to, as JSON (its device key is in the Keychain).
+    static let siteAccount = "siteAccount"
+    /// This iPhone's id on the site from its last sign-in, kept after signing out: the next one replaces it.
+    static let siteDeviceID = "siteDeviceID"
+
     /// Whether this device has moved the per-article saved-word lists into the global book (once).
     static let vocabularyImported = "vocabularyImported"
 

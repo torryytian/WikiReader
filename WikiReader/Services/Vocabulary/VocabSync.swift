@@ -13,6 +13,8 @@ import OSLog
 ///
 /// Each Google account has its own book: before a sync the book is made the signed-in account's
 /// (`VocabularyBook.belong(to:)`), so signing in as someone else never merges one person's words into another's Drive.
+///
+/// Signed in to English Reader, the word book goes through the site instead (`VocabSiteSync`) and this stands aside.
 @Observable
 final class VocabSync {
     static let shared = VocabSync()
@@ -46,7 +48,7 @@ final class VocabSync {
     init(
         book: VocabularyBook = .shared,
         client: DriveClient = DriveClient(token: { force in try await GoogleAccount.shared.validAccessToken(force: force) }),
-        isSignedIn: @escaping () -> Bool = { GoogleAccount.shared.isSignedIn },
+        isSignedIn: @escaping () -> Bool = { GoogleAccount.shared.isSignedIn && !SiteAccount.shared.keepsWordBook },
         account: @escaping () -> String? = { GoogleAccount.shared.accountID },
         folders: @escaping () async throws -> (root: String, other: String?) = {
             let layout = try await DriveAudioStore.shared.layout()

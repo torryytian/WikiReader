@@ -10,6 +10,8 @@ nonisolated struct KeychainStore: Sendable {
     static let openAIKey = KeychainStore(service: "tik.tian.com.WikiReader.openai", account: "apiKey")
     /// The access token made on English Reader's admin page, for reading whole articles (docs/site-api-for-ios.md §10).
     static let siteToken = KeychainStore(service: "tik.tian.com.WikiReader.englishreader", account: "accessToken")
+    /// This device's key from signing in to English Reader (docs/vocab-sync-v1.md §2).
+    static let siteDeviceKey = KeychainStore(service: "tik.tian.com.WikiReader.englishreader", account: "deviceKey")
 
     enum Failure: Error, Equatable {
         case status(OSStatus)

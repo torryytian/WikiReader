@@ -4,14 +4,15 @@ import Observation
 import OSLog
 
 /// The saved-word book: one for the whole library, the same as the Chrome extension's (docs/shared-vocab-format.md).
-/// Kept on this iPhone as `Application Support/Vocabulary.json`, in exactly the shared format, and merged with
-/// Google Drive's copy by `VocabSync`.
+/// Kept on this iPhone as `Application Support/Vocabulary.json`, in exactly the shared format, and kept in step with
+/// English Reader by `VocabSiteSync` when signed in there, otherwise with Google Drive's copy by `VocabSync`.
 ///
 /// Saving a word records the sentence and article it was found in. Removing a word, from anywhere, deletes it for
 /// good on every device (a tombstone): the book is global, and "I know this one now" is the same as deleting it.
 ///
-/// A book belongs to one Google account (`owner`, the first one it is synced with), so two accounts' words never
-/// mix: signing in as someone else sets this book aside and brings out that account's own (`belong(to:)`).
+/// A book belongs to one account (`owner`, the first one it is synced with, Google's or English Reader's: an address
+/// either way), so two accounts' words never mix: signing in as someone else sets this book aside and brings out
+/// that account's own (`belong(to:)`).
 @Observable
 final class VocabularyBook {
     static let shared = VocabularyBook()
@@ -19,11 +20,13 @@ final class VocabularyBook {
     private(set) var file: VocabFile
     /// Bumped by every change, so the reader marks the text again and the sync knows there is something to send.
     private(set) var version = 0
-    /// The Google account (lowercased address) this book is kept in step with; nil until the first sync. Words saved
+    /// The account (lowercased address) this book is kept in step with; nil until the first sync. Words saved
     /// while signed out belong to it too. Kept beside the book, not in it: the book's file is what goes to Drive.
     private(set) var owner: String?
     /// Called after a change made here (not after a sync brought one in), to schedule a sync.
     @ObservationIgnored var onLocalChange: (() -> Void)?
+    /// Called with the same changes' words, for the site, which is told about each word rather than sent the whole book.
+    @ObservationIgnored var onLocalKeysChange: ((Set<String>) -> Void)?
 
     @ObservationIgnored private let fileURL: URL
     @ObservationIgnored private let now: () -> Date
@@ -69,7 +72,7 @@ final class VocabularyBook {
 
     // MARK: - Accounts
 
-    /// Makes this the book of `account` (a lowercased address), before syncing with that account's Drive. The first
+    /// Makes this the book of `account` (a lowercased address), before syncing with that account's copy. The first
     /// account keeps the book as it is. Another one gets its own: the book it had here before, or an empty one, while
     /// the current book is set aside for its owner to get back. Returns whether the book was swapped.
     @discardableResult
@@ -170,7 +173,7 @@ final class VocabularyBook {
         guard let index = file.entries.firstIndex(where: { $0.key == key }) else { return }
         file.entries.remove(at: index)
         file.deleted[key] = VocabFormat.milliseconds(now())
-        changed(locally: true)
+        changed(locally: true, keys: [key])
     }
 
     /// The dictionary's bookmark button: saves the word, or deletes it if it is saved. Returns whether it is saved after.
@@ -202,21 +205,42 @@ final class VocabularyBook {
         changed(locally: false)
     }
 
+    /// Words and deletions from English Reader, by the shared merge. Nothing happens if they say nothing new: the
+    /// site's answers come every few seconds, often echoing what went up, and the reader marks its text again on every
+    /// change.
+    func applyFromSite(entries: [VocabEntry], deleted: [String: Int64]) {
+        guard !entries.isEmpty || !deleted.isEmpty else { return }
+        let merged = VocabFormat.merge(file, VocabFile(entries: entries, deleted: deleted), now: VocabFormat.milliseconds(now()), by: "ios")
+        guard !VocabFormat.sameContent(merged, file) else { return }
+        replace(with: merged)
+    }
+
     private func store(_ entry: VocabEntry) {
         if let index = file.entries.firstIndex(where: { $0.key == entry.key }) {
             file.entries[index] = entry
         } else {
             file.entries.append(entry)
         }
-        changed(locally: true)
+        changed(locally: true, keys: [entry.key])
     }
 
-    private func changed(locally: Bool) {
+    /// The words that differ between two versions of the book.
+    private static func changedKeys(from old: VocabFile, to new: VocabFile) -> Set<String> {
+        let before = Dictionary(old.entries.map { ($0.key, $0) }) { first, _ in first }
+        var keys = Set(new.entries.filter { before[$0.key] != $0 }.map(\.key))
+        keys.formUnion(new.deleted.keys.filter { old.deleted[$0] != new.deleted[$0] })
+        return keys
+    }
+
+    private func changed(locally: Bool, keys: Set<String> = []) {
         file.updatedAt = VocabFormat.milliseconds(now())
         file.updatedBy = "ios"
         version += 1
         save()
-        if locally { onLocalChange?() }
+        if locally {
+            onLocalChange?()
+            onLocalKeysChange?(keys)
+        }
     }
 
     private func save() {
@@ -233,8 +257,9 @@ final class VocabularyBook {
         guard other.formatVersion == VocabFile.currentVersion else { return }
         let merged = VocabFormat.merge(file, other, now: VocabFormat.milliseconds(now()), by: "ios")
         guard !VocabFormat.sameContent(merged, file) else { return }
+        let keys = Self.changedKeys(from: file, to: merged)
         file = merged
-        changed(locally: true)
+        changed(locally: true, keys: keys)
     }
 
     // MARK: - Moving in the per-article lists
@@ -261,9 +286,10 @@ final class VocabularyBook {
         guard !incoming.isEmpty else { return }
         let merged = VocabFormat.merge(file, VocabFile(entries: Array(incoming.values)), now: VocabFormat.milliseconds(now()), by: "ios")
         guard !VocabFormat.sameContent(merged, file) else { return }
+        let keys = Self.changedKeys(from: file, to: merged)
         file = merged
         Log.app.info("Vocabulary: moved \(incoming.count) words from the articles' lists into the book")
-        changed(locally: true)
+        changed(locally: true, keys: keys)
     }
 
     /// Once per device: the per-article lists into the book.

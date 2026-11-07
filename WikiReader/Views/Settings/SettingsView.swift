@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var hasSiteToken = KeychainStore.siteToken.read() != nil
     @State private var siteTokenInput = ""
     @State private var site = SiteLibrary.shared
+    @State private var siteAccount = SiteAccount.shared
 
     /// - Parameter opensVoicePage: Start on the voice page, for when reading failed and the fix is a voice or key.
     init(opensVoicePage: Bool = false) {
@@ -132,6 +133,7 @@ struct SettingsView: View {
 
     private var englishReaderSection: some View {
         Section {
+            SiteAccountRows()
             if hasSiteToken {
                 LabeledContent("Access Token") {
                     if site.tokenRefused {
@@ -146,7 +148,7 @@ struct SettingsView: View {
                     hasSiteToken = false
                     Log.app.info("English Reader access token removed")
                 }
-            } else {
+            } else if !siteAccount.keepsWordBook {
                 SecureField("Access token (er_…)", text: $siteTokenInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -159,8 +161,10 @@ struct SettingsView: View {
         } footer: {
             if hasSiteToken && site.tokenRefused {
                 Text("English Reader refused this token: it may have been revoked or have expired. Remove it and paste a new one.")
+            } else if siteAccount.keepsWordBook {
+                Text("Signed in, your word book stays in step with the website: a word saved or deleted on one side shows on the other within about a minute. Whole articles come with the account too.")
             } else {
-                Text("Without an access token English Reader may show only the beginning of each article. Make one on the site's admin page (Access Tokens) and paste it here. It is kept in this iPhone's Keychain and sent only to english.thrones.wang.")
+                Text("Sign in to keep your word book in step with the website and read whole articles. The sign-in happens on the site; no password is kept here. Without signing in English Reader may show only the beginning of each article, unless you paste an access token made on the site's admin page (Access Tokens). Either is kept in this iPhone's Keychain and sent only to english.thrones.wang.")
             }
         }
     }

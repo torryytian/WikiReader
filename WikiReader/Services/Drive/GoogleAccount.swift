@@ -1,8 +1,6 @@
-import AuthenticationServices
 import Foundation
 import Observation
 import OSLog
-import UIKit
 
 /// The Google account audio is shared through: signing in and out, and handing out access tokens to `DriveClient`.
 ///
@@ -30,7 +28,6 @@ final class GoogleAccount {
     @ObservationIgnored private var accessToken: (token: String, expires: Date)?
     /// A refresh in progress, shared by everyone who needs a token meanwhile.
     @ObservationIgnored private var refreshing: Task<String, Error>?
-    @ObservationIgnored private var presenter: SignInPresenter?
     /// Called when a sign-in is for a different Google account than the last one: what was learned about the other
     /// account's Drive (folder ids, the audio index) must not be used for this one.
     @ObservationIgnored var onAccountChange: (() -> Void)?
@@ -193,34 +190,10 @@ final class GoogleAccount {
     // MARK: - The sign-in sheet
 
     private func presentSignIn(url: URL, callbackScheme: String) async throws(GoogleAuthError) -> URL {
-        let result: Result<URL, GoogleAuthError> = await withCheckedContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callback, error in
-                if let callback {
-                    continuation.resume(returning: .success(callback))
-                } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-                    continuation.resume(returning: .failure(.cancelled))
-                } else {
-                    continuation.resume(returning: .failure(.rejected(error?.localizedDescription ?? "no answer")))
-                }
-            }
-            let presenter = SignInPresenter()
-            self.presenter = presenter
-            session.presentationContextProvider = presenter
-            // Shares Safari's cookies, so a Google account already signed in there needs no password.
-            session.prefersEphemeralWebBrowserSession = false
-            if !session.start() {
-                continuation.resume(returning: .failure(.rejected("the sign-in sheet couldn't open")))
-            }
-        }
-        presenter = nil
-        return try result.get()
-    }
-
-    /// Tells the sign-in sheet which window to appear over.
-    private final class SignInPresenter: NSObject, ASWebAuthenticationPresentationContextProviding {
-        func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-            return scenes.flatMap(\.windows).first { $0.isKeyWindow } ?? scenes.first.map(UIWindow.init(windowScene:)) ?? UIWindow()
+        switch await WebSignInSheet.present(url: url, callbackScheme: callbackScheme) {
+        case .success(let redirect): redirect
+        case .failure(.cancelled): throw .cancelled
+        case .failure(.failed(let detail)): throw .rejected(detail)
         }
     }
 }

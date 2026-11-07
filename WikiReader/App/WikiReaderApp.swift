@@ -33,10 +33,12 @@ private struct RootView: View {
                 // connection changes (uploads may be waiting for Wi-Fi).
                 DriveAudioStore.shared.pumpUploads()
                 NetworkWatcher.shared.onChange = { DriveAudioStore.shared.pumpUploads() }
-                // The word book: the dictionary's base forms for marking related words, and a sync with Drive a
-                // few seconds after each change.
+                // The word book: the dictionary's base forms for marking related words, and a sync a few seconds
+                // after each change (with English Reader when signed in there, which starts listening here; otherwise
+                // with Drive).
                 VocabLemmas.shared.load()
                 VocabularyBook.shared.onLocalChange = { VocabSync.shared.scheduleSync() }
+                _ = VocabSiteSync.shared
                 // Signed in as someone else: forget the other account's Drive folders and audio index (the word
                 // book swaps to that account's own at its next sync).
                 GoogleAccount.shared.onAccountChange = { DriveAudioStore.shared.reset() }
@@ -45,11 +47,13 @@ private struct RootView: View {
             // Coming to the front (launch included): words saved on other devices or in Chrome come in, and new
             // articles on English Reader (at most every ten minutes).
             .onChange(of: scenePhase, initial: true) { _, phase in
+                if phase == .background { VocabSiteSync.shared.appWentToBackground() }
                 guard phase == .active else { return }
                 // The site may have moved the shared Drive folder meanwhile: decide again which one to use (at most
                 // every few minutes), before the word book's sync asks for it.
                 DriveAudioStore.shared.appBecameActive()
                 Task { await VocabSync.shared.sync() }
+                VocabSiteSync.shared.appBecameActive()
                 Task { await SiteLibrary.shared.sync(ifDue: true) }
             }
     }

@@ -11,6 +11,8 @@
 >
 > 2026-11-05 起，**English Reader 网站**（english.thrones.wang）作为第三个读写方加入，规则完全相同，只是本端标识用 `"web"`（需求见 `docs/site-api-for-ios.md` §5）。这次只是增补，iOS 和 Chrome 不用改：它们本来就原样保留不认识的字段和取值。
 
+2026-11-07 起，登录了网站的客户端不再读写 Drive 上的 `vocab.json`，改走网站的生词本接口（`docs/vocab-sync-v1.md`，权威版本在网站仓库 `docs/app-api/vocab-sync-v1.md`）。接口里的词条和合并规则就是本文件的 v2，本文件仍是格式的权威定义；旧版客户端和没登录的 iPhone 继续按下面的方式走 Drive。
+
 ## 1. 位置与编码
 
 - Google Drive：`WikiReader Cache/vocab.json`，与 `format.json` 同级（目录结构见 `shared-tts-cache-format.md`）。同名文件有多个时用 `createdTime` 最早的一个。迁移到 `English Reader/` 之后是 `English Reader/vocab.json`，格式不变（见 `shared-drive-layout.md`）。
