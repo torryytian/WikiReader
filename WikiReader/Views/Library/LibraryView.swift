@@ -5,7 +5,6 @@ import SwiftUI
 /// Where the library leads: an article, or one of English Reader's categories.
 enum LibraryRoute: Hashable {
     case article(Article)
-    case category(SiteCategory)
 }
 
 /// The two parts of the library.
@@ -32,6 +31,11 @@ struct LibraryView: View {
     @State private var siteOpenError: String?
     /// Articles being fetched from English Reader before their narration is downloaded.
     @State private var isPreparingSiteDownload = false
+    /// The English Reader category shown on its shelf; nil for For You.
+    @State private var siteTab: SiteCategory?
+    /// A level the shown category is narrowed to (A2…C2).
+    @State private var siteLevel: String?
+    @AppStorage(SettingsKeys.siteArticleOrder) private var siteOrder = SiteArticleOrder.newest
     @State private var path: [LibraryRoute] = []
     @State private var isAddingArticle = false
     @State private var importer = ArticleImportCoordinator()
@@ -111,22 +115,7 @@ struct LibraryView: View {
                     }
                 }
                 if showsSite {
-                    if searchText.isEmpty, !site.articles.isEmpty {
-                        Section {
-                            categoryCarousel
-                        } header: {
-                            Text("Categories")
-                        }
-                    }
-                    Section {
-                        ForEach(shownSiteArticles, id: \.id) { summary in
-                            siteRow(summary)
-                        }
-                    } header: {
-                        if searchText.isEmpty, !site.articles.isEmpty { Text("Latest") }
-                    } footer: {
-                        if !site.articles.isEmpty { Text(siteFooter) }
-                    }
+                    siteShelf
                 } else {
                 Section {
                     ForEach(shownArticles) { article in
@@ -198,11 +187,6 @@ struct LibraryView: View {
                 switch route {
                 case .article(let article):
                     ReaderView(article: article)
-                case .category(let category):
-                    SiteCategoryView(
-                        category: category, state: siteRowState, isPreparingDownload: isPreparingSiteDownload,
-                        onOpen: openSite, onDownload: downloadSite
-                    )
                 }
             }
             .toolbar {
@@ -404,13 +388,8 @@ struct LibraryView: View {
         show(article)
     }
 
-    /// Opens the reader: over a category's page if one is shown (back returns to it), else from the library.
     private func show(_ article: Article) {
-        if case .category = path.last {
-            path.append(.article(article))
-        } else {
-            path = [.article(article)]
-        }
+        path = [.article(article)]
     }
 
     // MARK: - + menu
@@ -565,66 +544,197 @@ struct LibraryView: View {
 
     // MARK: - English Reader
 
-    private func siteRow(_ summary: SiteArticleSummary) -> some View {
-        let local = localArticle(summary)
-        let rowID = local?.persistentModelID
-        return SwipeRevealRow(
-            isOpen: rowID != nil && openRow == rowID,
-            // Info needs the article here, so only once it was opened.
-            isEnabled: local != nil,
-            onOpenChange: { openRow = $0 ? rowID : nil },
-            onInfo: {
-                openRow = nil
-                infoArticle = local
-            },
-            onTap: {
-                openRow = nil
-                openSite(summary)
+    /// The shelf: tabs for For You and each category, then the articles as books three to a row. For You shows a few
+    /// of each kind and never the same article twice; a category shows all of its own; a search, every match.
+    @ViewBuilder
+    private var siteShelf: some View {
+        if !searchText.isEmpty {
+            Section {
+                bookGrid(shownSiteArticles)
             }
-        ) {
-            SiteArticleRow(summary: summary, state: siteRowState(summary))
-        }
-        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: SwipeRevealRow<EmptyView>.cornerRadius, style: .continuous))
-        .contextMenu {
-            Button("Download Audio", systemImage: "arrow.down.circle") {
-                downloadSite([summary])
+        } else if !site.articles.isEmpty {
+            Section {
+                SiteShelfTabs(categories: site.categories.map(\.category), selection: $siteTab)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 0, trailing: 0))
             }
-            if let local {
-                Button("Info", systemImage: "info.circle") {
-                    openRow = nil
-                    infoArticle = local
-                }
-            }
-        }
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
-    }
-
-    /// The site's categories as a row of covers, the fullest first; each leads to its own page.
-    private var categoryCarousel: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 12) {
-                ForEach(site.categories, id: \.category) { group in
-                    Button {
-                        path.append(.category(group.category))
-                    } label: {
-                        CategoryTile(category: group.category, count: group.articles.count)
+            if let category = siteTab, site.categories.contains(where: { $0.category == category }) {
+                categoryShelf(category)
+            } else {
+                ForEach(forYouSections, id: \.title) { section in
+                    Section {
+                        bookGrid(section.articles)
+                    } header: {
+                        SiteShelfHeading(title: section.title, seeAll: section.seeAll.map { category in { siteTab = category } })
                     }
-                    .buttonStyle(.plain)
+                }
+            }
+            Section {
+            } footer: {
+                Text(siteFooter)
+            }
+        }
+    }
+
+    private struct ShelfSection {
+        var title: String
+        var articles: [SiteArticleSummary]
+        /// The category the section is a taste of, when it has more.
+        var seeAll: SiteCategory?
+    }
+
+    /// What was opened on this iPhone, the newest, then a few more of each category.
+    private var forYouSections: [ShelfSection] {
+        var shown = Set<String>()
+        func take(_ list: [SiteArticleSummary], _ limit: Int) -> [SiteArticleSummary] {
+            let fresh = Array(list.filter { !shown.contains($0.id) }.prefix(limit))
+            shown.formUnion(fresh.map(\.id))
+            return fresh
+        }
+        var sections: [ShelfSection] = []
+        let opened = take(continueReading, 3)
+        if !opened.isEmpty { sections.append(ShelfSection(title: "Continue Reading", articles: opened)) }
+        sections.append(ShelfSection(title: "Latest", articles: take(site.articles, 6)))
+        for group in site.categories {
+            let more = take(SiteCategories.sorted(group.articles, by: .newest), 3)
+            guard !more.isEmpty else { continue }
+            sections.append(ShelfSection(
+                title: group.category.name, articles: more,
+                seeAll: group.articles.count > more.count ? group.category : nil
+            ))
+        }
+        return sections
+    }
+
+    /// The site's articles opened here, the last one opened first.
+    private var continueReading: [SiteArticleSummary] {
+        let opened = Dictionary(articles.map { ($0.sourceURL, $0.addedAt) }) { first, _ in first }
+        return site.articles
+            .compactMap { summary in
+                site.links[summary.id].flatMap { opened[$0.articleURL] }.map { (summary, $0) }
+            }
+            .sorted { $0.1 > $1.1 }
+            .map(\.0)
+    }
+
+    /// One category, all of it: narrowed to a level if asked, in the order chosen, with its narration to download.
+    @ViewBuilder
+    private func categoryShelf(_ category: SiteCategory) -> some View {
+        let all = site.articles.filter { $0.siteCategory == category }
+        let levels = SiteCategories.levels(in: all)
+        let chosen = siteLevel.map { level in all.filter { $0.cefr?.uppercased() == level } } ?? all
+        let shown = SiteCategories.sorted(chosen, by: siteOrder)
+        Section {
+            bookGrid(shown)
+        } header: {
+            // All above the books, where the list's rounded corners don't cut into the text.
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(Self.summaryLine(count: all.count, levels: levels))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.secondary)
+                    Spacer()
+                    if isPreparingSiteDownload {
+                        ProgressView()
+                    } else {
+                        Menu {
+                            Picker("Order", selection: $siteOrder) {
+                                ForEach(SiteArticleOrder.allCases) { Text($0.title).tag($0) }
+                            }
+                            Section {
+                                Button(shown.count == 1 ? "Download Audio" : "Download Audio of All \(shown.count)", systemImage: "arrow.down.circle") {
+                                    downloadSite(shown)
+                                }
+                                .disabled(shown.isEmpty)
+                            }
+                        } label: {
+                            Label("Order and Download", systemImage: "ellipsis.circle")
+                                .labelStyle(.iconOnly)
+                                .font(.title3)
+                        }
+                    }
+                }
+                if let description = site.info(for: category)?.description, !description.isEmpty {
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                }
+                if levels.count > 1 {
+                    levelChips(levels, category: category)
+                }
+            }
+            .textCase(nil)
+            .padding(.horizontal, LibraryView.shelfInset - 16)
+        }
+        .onChange(of: siteTab) { siteLevel = nil }
+    }
+
+    /// "12 articles · B1 to C2".
+    private static func summaryLine(count: Int, levels: [String]) -> String {
+        let articles = count == 1 ? "1 article" : "\(count) articles"
+        guard let easiest = levels.first, let hardest = levels.last else { return articles }
+        return easiest == hardest ? "\(articles) · \(easiest)" : "\(articles) · \(easiest) to \(hardest)"
+    }
+
+    private func levelChips(_ levels: [String], category: SiteCategory) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                levelChip("All Levels", isOn: siteLevel == nil, category: category) { siteLevel = nil }
+                ForEach(levels, id: \.self) { value in
+                    levelChip(value, isOn: siteLevel == value, category: category) { siteLevel = siteLevel == value ? nil : value }
                 }
             }
         }
-        // The covers scroll out to the screen's edges rather than stopping at the list's margins.
         .scrollClipDisabled()
-        .frame(height: CategoryTile.size.height)
-        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
-        .listRowBackground(Color.clear)
     }
 
-    private func siteRowState(_ summary: SiteArticleSummary) -> SiteArticleRow.State {
+    private func levelChip(_ title: String, isOn: Bool, category: SiteCategory, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .foregroundStyle(isOn ? Color.white : Color.primary)
+                .background(isOn ? AnyShapeStyle(Color(rgb: CategoryTheme.forCategory(category.name).bottom)) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
+    /// Books three to a row; a long press offers the narration and, once opened, the article's info.
+    private func bookGrid(_ summaries: [SiteArticleSummary]) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .top), count: 3), alignment: .leading, spacing: 20) {
+            ForEach(summaries, id: \.id) { summary in
+                let local = localArticle(summary)
+                Button {
+                    openSite(summary)
+                } label: {
+                    SiteBookCell(summary: summary, state: siteRowState(summary))
+                }
+                .buttonStyle(.plain)
+                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .contextMenu {
+                    Button("Download Audio", systemImage: "arrow.down.circle") {
+                        downloadSite([summary])
+                    }
+                    if let local {
+                        Button("Info", systemImage: "info.circle") {
+                            infoArticle = local
+                        }
+                    }
+                }
+            }
+        }
+        .listRowBackground(Color.clear)
+        // Clear of the corners: the list rounds every section's corners, clear background or not.
+        .listRowInsets(EdgeInsets(top: Self.shelfInset, leading: Self.shelfInset, bottom: Self.shelfInset, trailing: Self.shelfInset))
+    }
+
+    static let shelfInset: CGFloat = 10
+
+    private func siteRowState(_ summary: SiteArticleSummary) -> SiteBookCell.State {
         let rowID = localArticle(summary)?.persistentModelID
-        return SiteArticleRow.State(
+        return SiteBookCell.State(
             audioFraction: rowID.map { audioFractions[$0] ?? 0 },
             isOpening: openingSiteID == summary.id,
             isDownloading: rowID.map { downloader.isDownloading($0) } ?? false,
