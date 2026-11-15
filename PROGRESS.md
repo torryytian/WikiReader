@@ -248,7 +248,7 @@
 ### 网站 english.thrones.wang 作为文章来源（2026-11-05，第一期已完成，未上真机）
 - **用户的决定**：
   - 重构内容这块，主要文章来源改成用户自己的网站 English Reader（`english.thrones.wang`）。
-  - 网站源码在云主机 `vultr_machine:/root/claude/english_site`（别名 `vultr_machine`，SSH 直连，不走 Cloudflare）；本机 `~/Desktop/claude/english_site` 是旧副本，别参考。
+  - 网站源码在云主机 `gcp_machine:/root/claude/english_site`（GCP，别名 `gcp_machine`，2026-11-15 起；原来是 Vultr 的 `vultr_machine`，别名 `vultr_machine`，现在从这台 Mac 连 SSH 会被重置）；本机 `~/Desktop/claude/english_site` 是旧副本，别参考。
   - 手动添加文章保留；网站文章的记录全部同步到本地，正文和音频按需取；书库里网站文章单独一栏。
   - 单词本保留，要和网站同步，不同账号不能混。
   - 手机上直接调 OpenAI 生成语音、Drive 语音缓存**先保留**，等能从网站听之后再决定去不去掉。重构期间不要动它们。
