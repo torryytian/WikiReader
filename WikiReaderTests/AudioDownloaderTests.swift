@@ -198,7 +198,7 @@ struct AudioDownloaderTests {
         #expect(plan.items.map(\.piece.request.input) == ["The first paragraph.", "The second paragraph."])
         #expect(plan.articleCount == 1)
         #expect(plan.characters == "The first paragraph.".count + "The second paragraph.".count)
-        #expect(plan.voice == "marin")
+        #expect(plan.voice == NarrationVoice("marin"))
     }
 
     @Test func downloadsEverythingMissingOnceAndKeepsTheScreenOnMeanwhile() async throws {

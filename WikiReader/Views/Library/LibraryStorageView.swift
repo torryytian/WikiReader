@@ -59,10 +59,12 @@ struct LibraryStorageView: View {
             .task(id: articles.count) {
                 totals = await Self.totals(of: articles.map(\.blocksData), savedWords: VocabularyBook.shared.count)
             }
-            .task(id: MeasureInput(count: articles.count, voice: openAIVoice, done: downloader.donePieces, version: version, siteLinks: site.links.count)) {
+            .task(id: MeasureInput(count: articles.count, voice: openAIVoice, done: downloader.donePieces, version: version, siteLinks: site.links)) {
                 usage = await ArticleAudio.usage(
                     ofBlocksData: articles.map(\.blocksData), voice: openAIVoice,
-                    narrations: articles.map { site.narrationVoice(forArticleURL: $0.sourceURL) }
+                    narrations: articles.map { article in
+                        site.narrationVoice(forArticleURL: article.sourceURL) == nil ? [] : site.siteVoices(of: [article.sourceURL])
+                    }
                 )
             }
             .audioDownloadPrompt($downloadPrompt)
@@ -81,7 +83,8 @@ struct LibraryStorageView: View {
         var voice: String
         var done: Int
         var version: Int
-        var siteLinks: Int
+        /// A voice switched for an article moves its audio between the shares.
+        var siteLinks: [String: SiteLibrary.Link]
     }
 
     /// The articles the OpenAI voice reads: not the ones English Reader narrates, whose audio is free from the site.

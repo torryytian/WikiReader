@@ -167,6 +167,13 @@ struct ReaderBottomMenu: View {
     /// Whether the menu stays on screen (pinned) instead of hiding when the text is tapped or scrolled.
     @Binding var isPinned: Bool
     var onModeChanged: (PlaybackMode) -> Void = { _ in }
+    /// The voices English Reader narrates the article in, when it has more than one: picked above the player.
+    var voices: [SiteArticleDetail.VoiceOption] = []
+    /// The one read in now.
+    var currentVoice: String?
+    /// The one being fetched, while it is.
+    var switchingVoice: String?
+    var onPickVoice: (SiteArticleDetail.VoiceOption) -> Void = { _ in }
 
     /// The tab in view. Remembered, so the menu opens on the one used last.
     @AppStorage(SettingsKeys.readerMenuTab) private var tab = MenuTab.playback
@@ -263,8 +270,59 @@ struct ReaderBottomMenu: View {
     // MARK: - Playback
 
     private func playbackPanel(_ colors: MenuColors) -> some View {
-        PlayerBar(session: session, playbackMode: $playbackMode, onModeChanged: onModeChanged, accent: colors.accent, onAccent: colors.onAccent)
-            .padding(.bottom, 2)
+        VStack(spacing: 10) {
+            if voices.count > 1 {
+                voiceRow(colors)
+            }
+            PlayerBar(session: session, playbackMode: $playbackMode, onModeChanged: onModeChanged, accent: colors.accent, onAccent: colors.onAccent)
+                .padding(.bottom, 2)
+        }
+    }
+
+    /// English Reader's voices for this article, as chips: the one read in is filled. Switching keeps the place.
+    private func voiceRow(_ colors: MenuColors) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "waveform")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(colors.secondary)
+                .accessibilityHidden(true)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(voices) { option in
+                        voiceChip(option, colors: colors)
+                    }
+                }
+            }
+            .scrollClipDisabled()
+        }
+        .padding(.horizontal, 10)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Voice")
+    }
+
+    private func voiceChip(_ option: SiteArticleDetail.VoiceOption, colors: MenuColors) -> some View {
+        let isCurrent = option.id == (currentVoice ?? voices.first?.id)
+        return Button {
+            onPickVoice(option)
+        } label: {
+            HStack(spacing: 6) {
+                if switchingVoice == option.id {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(colors.accent)
+                }
+                Text(option.name)
+                    .font(.subheadline.weight(isCurrent ? .semibold : .regular))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isCurrent ? colors.accent : colors.text)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(isCurrent ? colors.accent.opacity(0.16) : colors.chip, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(switchingVoice != nil)
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 
     // MARK: - Font and size

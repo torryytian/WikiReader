@@ -1132,7 +1132,7 @@ struct DriveBeforeOpenAITests {
         container.mainContext.insert(second)
         let pieces = ArticleAudio.pieces(of: [.paragraph(String(repeating: "a", count: 840)), .paragraph(String(repeating: "b", count: 420))], voice: "alloy")
         var plan = AudioDownloader.Plan(
-            voice: "alloy",
+            voice: NarrationVoice("alloy"),
             items: [.init(article: first.persistentModelID, piece: pieces[0]), .init(article: second.persistentModelID, piece: pieces[1])],
             articleCount: 2
         )
@@ -1154,7 +1154,7 @@ struct DriveBeforeOpenAITests {
         let article = Article(title: "T", sourceURL: URL(string: "https://en.wikipedia.org/wiki/T")!, blocks: [])
         container.mainContext.insert(article)
         let pieces = ArticleAudio.pieces(of: [.paragraph(String(repeating: "a", count: 840)), .paragraph(String(repeating: "b", count: 840))], voice: "alloy")
-        var plan = AudioDownloader.Plan(voice: "alloy", items: pieces.map { .init(article: article.persistentModelID, piece: $0) }, articleCount: 1)
+        var plan = AudioDownloader.Plan(voice: NarrationVoice("alloy"), items: pieces.map { .init(article: article.persistentModelID, piece: $0) }, articleCount: 1)
         let onDrive = SpeechAudioCache.key(for: pieces[0].request)
         plan.markOnDrive { $0 == onDrive }
         #expect(plan.driveCharacters == 840)

@@ -34,7 +34,10 @@ final class AudioDownloader {
             var fromDriveOnly = false
         }
 
-        var voice: String
+        var voice: NarrationVoice
+        /// What to call the voice while it downloads, when not `voice`'s name (English Reader's narration of articles
+        /// in several voices).
+        var voiceName: String?
         /// Pieces without audio yet, article by article in the order given.
         var items: [Item]
         /// Articles with something to download.
@@ -88,7 +91,8 @@ final class AudioDownloader {
     }
 
     private(set) var phase = Phase.idle
-    private(set) var voice = ""
+    /// The voice being downloaded, for showing.
+    private(set) var voiceName = ""
     private(set) var totalPieces = 0
     private(set) var donePieces = 0
     private(set) var failedPieces = 0
@@ -136,9 +140,16 @@ final class AudioDownloader {
         (pending[article] ?? 0) > 0
     }
 
-    /// What downloading `articles` with `voice` would take. Reads the disk, so it runs off the main actor.
+    /// What downloading `articles` with one of this app's voices would take. Reads the disk, so it runs off the main
+    /// actor.
     @concurrent
     static func plan(for articles: [Source], voice: String, cache: SpeechAudioCache = .standard) async -> Plan {
+        await plan(for: articles, voice: NarrationVoice(voice), cache: cache)
+    }
+
+    /// What downloading `articles` with `voice` would take.
+    @concurrent
+    static func plan(for articles: [Source], voice: NarrationVoice, cache: SpeechAudioCache = .standard) async -> Plan {
         var items: [Plan.Item] = []
         var articleCount = 0
         for article in articles {
@@ -163,7 +174,7 @@ final class AudioDownloader {
             consecutiveFailures = 0
             isFromSite = plan.isFromSite
         }
-        voice = plan.voice
+        voiceName = plan.voiceName ?? plan.voice.displayName
         var queued = Set(queue.map { cache.fileURL(for: $0.piece.request) })
         for item in plan.items where queued.insert(cache.fileURL(for: item.piece.request)).inserted {
             queue.append(item)
@@ -172,7 +183,7 @@ final class AudioDownloader {
             if item.fromDriveOnly { driveOnlyPieces += 1 }
             pending[item.article, default: 0] += 1
         }
-        Log.speech.info("Audio download: \(self.queue.count) pieces queued with \(plan.voice, privacy: .public)")
+        Log.speech.info("Audio download: \(self.queue.count) pieces queued with \(plan.voice.voice, privacy: .public)")
         phase = .running
         keepAwake(true)
         while workers < Self.maxConcurrent, !queue.isEmpty {

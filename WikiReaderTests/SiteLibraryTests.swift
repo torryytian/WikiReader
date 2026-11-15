@@ -233,7 +233,7 @@ struct SiteLibraryTests {
         #expect(article.origin == Article.siteOrigin)
         #expect(article.sourceURL == summary.canonicalUrl)
         #expect(article.blocks.count == 13)
-        #expect(library.narrationVoice(forArticleURL: article.sourceURL) == "alloy")
+        #expect(library.narrationVoice(forArticleURL: article.sourceURL) == NarrationVoice("alloy"))
         #expect(library.hasAudio)
         func detailRequests() async -> Int { await site.paths.count { $0.hasPrefix("/api/app/v1/articles/") } }
         #expect(await detailRequests() == 1)
@@ -277,7 +277,7 @@ struct SiteLibraryTests {
         #expect(try context.fetch(FetchDescriptor<Article>()).count == 1)
         #expect(library.links[SiteFixture.covidID]?.ownsText == false)
         // Its narration is still the site's where the text is the same.
-        #expect(library.narrationVoice(forArticleURL: mine.sourceURL) == "alloy")
+        #expect(library.narrationVoice(forArticleURL: mine.sourceURL) == NarrationVoice("alloy"))
     }
 
     @Test func offlineAnArticleOpenedBeforeStillOpens() async throws {

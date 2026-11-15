@@ -1,7 +1,8 @@
 import Foundation
 import OSLog
 
-/// `SpeechEngine` that speaks with OpenAI voices.
+/// `SpeechEngine` that speaks with OpenAI voices, or plays English Reader's narration of an article in whatever voice the
+/// site has it in (`NarrationVoice`: Google's, a speaker's recording), which only ever comes from the site.
 ///
 /// Each block is generated once (split into chunks if longer than a request allows), cached on
 /// disk, and played with `AVAudioPlayer`. Starting part-way through a block seeks inside its audio,
@@ -26,7 +27,7 @@ final class OpenAISpeechEngine: SpeechEngine {
 
     var onEvent: ((SpeechEvent) -> Void)?
 
-    private let voice: String
+    private let voice: NarrationVoice
     private let client: OpenAITTSClient
     private let cache: SpeechAudioCache
     private let apiKey: () -> String?
@@ -78,8 +79,9 @@ final class OpenAISpeechEngine: SpeechEngine {
         func chunkText(_ index: Int) -> String { text.substring(with: chunks[index]) }
     }
 
+    /// `voice`: one of this app's OpenAI voices, or English Reader's narration voice for an article from the site.
     init(
-        voice: String = OpenAISpeechEngine.defaultVoice,
+        voice: NarrationVoice = NarrationVoice(OpenAISpeechEngine.defaultVoice),
         client: OpenAITTSClient = OpenAITTSClient(),
         cache: SpeechAudioCache = .standard,
         apiKey: @escaping () -> String? = { KeychainStore.openAIKey.read() },
@@ -100,7 +102,7 @@ final class OpenAISpeechEngine: SpeechEngine {
         self.tickInterval = tickInterval
         self.stallCheck = stallCheck
         self.log = log
-        Log.speech.info("Using OpenAI voice \(voice, privacy: .public)")
+        Log.speech.info("Using voice \(voice.voice, privacy: .public) (\(voice.model, privacy: .public))")
     }
 
     // MARK: - SpeechEngine
@@ -332,17 +334,14 @@ final class OpenAISpeechEngine: SpeechEngine {
     // MARK: - Audio files
 
     private func request(for text: String) -> OpenAISpeechRequest {
-        Self.request(for: text, voice: voice)
+        voice.request(for: text)
     }
 
-    /// The request that reads `text` with `voice`. Its cache name depends on every field, so anything that looks for
-    /// an article's audio (backup, the article info page, the batch download) builds requests here. A recording's
-    /// pieces are named the way English Reader names them: its model, its voice and no instructions.
+    /// The request that reads `text` with one of this app's voices (or a recording's, `NarrationVoice.init(_:)`). Its
+    /// cache name depends on every field, so anything that looks for an article's audio (backup, the article info
+    /// page, the batch download) builds requests here or with `NarrationVoice.request(for:)`.
     nonisolated static func request(for text: String, voice: String) -> OpenAISpeechRequest {
-        if isRecording(voice) {
-            return OpenAISpeechRequest(model: recordingModel, voice: voice, input: text, instructions: "")
-        }
-        return OpenAISpeechRequest(model: model, voice: voice, input: text, instructions: instructions)
+        NarrationVoice(voice).request(for: text)
     }
 
     /// The cached audio for `text`, generating it at once if needed (this is what is being read, so it doesn't wait

@@ -13,6 +13,9 @@ nonisolated struct OpenAISpeechRequest: Equatable, Sendable {
 
     /// A piece of a speaker's own recording on the English Reader site, not something OpenAI can make.
     var isRecording: Bool { model == OpenAISpeechEngine.recordingModel }
+
+    /// Audio only English Reader has (`NarrationVoice.isSiteOnly`): never generated, never looked for on Drive.
+    var isSiteOnly: Bool { model != OpenAISpeechEngine.model }
 }
 
 nonisolated enum OpenAITTSError: Error, Equatable {
@@ -28,7 +31,8 @@ nonisolated enum OpenAITTSError: Error, Equatable {
     case badResponse
     /// The audio couldn't be saved or played back.
     case audio(String)
-    /// A piece of a recording English Reader didn't send (it can't be generated instead).
+    /// A piece in a voice only English Reader has (a recording, Google's) that it didn't send: it can't be generated
+    /// instead.
     case notOnSite
 
     /// How this error counts in the call log.
@@ -83,7 +87,7 @@ nonisolated enum OpenAITTSError: Error, Equatable {
         case .network(let detail): "Couldn't reach OpenAI: \(detail)"
         case .badResponse: "OpenAI returned an unexpected response."
         case .audio(let detail): "Couldn't play the generated audio: \(detail)"
-        case .notOnSite: "Couldn't download this part of the recording from English Reader. Check the connection and try again."
+        case .notOnSite: "Couldn't download this part of the narration from English Reader. Check the connection and try again."
         }
     }
 }

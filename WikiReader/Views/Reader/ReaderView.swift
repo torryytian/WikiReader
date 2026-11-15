@@ -54,6 +54,8 @@ private struct ArticleReader: View {
     // times, and laying out the article or starting a speech engine each time would be wasteful.
     @State private var document: ArticleDocument?
     @State private var session: ReadingSession?
+    /// The English Reader voice whose narration is being fetched for this article, while it is.
+    @State private var switchingVoice: String?
     /// Lock screen and Control Center: shows what is being read and takes their buttons.
     @State private var nowPlaying: NowPlayingController?
     @AppStorage(SettingsKeys.voiceIdentifier) private var voiceIdentifier: String?
@@ -187,7 +189,9 @@ private struct ArticleReader: View {
                                 ReaderBottomMenu(
                                     session: session, style: style, fontFamily: $fontFamily, fontSize: $fontSize,
                                     lineSpacing: $lineSpacing, margins: $margins, theme: $theme, playbackMode: $playbackMode,
-                                    isPinned: $isMenuPinned, onModeChanged: { showMessage(symbol: $0.symbol, text: $0.menuTitle) }
+                                    isPinned: $isMenuPinned, onModeChanged: { showMessage(symbol: $0.symbol, text: $0.menuTitle) },
+                                    voices: siteLink?.voices ?? [], currentVoice: siteLink?.currentVoice?.id,
+                                    switchingVoice: switchingVoice, onPickVoice: { pickVoice($0, in: session) }
                                 )
                                 .background {
                                     GeometryReader { proxy in
@@ -479,17 +483,42 @@ private struct ArticleReader: View {
 
     /// The voice of the English Reader site's narration of this article, if it was opened from the site and the site
     /// has narration files for it.
-    private var siteVoice: String? {
+    private var siteVoice: NarrationVoice? {
         SiteLibrary.shared.narrationVoice(forArticleURL: article.sourceURL)
+    }
+
+    /// What English Reader says about this article, when it came from there: the voices it is narrated in.
+    private var siteLink: SiteLibrary.Link? {
+        SiteLibrary.shared.link(forArticleURL: article.sourceURL)
+    }
+
+    /// Reads on in another of the voices English Reader narrates this article in: its narration in that voice is
+    /// fetched, then the engine is replaced and reading carries on from the same word.
+    private func pickVoice(_ option: SiteArticleDetail.VoiceOption, in session: ReadingSession) {
+        guard switchingVoice == nil, option.id != siteLink?.currentVoice?.id else { return }
+        switchingVoice = option.id
+        Task {
+            do throws(SiteError) {
+                try await SiteLibrary.shared.useVoice(option, for: article)
+                // Its text may have changed with it.
+                try? article.modelContext?.save()
+                session.replaceEngine(makeEngine())
+                showMessage(symbol: "waveform", text: option.name)
+            } catch {
+                showMessage(symbol: "exclamationmark.triangle", text: error.message)
+            }
+            switchingVoice = nil
+        }
     }
 
     private func makeEngine() -> SpeechEngine {
         if let voice = siteVoice {
             // The site's narration, free, whatever voice Settings has. A piece the site lacks is generated only when
             // an OpenAI voice is chosen in Settings (paid, as for any article); otherwise only Drive is asked. A
-            // recording only ever comes from the site, with its words' real timing.
+            // recording, or a voice OpenAI doesn't make (Google's), only ever comes from the site; a recording with its
+            // words' real timing.
             usesCloudEngine = true
-            let mayPay = engineChoice == .openAI && !OpenAISpeechEngine.isRecording(voice)
+            let mayPay = engineChoice == .openAI && !voice.isSiteOnly
             let site = SiteLibrary.shared
             return OpenAISpeechEngine(
                 voice: voice, apiKey: { mayPay ? KeychainStore.openAIKey.read() : nil },
@@ -502,7 +531,7 @@ private struct ArticleReader: View {
             return SystemSpeechEngine(voiceIdentifier: voiceIdentifier)
         case .openAI:
             usesCloudEngine = true
-            return OpenAISpeechEngine(voice: openAIVoice)
+            return OpenAISpeechEngine(voice: NarrationVoice(openAIVoice))
         }
     }
 

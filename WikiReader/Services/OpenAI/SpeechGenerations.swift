@@ -39,8 +39,9 @@ final class SpeechGenerations {
             if let site, site.isEnabled, let url = await site.fetch(request, into: cache) {
                 return .success(url)
             }
-            // A speaker's recording is only on the site: Drive never has it, and OpenAI can't make it.
-            if request.isRecording { return .failure(.notOnSite) }
+            // A speaker's recording, or a voice OpenAI doesn't make, is only on the site: Drive never has it, and
+            // OpenAI can't make it.
+            if request.isSiteOnly { return .failure(.notOnSite) }
             if let remote, remote.looksUpBeforeGenerating, let url = await remote.fetch(request, into: cache) {
                 return .success(url)
             }
@@ -64,7 +65,7 @@ final class SpeechGenerations {
     func fetchFromRemote(_ request: OpenAISpeechRequest, cache: SpeechAudioCache) async -> URL? {
         if let pending = running[cache.fileURL(for: request)] { return try? await pending.value.get() }
         if let site, site.isEnabled, let url = await site.fetch(request, into: cache) { return url }
-        guard !request.isRecording, let remote, remote.isEnabled else { return nil }
+        guard !request.isSiteOnly, let remote, remote.isEnabled else { return nil }
         return await remote.fetch(request, into: cache)
     }
 

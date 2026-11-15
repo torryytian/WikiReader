@@ -94,7 +94,7 @@ struct SiteRecordingTests {
         let article = try await library.open(try detail().summary, in: try makeContext())
         let voice = try #require(library.narrationVoice(forArticleURL: article.sourceURL))
         #expect(library.isRecording(articleURL: article.sourceURL))
-        #expect(library.recordingVoices(of: [article.sourceURL]) == [voice])
+        #expect(library.siteVoices(of: [article.sourceURL]) == [voice])
         let piece = ArticleAudio.pieces(of: article.blocks, voice: voice)[1].request
         #expect(library.wordStarts(forKey: SpeechAudioCache.key(for: piece)) != nil)
 
@@ -145,10 +145,10 @@ struct SiteRecordingTests {
 
         // Deleting the article's audio takes its recording too.
         #expect(ArticleAudio.files(of: blocks, notUsedBy: [], cache: cache).isEmpty)
-        #expect(ArticleAudio.files(of: blocks, notUsedBy: [], recordings: [recording.voice], cache: cache) == [cache.fileURL(for: recording)])
+        #expect(ArticleAudio.files(of: blocks, notUsedBy: [], siteVoices: [NarrationVoice(recording.voice)], cache: cache) == [cache.fileURL(for: recording)])
 
         // Storage: English Reader's, not another voice nor unused, and nothing for the OpenAI voice to download.
-        let usage = ArticleAudio.usage(of: [blocks], voice: "marin", narrations: [recording.voice], cache: cache)
+        let usage = ArticleAudio.usage(of: [blocks], voice: "marin", narrations: [[NarrationVoice(recording.voice)]], cache: cache)
         #expect(usage.siteBytes == 3)
         #expect(usage.unusedFiles.isEmpty)
         #expect(usage.otherVoiceFiles.isEmpty)

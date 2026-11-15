@@ -1,0 +1,191 @@
+{
+ "formatVersion": 1,
+ "seq": 123,
+ "id": "73d62e6f-a9a2-4365-9244-1f2249e3a79f",
+ "slug": "australia",
+ "pageUrl": "https://english.thrones.wang/a/australia",
+ "canonicalUrl": "https://en.wikipedia.org/wiki/Australia",
+ "title": "Australia",
+ "excerpt": "Australia, officially the Commonwealth of Australia, is a country comprising the mainland of the Australian continent, the island of Tasmania and numerous smaller islands. It has a land area of…",
+ "category": {
+  "id": 2,
+  "name": "Places"
+ },
+ "cover": {
+  "src": "https://audio.thrones.wang/img/5d0bafb2ebcc7561cd7505bf7c7ec77ab8aa2246d4b1e6dec29a8405b08bf472.webp",
+  "src600": "https://audio.thrones.wang/img/5d0bafb2ebcc7561cd7505bf7c7ec77ab8aa2246d4b1e6dec29a8405b08bf472-600.webp",
+  "width": 1024,
+  "height": 683,
+  "credit": "TimJN1, CC BY-SA 2.0, via Wikimedia Commons",
+  "license": "CC BY-SA 2.0"
+ },
+ "cefr": "C1",
+ "wordCount": 9631,
+ "source": {
+  "kind": "wikipedia",
+  "url": "https://en.wikipedia.org/wiki/Australia",
+  "host": "en.wikipedia.org",
+  "revision": 1383000962
+ },
+ "license": "CC-BY-SA-4.0",
+ "publishedAt": 1793738820356,
+ "releasedAt": 1793796224930,
+ "contentVersion": "2dd8d426d60106b4",
+ "audio": {
+  "voice": "alloy",
+  "totalChunks": 153,
+  "readyChunks": 153,
+  "readyMs": 4229640
+ },
+ "difficulty": {
+  "score": 71.3,
+  "off5k": 0.06,
+  "avgSentenceLength": 20.7,
+  "beyondCet6": 294,
+  "exam": {
+   "cet4": 743,
+   "cet6": 764,
+   "ielts": 707,
+   "toefl": 636,
+   "gre": 294
+  }
+ },
+ "attribution": {
+  "text": "Source: “Australia” on Wikipedia, by Wikipedia contributors, revision 1383000962 (2026-10-31). Licensed under CC BY-SA 4.0. This page’s text and narration are available under the same license.",
+  "parts": [
+   {
+    "text": "Source: “"
+   },
+   {
+    "text": "Australia",
+    "href": "https://en.wikipedia.org/wiki/Australia"
+   },
+   {
+    "text": "” on Wikipedia, by "
+   },
+   {
+    "text": "Wikipedia contributors",
+    "href": "https://en.wikipedia.org/w/index.php?title=Australia&action=history"
+   },
+   {
+    "text": ", "
+   },
+   {
+    "text": "revision 1383000962",
+    "href": "https://en.wikipedia.org/w/index.php?oldid=1383000962"
+   },
+   {
+    "text": " (2026-10-31)"
+   },
+   {
+    "text": ". Licensed under "
+   },
+   {
+    "text": "CC BY-SA 4.0",
+    "href": "https://creativecommons.org/licenses/by-sa/4.0/"
+   },
+   {
+    "text": "."
+   },
+   {
+    "text": " This page’s text and narration are available under the same license."
+   }
+  ]
+ },
+ "narration": {
+  "key": "ios-v1",
+  "model": "gpt-4o-mini-tts",
+  "voice": "alloy",
+  "instructions": "Read like a clear, natural audiobook narrator, at a steady, moderate pace.",
+  "chunker": "ios-paragraph-4096",
+  "profile": "mp3-48k",
+  "sourceIdentical": false
+ },
+ "voices": [
+  {
+   "id": "5b9aa60a06",
+   "engine": "openai",
+   "model": "gpt-4o-mini-tts",
+   "voice": "alloy",
+   "instructions": "Read like a clear, natural audiobook narrator, at a steady, moderate pace.",
+   "name": "Alloy · OpenAI",
+   "default": true
+  },
+  {
+   "id": "11e8fa6ffa",
+   "engine": "gemini",
+   "model": "gemini-3.8-flash-tts",
+   "voice": "Kore",
+   "instructions": "clear, natural audiobook narration at a steady, moderate pace",
+   "name": "Kore · Google",
+   "default": false
+  }
+ ],
+ "access": "full",
+ "blocks": [
+  {
+   "kind": "figure",
+   "readable": false,
+   "figure": {
+    "src": "https://audio.thrones.wang/img/38a05a99172578dd2b423d4e69096d526dff8ec8a342e580b4031338bf87f933.webp",
+    "src600": "https://audio.thrones.wang/img/38a05a99172578dd2b423d4e69096d526dff8ec8a342e580b4031338bf87f933-600.webp",
+    "width": 1200,
+    "height": 600,
+    "alt": "A blue field with the Union Flag in the upper hoist quarter, a large white seven-pointed star in the lower hoist quarter, and a constellation of five white stars in the fly – one small five-pointed star and four larger, seven-pointed stars",
+    "credit": "Unknown (Vector graphics image by Ian Fieggen) (only minor code changes by uploader.), Public domain, via Wikimedia Commons",
+    "license": "Public domain",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Flag_of_Australia_(converted).svg"
+   }
+  },
+  {
+   "kind": "infobox",
+   "readable": false,
+   "html": "<table><tbody><tr><th colspan=\"2\">Commonwealth of Australia</th></tr><tr></tr><tr><td colspan=\"2\"><b>Anthem:</b> \"<a href=\"https://en.wikipedia.org/wiki/Advance_Australia_Fair\" rel=\"nofollow noopener\" target=\"_blank\">Advance Australia Fair</a>\"<span></span><br /> <span><span></span></span></td></tr><tr><td colspan=\"2\"><span><a href=\"https://en.wikipedia.org/wiki/File:Australia_with_AAT_(orthographic_projection).svg\" rel=\"nofollow noopener\" target=\"_blank\"></a></span><span><a href=\"https://en.wikipedia.org/wiki/File:Territorial_waters_-_Australia.svg\" rel=\"nofollow noopener\" target=\"_blank\"></a></span><span> </span> Commonwealth of Australia\n<span> </span> <a href=\"https://en.wikipedia.org/wiki/States_and_territories_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">External territories of Australia</a></td></tr><tr><th scope=\"row\">Capital</th><td><a href=\"https://en.wikipedia.org/wiki/Canberra\" rel=\"nofollow noopener\" target=\"_blank\">Canberra</a><br /><span><span><a href=\"https://geohack.toolforge.org/geohack.php?pagename=Australia&amp;params=35_18_29_S_149_07_28_E_type:city_region:AU\" rel=\"nofollow noopener\" target=\"_blank\"><span><span><span>35°18′29″S</span> <span>149°07′28″E</span></span></span><span>﻿ / ﻿</span><span><span>35.30806°S 149.12444°E</span></span></a></span></span></td></tr><tr><th scope=\"row\">Largest city</th><td><a href=\"https://en.wikipedia.org/wiki/Sydney\" rel=\"nofollow noopener\" target=\"_blank\">Sydney</a> (metropolitan)<br /><a href=\"https://en.wikipedia.org/wiki/Melbourne\" rel=\"nofollow noopener\" target=\"_blank\">Melbourne</a> (urban)</td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/National_language\" rel=\"nofollow noopener\" target=\"_blank\">National language</a></th><td><a href=\"https://en.wikipedia.org/wiki/English_language\" rel=\"nofollow noopener\" target=\"_blank\">English</a></td></tr><tr><th scope=\"row\">Religion  (<a href=\"https://en.wikipedia.org/wiki/2021_Australian_census\" rel=\"nofollow noopener\" target=\"_blank\">2021</a>)</th><td><ul><li>43.9% <a href=\"https://en.wikipedia.org/wiki/Christianity_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Christianity</a></li><li>38.9% <a href=\"https://en.wikipedia.org/wiki/Irreligion_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">no religion</a></li><li>3.2% <a href=\"https://en.wikipedia.org/wiki/Islam_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Islam</a></li><li>2.7% <a href=\"https://en.wikipedia.org/wiki/Hinduism_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Hinduism</a></li><li>2.4% <a href=\"https://en.wikipedia.org/wiki/Buddhism_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Buddhism</a></li><li>1.7% <a href=\"https://en.wikipedia.org/wiki/Religion_in_Australia#Other_religions\" rel=\"nofollow noopener\" target=\"_blank\">other</a></li><li>7.2% unanswered</li></ul></td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Demonym\" rel=\"nofollow noopener\" target=\"_blank\">Demonyms</a></th><td><ul><li><a href=\"https://en.wikipedia.org/wiki/Australians\" rel=\"nofollow noopener\" target=\"_blank\">Australian</a></li><li>Aussie (colloquial)</li></ul></td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Politics_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Government</a></th><td><a href=\"https://en.wikipedia.org/wiki/Federalism\" rel=\"nofollow noopener\" target=\"_blank\">Federal</a> parliamentary <a href=\"https://en.wikipedia.org/wiki/Constitutional_monarchy\" rel=\"nofollow noopener\" target=\"_blank\">constitutional monarchy</a></td></tr><tr><td colspan=\"2\"></td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Monarchy_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Monarch</a> </th><td><a href=\"https://en.wikipedia.org/wiki/Charles_III\" rel=\"nofollow noopener\" target=\"_blank\">Charles III</a></td></tr><tr><th scope=\"row\">• <span><a href=\"https://en.wikipedia.org/wiki/Governor-General_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Governor-General</a></span> </th><td><a href=\"https://en.wikipedia.org/wiki/Sam_Mostyn\" rel=\"nofollow noopener\" target=\"_blank\">Sam Mostyn</a></td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Prime_Minister_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Prime Minister</a> </th><td><a href=\"https://en.wikipedia.org/wiki/Anthony_Albanese\" rel=\"nofollow noopener\" target=\"_blank\">Anthony Albanese</a></td></tr><tr><th scope=\"row\">Legislature</th><td><a href=\"https://en.wikipedia.org/wiki/Parliament_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Parliament</a></td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Upper_house\" rel=\"nofollow noopener\" target=\"_blank\">Upper house</a></th><td><a href=\"https://en.wikipedia.org/wiki/Australian_Senate\" rel=\"nofollow noopener\" target=\"_blank\">Senate</a></td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Lower_house\" rel=\"nofollow noopener\" target=\"_blank\">Lower house</a></th><td><a href=\"https://en.wikipedia.org/wiki/Australian_House_of_Representatives\" rel=\"nofollow noopener\" target=\"_blank\">House of Representatives</a></td></tr><tr><th colspan=\"2\">Independence from the United Kingdom</th></tr><tr><td colspan=\"2\"></td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Federation_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Federation</a> </th><td>1 January 1901</td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Balfour_Declaration_of_1926\" rel=\"nofollow noopener\" target=\"_blank\">Balfour Declaration</a> </th><td>15 November 1926</td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Statute_of_Westminster_Adoption_Act_1942\" rel=\"nofollow noopener\" target=\"_blank\">Statute of Westminster Adoption Act</a> </th><td>9 October 1942</td></tr><tr><th scope=\"row\">• <a href=\"https://en.wikipedia.org/wiki/Australia_Acts\" rel=\"nofollow noopener\" target=\"_blank\">Australia Acts</a> </th><td>3 March 1986</td></tr><tr><th colspan=\"2\"><a href=\"https://en.wikipedia.org/wiki/Geography_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Area </a></th></tr><tr><th scope=\"row\">• Total</th><td>7,688,287 km<sup>2</sup> (2,968,464 sq mi) (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_and_dependencies_by_area\" rel=\"nofollow noopener\" target=\"_blank\">6th</a>)</td></tr><tr><th scope=\"row\">• Water (%)</th><td>1.79 (2015)</td></tr><tr><th colspan=\"2\"><a href=\"https://en.wikipedia.org/wiki/Demographics_of_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Population</a></th></tr><tr><th scope=\"row\">• 2025 (December) estimate</th><td><span><span></span></span> 27,801,023 (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_and_dependencies_by_population\" rel=\"nofollow noopener\" target=\"_blank\">54th</a>)</td></tr><tr><th scope=\"row\">• 2021 census</th><td><span><span></span></span> 25,890,773</td></tr><tr><th scope=\"row\">• Density</th><td>3.7/km<sup>2</sup> (9.6/sq mi) (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_and_dependencies_by_population_density\" rel=\"nofollow noopener\" target=\"_blank\">237th</a>)</td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Gross_domestic_product\" rel=\"nofollow noopener\" target=\"_blank\">GDP</a> <span>(<a href=\"https://en.wikipedia.org/wiki/Purchasing_power_parity\" rel=\"nofollow noopener\" target=\"_blank\">PPP</a>)</span></th><td>2026 estimate</td></tr><tr><th scope=\"row\">• Total</th><td><span><span></span></span> $2.107 trillion (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(PPP)\" rel=\"nofollow noopener\" target=\"_blank\">22nd</a>)</td></tr><tr><th scope=\"row\">• Per capita</th><td><span><span></span></span> $75,039 (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(PPP)_per_capita\" rel=\"nofollow noopener\" target=\"_blank\">26th</a>)</td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Gross_domestic_product\" rel=\"nofollow noopener\" target=\"_blank\">GDP</a> <span>(nominal)</span></th><td>2026 estimate</td></tr><tr><th scope=\"row\">• Total</th><td><span><span></span></span> $2.111 trillion (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)\" rel=\"nofollow noopener\" target=\"_blank\">12th</a>)</td></tr><tr><th scope=\"row\">• Per capita</th><td><span><span></span></span> $75,172 (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)_per_capita\" rel=\"nofollow noopener\" target=\"_blank\">13th</a>)</td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Gini_coefficient\" rel=\"nofollow noopener\" target=\"_blank\">Gini</a> <span>(2020)</span></th><td><span><span></span></span> 32.4<br /><span><span>medium inequality</span></span></td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Human_Development_Index\" rel=\"nofollow noopener\" target=\"_blank\">HDI</a> <span>(2023)</span></th><td><span><span></span></span> 0.958<br /><span><span>very high</span></span> (<a href=\"https://en.wikipedia.org/wiki/List_of_countries_by_Human_Development_Index\" rel=\"nofollow noopener\" target=\"_blank\">7th</a>)</td></tr><tr><th scope=\"row\">Currency</th><td><a href=\"https://en.wikipedia.org/wiki/Australian_dollar\" rel=\"nofollow noopener\" target=\"_blank\">Australian dollar</a> (<a href=\"https://en.wikipedia.org/wiki/$\" rel=\"nofollow noopener\" target=\"_blank\">$</a>) (<a href=\"https://en.wikipedia.org/wiki/ISO_4217\" rel=\"nofollow noopener\" target=\"_blank\">AUD</a>)</td></tr><tr><th scope=\"row\">Time zone</th><td><span><a href=\"https://en.wikipedia.org/wiki/Coordinated_Universal_Time\" rel=\"nofollow noopener\" target=\"_blank\">UTC</a>+8; +9.5; +10</span> (<a href=\"https://en.wikipedia.org/wiki/Time_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">AWST, ACST, AEST</a>)</td></tr><tr><th scope=\"row\">• Summer (<a href=\"https://en.wikipedia.org/wiki/Daylight_saving_time\" rel=\"nofollow noopener\" target=\"_blank\">DST</a>)</th><td><span><a href=\"https://en.wikipedia.org/wiki/Coordinated_Universal_Time\" rel=\"nofollow noopener\" target=\"_blank\">UTC</a>+10.5; +11</span> (<a href=\"https://en.wikipedia.org/wiki/Time_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">ACDT, AEDT</a>)</td></tr><tr><th scope=\"row\"></th><td><a href=\"https://en.wikipedia.org/wiki/Daylight_saving_time\" rel=\"nofollow noopener\" target=\"_blank\">DST</a> not observed in Qld, WA and NT</td></tr><tr><th scope=\"row\">Date format</th><td><abbr title=\"day\">dd</abbr>/<abbr title=\"month\">mm</abbr>/<abbr title=\"year\">yyyy</abbr></td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Telephone_numbers_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">Calling code</a></th><td><a href=\"https://en.wikipedia.org/wiki/Telephone_numbers_in_Australia\" rel=\"nofollow noopener\" target=\"_blank\">+61</a></td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/ISO_3166\" rel=\"nofollow noopener\" target=\"_blank\">ISO 3166 code</a></th><td><a href=\"https://en.wikipedia.org/wiki/ISO_3166-2:AU\" rel=\"nofollow noopener\" target=\"_blank\">AU</a></td></tr><tr><th scope=\"row\"><a href=\"https://en.wikipedia.org/wiki/Country_code_top-level_domain\" rel=\"nofollow noopener\" target=\"_blank\">Internet TLD</a></th><td><a href=\"https://en.wikipedia.org/wiki/.au\" rel=\"nofollow noopener\" target=\"_blank\">.au</a></td></tr></tbody></table>"
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "text": "Australia, officially the Commonwealth of Australia, is a country comprising the mainland of the Australian continent, the island of Tasmania and numerous smaller islands. It has a land area of 7,688,287 km2 (2,968,464 sq mi), making it the sixth-largest country in the world, and is the world's flattest and driest inhabited continent. It is a megadiverse country, and its size gives it a wide variety of landscapes and climates, including large deserts centrally and tropical rainforests along the coast.",
+   "readable": true,
+   "chunks": [
+    {
+     "key": "3069423ae493dbd1aef9d9313c903d85b20c027cea00ba915734c4a0a4c7e193",
+     "off": 0,
+     "text": "Australia, officially the Commonwealth of Australia, is a country comprising the mainland of the Australian continent, the island of Tasmania and numerous smaller islands. It has a land area of 7,688,287 km2 (2,968,464 sq mi), making it the sixth-largest country in the world, and is the world's flattest and driest inhabited continent. It is a megadiverse country, and its size gives it a wide variety of landscapes and climates, including large deserts centrally and tropical rainforests along the coast.",
+     "url": "https://audio.thrones.wang/audio/mp3-48k/5736db7de9001af194e3c4f623212c24733e7ae0.mp3",
+     "ms": 38952
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "text": "The ancestors of Aboriginal Australians began arriving from Southeast Asia 50,000 to 65,000 years ago, during the Last Glacial Period. By the time of British settlement, Aboriginal Australians spoke more than 250 distinct languages and had one of the oldest living cultures in the world. Australia's written history commenced with Dutch exploration of most of the coastline in the 17th century. British colonisation began in 1788 with the establishment of the penal colony of New South Wales. By the mid-19th century, most of the continent had been explored by European settlers and five additional self-governing British colonies were established, each gaining responsible government by 1890. The colonies federated in 1901, forming the Commonwealth of Australia. This continued a process of increasing autonomy from the United Kingdom, highlighted by the Statute of Westminster Adoption Act 1942, and culminating in the Australia Act 1986.",
+   "readable": true,
+   "chunks": [
+    {
+     "key": "e4bd9ded4a15dd56625ab21ccaa51a59c7f4267045b84550cad9ad39292136f6",
+     "off": 0,
+     "text": "The ancestors of Aboriginal Australians began arriving from Southeast Asia 50,000 to 65,000 years ago, during the Last Glacial Period. By the time of British settlement, Aboriginal Australians spoke more than 250 distinct languages and had one of the oldest living cultures in the world. Australia's written history commenced with Dutch exploration of most of the coastline in the 17th century. British colonisation began in 1788 with the establishment of the penal colony of New South Wales. By the mid-19th century, most of the continent had been explored by European settlers and five additional self-governing British colonies were established, each gaining responsible government by 1890. The colonies federated in 1901, forming the Commonwealth of Australia. This continued a process of increasing autonomy from the United Kingdom, highlighted by the Statute of Westminster Adoption Act 1942, and culminating in the Australia Act 1986.",
+     "url": "https://audio.thrones.wang/audio/mp3-48k/df861509188fcee3e88f694ac724cc6dc87ccb24.mp3",
+     "ms": 63216
+    }
+   ]
+  },
+  {
+   "kind": "paragraph",
+   "level": 0,
+   "text": "Australia is a parliamentary democracy with a constitutional monarchy, and a federation comprising six states and ten territories. Its population of almost 29 million is highly urbanised and heavily concentrated on the eastern seaboard. Canberra is the nation's capital, while its most populous cities are Sydney and Melbourne, each with a population of more than five million. Australia's culture is diverse, and the country has one of the highest foreign-born populations in the world. It has a highly developed economy and one of the highest per capita incomes globally. Its abundant natural resources and well-developed international trade relations are crucial to the country's economy. It ranks highly for quality of life, health, education, economic freedom, civil liberties and political rights.",
+   "readable": true,
+   "chunks": [
+    {
+     "key": "d08841c20855c04f019969159d69f3b3d633adddb5873a324ff3e01bf9958ca4",
+     "off": 0,
+     "text": "Australia is a parliamentary democracy with a constitutional monarchy, and a federation comprising six states and ten territories. Its population of almost 29 million is highly urbanised and heavily concentrated on the eastern seaboard. Canberra is the nation's capital, while its most populous cities are Sydney and Melbourne, each with a population of more than five million. Australia's culture is diverse, and the country has one of the highest foreign-born populations in the world. It has a highly developed economy and one of the highest per capita incomes globally. Its abundant natural resources and well-developed international trade relations are crucial to the country's economy. It ranks highly for quality of life, health, education, economic freedom, civil liberties and political rights.",
+     "url": "https://audio.thrones.wang/audio/mp3-48k/30b4ddbc5daf909512039bdb4fc3a39391e50302.mp3",
+     "ms": 49056
+    }
+   ]
+  }
+ ]
+}

@@ -27,7 +27,8 @@ final class SiteLibrary {
         var articleURL: URL
         /// The detail that the `Article`'s text came from.
         var contentVersion: String
-        /// The site's narration voice, when its files can be used here (`SiteArticleDetail.audioFiles`).
+        /// The narration's voice as versions before 2026-11-15 kept it: one of this app's voices or a recording's. Read
+        /// when `narration` isn't there; still written, for them, when the narration is in such a voice.
         var voice: String?
         /// The text is the site's (made from it), not one added by hand before: only then is it updated from the site.
         var ownsText: Bool
@@ -36,6 +37,24 @@ final class SiteLibrary {
         /// Only the beginning was sent (the site's preview, for readers without an access token): fetched again each
         /// time it is opened, so an access token added since brings the rest.
         var preview: SiteArticleDetail.Preview?
+        /// The voice the site's narration plays in here, when its files can be used (`SiteArticleDetail.audioFiles`).
+        var narration: NarrationVoice? = nil
+        /// The voices the site has the whole narration in, its first (default) one first; nil when it has one.
+        var voices: [SiteArticleDetail.VoiceOption]? = nil
+        /// The one of `voices` chosen here; nil: the site's first.
+        var voiceID: String? = nil
+        /// The catalog's `contentVersion` when the detail was fetched: a detail in another voice than the site's first
+        /// has its own. Nil for links made before 2026-11-15, which are fetched once more for their voices.
+        var catalogVersion: String? = nil
+
+        /// The voice the site's narration plays in here.
+        var narrationVoice: NarrationVoice? { narration ?? voice.map(NarrationVoice.init) }
+
+        /// The voice `voices` lists the narration in now (nil when the site has only the one).
+        var currentVoice: SiteArticleDetail.VoiceOption? {
+            guard let voices else { return nil }
+            return voices.first { $0.narration == narrationVoice } ?? voices.first
+        }
     }
 
     /// Bumped whenever `SiteArticleSummary` learns a field. Summaries kept by an older version lack it, and the site
@@ -240,19 +259,20 @@ final class SiteLibrary {
     /// The `Article` for a catalog entry, made or brought up to date from the site's detail: the one opened before,
     /// or a Wikipedia article already added by hand (its text is left as it is), or a new one. Without a connection,
     /// one opened before still opens. Only a preview (no access token, docs/site-api-for-ios.md §10): it is kept as one
-    /// and fetched again next time; a whole article kept here is never swapped for a preview.
+    /// and fetched again next time; a whole article kept here is never swapped for a preview. Its narration is in the
+    /// voice chosen for it here while the site still has that one, else in the site's first.
     func open(_ summary: SiteArticleSummary, in context: ModelContext) async throws(SiteError) -> Article {
         let link = stored.links[summary.id]
         let existing = Self.article(at: link?.articleURL ?? summary.canonicalUrl, in: context)
         // A recording opened with a version that couldn't play it is fetched again, for its audio.
-        let missesRecording = link?.voice == nil && summary.audio?.voice.map(OpenAISpeechEngine.isRecording) == true
-        if let existing, let link, link.contentVersion == summary.contentVersion, !missesRecording, link.preview == nil {
+        let missesRecording = link?.narrationVoice == nil && summary.audio?.voice.map(OpenAISpeechEngine.isRecording) == true
+        if let existing, let link, link.catalogVersion == summary.contentVersion, !missesRecording, link.preview == nil {
             return existing
         }
 
         let detail: SiteArticleDetail
         do {
-            let fetched = try await client.article(id: summary.id)
+            let fetched = try await fetchDetail(id: summary.id, voice: link?.voiceID)
             detail = fetched.detail
             noteToken(nil)
             if detail.isPreview, let existing, let link, link.preview == nil {
@@ -267,43 +287,115 @@ final class SiteLibrary {
             if let existing { return existing }
             throw error
         }
-        let blocks = detail.contentBlocks
         let article: Article
         let ownsText: Bool
         if let existing {
             article = existing
             ownsText = link?.ownsText ?? false
-            if ownsText, article.blocks != blocks {
-                article.blocksData = (try? JSONEncoder().encode(blocks)) ?? article.blocksData
-                article.lastReadBlockIndex = min(article.lastReadBlockIndex, max(blocks.count - 1, 0))
-                article.title = detail.summary.title
-                Log.app.info("English Reader: updated an article's text from the site")
-            }
+            if ownsText { Self.takeText(of: detail, into: article) }
         } else {
+            let blocks = detail.contentBlocks
             article = Article(title: detail.summary.title, sourceURL: detail.summary.canonicalUrl, blocks: blocks)
             article.origin = detail.summary.isWikipedia ? Article.wikipediaOrigin : Article.siteOrigin
             context.insert(article)
             ownsText = true
             Log.app.info("English Reader: added an article from the site (\(blocks.count) blocks)")
         }
+        let narration = takeNarration(of: detail)
+        stored.links[summary.id] = Link(
+            articleURL: article.sourceURL, contentVersion: detail.summary.contentVersion,
+            voice: Self.voiceForOlderVersions(narration), ownsText: ownsText,
+            attribution: detail.attribution?.text,
+            preview: detail.isPreview ? (detail.preview ?? SiteArticleDetail.Preview()) : nil,
+            narration: narration, voices: detail.voices, voiceID: detail.voice,
+            // A detail in another voice than the site's first has a version of its own; the catalog's is kept.
+            catalogVersion: detail.voice == nil ? detail.summary.contentVersion : summary.contentVersion
+        )
+        if detail.isPreview { Log.app.info("English Reader: only a preview of this article (no access token)") }
+        // The detail is newer than the catalog entry: keep what it says (in the site's first voice, which the catalog
+        // describes).
+        if detail.voice == nil { stored.articles[summary.id] = detail.summary }
+        save()
+        publish()
+        return article
+    }
+
+    /// An article's detail with its narration in `voice` (an id of its `voices`), or in the site's first voice when
+    /// none is chosen or the site doesn't have that one any more.
+    private func fetchDetail(id: String, voice: String?) async throws(SiteError) -> (detail: SiteArticleDetail, data: Data) {
+        guard let voice else { return try await client.article(id: id) }
+        do throws(SiteError) {
+            return try await client.article(id: id, voice: voice)
+        } catch .notFound {
+            Log.app.info("English Reader: the site no longer has the voice chosen for an article; using its first")
+            return try await client.article(id: id)
+        }
+    }
+
+    /// Brings an article's text up to date with the site's, when it changed.
+    private static func takeText(of detail: SiteArticleDetail, into article: Article) {
+        let blocks = detail.contentBlocks
+        guard article.blocks != blocks else { return }
+        article.blocksData = (try? JSONEncoder().encode(blocks)) ?? article.blocksData
+        article.lastReadBlockIndex = min(article.lastReadBlockIndex, max(blocks.count - 1, 0))
+        article.title = detail.summary.title
+        Log.app.info("English Reader: updated an article's text from the site")
+    }
+
+    /// Keeps where a detail's narration files are, and returns the voice they are in (nil: no usable files).
+    private func takeNarration(of detail: SiteArticleDetail) -> NarrationVoice? {
         let files = detail.audioFiles
         if detail.mismatchedChunks > 0 {
             Log.app.error("English Reader: \(detail.mismatchedChunks) narration pieces don't match their text; not used")
         }
         audio.merge(files) { _, new in new }
         wordTimes.merge(detail.wordStarts) { _, new in new }
-        stored.links[summary.id] = Link(
-            articleURL: article.sourceURL, contentVersion: detail.summary.contentVersion,
-            voice: files.isEmpty ? nil : detail.narration?.voice, ownsText: ownsText,
-            attribution: detail.attribution?.text,
-            preview: detail.isPreview ? (detail.preview ?? SiteArticleDetail.Preview()) : nil
-        )
-        if detail.isPreview { Log.app.info("English Reader: only a preview of this article (no access token)") }
-        // The detail is newer than the catalog entry: keep what it says.
-        stored.articles[summary.id] = detail.summary
+        return files.isEmpty ? nil : detail.narration?.narrationVoice
+    }
+
+    /// What `Link.voice` says to versions before 2026-11-15: a voice they can read the narration in, or nothing (they
+    /// would ask OpenAI for a voice it doesn't have).
+    private static func voiceForOlderVersions(_ narration: NarrationVoice?) -> String? {
+        guard let narration, narration == NarrationVoice(narration.voice) else { return nil }
+        return narration.voice
+    }
+
+    /// Reads an article opened from the site in another of its voices from now on: its narration in that voice is
+    /// fetched and kept, along with any change to its text. The site's first voice is the one used until another is
+    /// chosen.
+    func useVoice(_ option: SiteArticleDetail.VoiceOption, for article: Article) async throws(SiteError) {
+        guard let (id, link) = stored.links.first(where: { $0.value.articleURL == article.sourceURL }).map({ ($0.key, $0.value) }) else {
+            throw .notFound
+        }
+        let isFirst = link.voices?.first?.id == option.id
+        let fetched: (detail: SiteArticleDetail, data: Data)
+        do throws(SiteError) {
+            fetched = try await client.article(id: id, voice: isFirst ? nil : option.id)
+            noteToken(nil)
+        } catch {
+            noteToken(error)
+            throw error
+        }
+        let detail = fetched.detail
+        guard let narration = takeNarration(of: detail) else {
+            throw .badResponse("no narration files in \(option.name)")
+        }
+        if !detail.isPreview { keepDetail(fetched.data, id: id) }
+        if link.ownsText { Self.takeText(of: detail, into: article) }
+        var updated = link
+        updated.contentVersion = detail.summary.contentVersion
+        updated.narration = narration
+        updated.voice = Self.voiceForOlderVersions(narration)
+        updated.voices = detail.voices ?? link.voices
+        updated.voiceID = detail.voice
+        if detail.voice == nil {
+            stored.articles[id] = detail.summary
+            updated.catalogVersion = detail.summary.contentVersion
+        }
+        stored.links[id] = updated
+        Log.app.info("English Reader: an article is read in \(option.name, privacy: .public) now")
         save()
         publish()
-        return article
     }
 
     /// Matched in memory: a library is at most a few hundred articles, and it sidesteps comparing URLs in a predicate.
@@ -317,33 +409,38 @@ final class SiteLibrary {
         return stored.articles[id]
     }
 
-    /// What the site says about an article opened from it: its source and license.
+    /// What the site says about an article opened from it: its source and license, its voices. Observed: a view
+    /// showing it follows a voice chosen for the article.
     func link(forArticleURL url: URL) -> Link? {
-        stored.links.values.first { $0.articleURL == url }
+        links.values.first { $0.articleURL == url }
     }
 
     /// The voice to read an article with so the site's narration plays: nil if it isn't from the site or the site
     /// has no usable files for it.
-    func narrationVoice(forArticleURL url: URL) -> String? {
-        stored.links.values.first { $0.articleURL == url }?.voice
+    func narrationVoice(forArticleURL url: URL) -> NarrationVoice? {
+        link(forArticleURL: url)?.narrationVoice
     }
 
     /// What the site sent of an article opened from it, when it was only a preview.
     func preview(forArticleURL url: URL) -> SiteArticleDetail.Preview? {
-        stored.links.values.first { $0.articleURL == url }?.preview
+        link(forArticleURL: url)?.preview
     }
 
     /// Whether an article is read from its speaker's own recording on the site.
     func isRecording(articleURL url: URL) -> Bool {
-        narrationVoice(forArticleURL: url).map(OpenAISpeechEngine.isRecording) ?? false
+        narrationVoice(forArticleURL: url)?.isRecording ?? false
     }
 
-    /// The recordings' voices of the articles at `urls` (opened from the site and read from a recording).
-    func recordingVoices(of urls: [URL]) -> [String] {
+    /// Every voice the site narrates the articles at `urls` in (the one read with and the others it offers), for
+    /// finding all their audio: an article may have been listened to in more than one.
+    func siteVoices(of urls: [URL]) -> [NarrationVoice] {
         let wanted = Set(urls)
-        return Array(Set(stored.links.values.compactMap { link in
-            wanted.contains(link.articleURL) ? link.voice.flatMap { OpenAISpeechEngine.isRecording($0) ? $0 : nil } : nil
-        }))
+        var voices = Set<NarrationVoice>()
+        for link in links.values where wanted.contains(link.articleURL) {
+            if let voice = link.narrationVoice { voices.insert(voice) }
+            for option in link.voices ?? [] { voices.insert(option.narration) }
+        }
+        return Array(voices)
     }
 
     // MARK: - Narration files
@@ -364,7 +461,8 @@ final class SiteLibrary {
             guard let data = try? Data(contentsOf: directory.appending(path: "Articles/\(id).json")),
                   data.range(of: needle) != nil else { continue }
             do throws(SiteError) {
-                let fetched = try await client.article(id: id)
+                // In the voice it is read in, whose file this is.
+                let fetched = try await client.article(id: id, voice: stored.links[id]?.voiceID)
                 noteToken(nil)
                 audio.merge(fetched.detail.audioFiles) { _, new in new }
                 wordTimes.merge(fetched.detail.wordStarts) { _, new in new }

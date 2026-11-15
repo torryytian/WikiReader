@@ -106,7 +106,7 @@ struct VoiceSettingsView: View {
                     isLocked: !hasOpenAIKey,
                     select: { select(.openAI(voice: voice)) },
                     previewID: "openai.\(voice)",
-                    makeEngine: { OpenAISpeechEngine(voice: voice) }
+                    makeEngine: { OpenAISpeechEngine(voice: NarrationVoice(voice)) }
                 )
             }
 

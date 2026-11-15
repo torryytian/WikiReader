@@ -34,6 +34,9 @@ struct ArticleInfoView: View {
     @State private var isConfirmingDelete = false
     /// Bumped to recount the audio after deleting it.
     @State private var audioVersion = 0
+    /// The English Reader voice whose narration is being fetched, while it is.
+    @State private var switchingVoice: String?
+    @State private var voiceError: String?
 
     private var isDownloading: Bool { downloader.isDownloading(article.persistentModelID) }
 
@@ -41,13 +44,22 @@ struct ArticleInfoView: View {
     private var siteSummary: SiteArticleSummary? { site.summary(forArticleURL: article.sourceURL) }
 
     /// English Reader's narration voice for it: its audio is counted and downloaded in that voice, free.
-    private var siteVoice: String? { site.narrationVoice(forArticleURL: article.sourceURL) }
+    private var siteVoice: NarrationVoice? { site.narrationVoice(forArticleURL: article.sourceURL) }
+
+    /// What English Reader says about it, when it came from there: the voices it is narrated in.
+    private var siteLink: SiteLibrary.Link? { site.link(forArticleURL: article.sourceURL) }
 
     /// The voice its audio is counted in: the site's, else the OpenAI voice chosen in Settings.
-    private var voice: String { siteVoice ?? openAIVoice }
+    private var voice: NarrationVoice { siteVoice ?? NarrationVoice(openAIVoice) }
 
     /// Read from its speaker's own recording, which only English Reader has (never Drive).
-    private var isRecording: Bool { siteVoice.map(OpenAISpeechEngine.isRecording) ?? false }
+    private var isRecording: Bool { siteVoice?.isRecording ?? false }
+
+    /// Read in a voice only English Reader has (a recording, Google's): never shared through Google Drive.
+    private var isSiteOnly: Bool { siteVoice?.isSiteOnly ?? false }
+
+    /// "Kore · Google" as the site names it, else the voice's own name.
+    private var voiceName: String { siteLink?.currentVoice?.name ?? voice.displayName }
 
     var body: some View {
         NavigationStack {
@@ -82,14 +94,16 @@ struct ArticleInfoView: View {
                 voice: voice, done: downloader.donePieces, version: audioVersion,
                 pending: drive.pendingUploads.count, signedIn: account.isSignedIn
             )) {
-                if drive.isEnabled, !isRecording {
+                if drive.isEnabled, !isSiteOnly {
                     await drive.syncIndex()
                     backup = await DriveAudioStore.backup(
-                        url: article.sourceURL.absoluteString, blocksData: article.blocksData, voice: voice,
+                        url: article.sourceURL.absoluteString, blocksData: article.blocksData, voice: voice.voice,
                         indexed: drive.indexedKeys, pending: Set(drive.pendingUploads), manifests: drive.manifestNames
                     )
                 }
-                status = await ArticleAudio.status(ofBlocksData: article.blocksData, voice: voice)
+                status = await ArticleAudio.status(
+                    ofBlocksData: article.blocksData, voice: voice, others: site.siteVoices(of: [article.sourceURL])
+                )
             }
             .audioDownloadPrompt($downloadPrompt)
             .confirmationDialog("Delete \(article.title)?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
@@ -114,7 +128,7 @@ struct ArticleInfoView: View {
     }
 
     private struct StatusInput: Equatable {
-        var voice: String
+        var voice: NarrationVoice
         var done: Int
         var version: Int
         var pending: Int
@@ -290,6 +304,9 @@ struct ArticleInfoView: View {
 
     private var audioSection: some View {
         Section {
+            if let voices = siteLink?.voices, voices.count > 1 {
+                voicePicker(voices)
+            }
             if let status {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -351,9 +368,47 @@ struct ArticleInfoView: View {
                     .frame(maxWidth: .infinity)
             }
         } header: {
-            Text("Audio · \(OpenAISpeechEngine.displayName(of: voice))")
+            Text("Audio · \(voiceName)")
         } footer: {
             Text(audioFooter)
+        }
+    }
+
+    /// The voices English Reader narrates it in; another one is fetched (free) when picked, and read in from then on.
+    private func voicePicker(_ voices: [SiteArticleDetail.VoiceOption]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(selection: Binding(
+                get: { siteLink?.currentVoice?.id ?? voices[0].id },
+                set: { pickVoice($0) }
+            )) {
+                ForEach(voices) { Text($0.name).tag($0.id) }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Voice")
+                    if switchingVoice != nil { ProgressView().controlSize(.small) }
+                }
+            }
+            .disabled(switchingVoice != nil || isDownloading)
+            if let voiceError {
+                Text(voiceError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func pickVoice(_ id: String) {
+        guard let option = siteLink?.voices?.first(where: { $0.id == id }), option.id != siteLink?.currentVoice?.id else { return }
+        switchingVoice = option.id
+        voiceError = nil
+        Task {
+            do throws(SiteError) {
+                try await site.useVoice(option, for: article)
+                try? article.modelContext?.save()
+            } catch {
+                voiceError = error.message
+            }
+            switchingVoice = nil
         }
     }
 
@@ -375,8 +430,9 @@ struct ArticleInfoView: View {
 
     @ViewBuilder
     private var driveSection: some View {
-        // A recording isn't shared through Drive (it's free from English Reader, and not OpenAI's audio).
-        if account.isSignedIn, !isRecording {
+        // A recording or Google's voice isn't shared through Drive (it's free from English Reader, and not OpenAI's
+        // audio).
+        if account.isSignedIn, !isSiteOnly {
             Section {
                 BackupStatusLine(backup: backup)
                     .font(.subheadline)

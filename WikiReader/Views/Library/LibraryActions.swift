@@ -39,18 +39,29 @@ enum LibraryActions {
     // MARK: English Reader
 
     /// Works out what taking English Reader's narration of `articles` (opened from the site) would bring, for the
-    /// confirmation. Only what the site has is downloaded, in its own voice; nothing is generated, so it is free.
+    /// confirmation. Only what the site has is downloaded, each article in the voice it is read in; nothing is
+    /// generated, so it is free.
     static func siteDownloadPrompt(for articles: [Article]) async -> AudioDownloadPrompt {
         let site = SiteLibrary.shared
         let voiced = articles.compactMap { article in site.narrationVoice(forArticleURL: article.sourceURL).map { (article, $0) } }
-        guard let voice = voiced.first?.1 else {
+        guard !voiced.isEmpty else {
             return .notice(title: "No Narration Yet", message: "English Reader has no narration for \(articles.count == 1 ? "this article" : "these articles") yet.")
         }
-        // The site narrates everything in one voice; an article in another would be another download.
-        let sources = voiced.filter { $0.1 == voice }.map { AudioDownloader.Source(id: $0.0.persistentModelID, blocksData: $0.0.blocksData) }
-        var plan = await AudioDownloader.plan(for: sources, voice: voice)
+        // Article by article, in order: the site may narrate them in different voices.
+        var whole: AudioDownloader.Plan?
+        for (article, voice) in voiced {
+            let part = await AudioDownloader.plan(for: [AudioDownloader.Source(id: article.persistentModelID, blocksData: article.blocksData)], voice: voice)
+            guard var plan = whole else {
+                whole = part
+                continue
+            }
+            plan.items += part.items
+            plan.articleCount += part.articleCount
+            if part.voice != plan.voice { plan.voiceName = "English Reader" }
+            whole = plan
+        }
         let these = articles.count == 1 ? "this article" : "these articles"
-        guard !plan.isEmpty else {
+        guard var plan = whole, !plan.isEmpty else {
             return .notice(title: "Already Downloaded", message: "All of English Reader's narration for \(these) is on this iPhone.")
         }
         plan.markOnDrive { site.audioURL(forKey: $0) != nil }
@@ -107,7 +118,7 @@ enum LibraryActions {
         let ids = Set(articles.map(\.persistentModelID))
         let removed = articles.map(\.blocksData)
         let keeping = library.filter { !ids.contains($0.persistentModelID) }.map(\.blocksData)
-        let recordings = SiteLibrary.shared.recordingVoices(of: articles.map(\.sourceURL))
+        let siteVoices = SiteLibrary.shared.siteVoices(of: articles.map(\.sourceURL))
         for article in articles {
             Log.app.info("Deleting \(article.title, privacy: .public)\(withAudio ? " and its audio" : "", privacy: .public)")
             AudioDownloader.shared.cancel(article: article.persistentModelID)
@@ -120,7 +131,7 @@ enum LibraryActions {
         }
         guard withAudio else { return }
         Task {
-            let freed = await ArticleAudio.removeAudio(of: removed, keeping: keeping, recordings: recordings)
+            let freed = await ArticleAudio.removeAudio(of: removed, keeping: keeping, siteVoices: siteVoices)
             Log.app.info("Deleted \(freed) bytes of audio with the articles")
         }
     }
@@ -131,8 +142,8 @@ enum LibraryActions {
         let ids = Set(articles.map(\.persistentModelID))
         for id in ids { AudioDownloader.shared.cancel(article: id) }
         let keeping = library.filter { !ids.contains($0.persistentModelID) }.map(\.blocksData)
-        let recordings = SiteLibrary.shared.recordingVoices(of: articles.map(\.sourceURL))
-        let freed = await ArticleAudio.removeAudio(of: articles.map(\.blocksData), keeping: keeping, recordings: recordings)
+        let siteVoices = SiteLibrary.shared.siteVoices(of: articles.map(\.sourceURL))
+        let freed = await ArticleAudio.removeAudio(of: articles.map(\.blocksData), keeping: keeping, siteVoices: siteVoices)
         Log.app.info("Deleted \(freed) bytes of audio of \(articles.count) articles")
         return freed
     }
@@ -203,7 +214,7 @@ enum AudioDownloadPrompt: Identifiable {
             return text + " Keep WikiReader open until it finishes."
         case .confirm(let plan) where plan.isDriveOnly:
             let articles = plan.articleCount == 1 ? "1 article" : "\(plan.articleCount) articles"
-            var text = "About \(AudioFormat.duration(minutes: plan.minutes)) of \(plan.voice.capitalized) audio for \(articles) is in your Google Drive. "
+            var text = "About \(AudioFormat.duration(minutes: plan.minutes)) of \(plan.voice.displayName) audio for \(articles) is in your Google Drive. "
                 + "Downloading it is free; nothing is generated."
             if plan.leftOutCharacters > 0 {
                 text += " Another \(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: plan.leftOutCharacters))) isn't in Drive: Download Audio generates it with OpenAI."
@@ -215,13 +226,13 @@ enum AudioDownloadPrompt: Identifiable {
             let keepOpen = "Keep WikiReader open until it finishes; the screen stays on meanwhile."
             let fromDrive = ArticleAudio.minutes(forCharacters: plan.driveCharacters)
             guard plan.driveCharacters > 0 else {
-                return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.capitalized) voice, "
+                return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.displayName) voice, "
                     + "roughly \(AudioFormat.cost(plan.dollars)) on your OpenAI account. " + keepOpen
             }
             guard plan.generatedCharacters > 0 else {
                 return "All \(AudioFormat.duration(minutes: fromDrive)) of audio for \(articles) is in your Google Drive, so it costs nothing. " + keepOpen
             }
-            return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.capitalized) voice: "
+            return "About \(AudioFormat.duration(minutes: plan.minutes)) of audio for \(articles) with the \(plan.voice.displayName) voice: "
                 + "\(AudioFormat.duration(minutes: fromDrive)) comes from your Google Drive for free, "
                 + "\(AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: plan.generatedCharacters))) is generated, "
                 + "roughly \(AudioFormat.cost(plan.dollars)) on your OpenAI account. " + keepOpen
@@ -304,7 +315,7 @@ struct AudioDownloadStatusRow: View {
     private var progressText: String {
         let done = AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: downloader.doneCharacters))
         let total = AudioFormat.duration(minutes: ArticleAudio.minutes(forCharacters: downloader.totalCharacters))
-        var text = "\(done) of \(total) · \(OpenAISpeechEngine.displayName(of: downloader.voice)) · screen stays on"
+        var text = "\(done) of \(total) · \(downloader.voiceName) · screen stays on"
         if downloader.failedPieces > 0 { text += " · \(downloader.failedPieces) failed" }
         return text
     }

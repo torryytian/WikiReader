@@ -533,7 +533,7 @@ struct LibraryView: View {
     /// How much of each article's audio is here: in the site's narration voice for articles opened from the site,
     /// in Settings' OpenAI voice for the rest.
     private func fractions() async -> [PersistentIdentifier: Double] {
-        let groups = Dictionary(grouping: articles) { site.narrationVoice(forArticleURL: $0.sourceURL) ?? openAIVoice }
+        let groups = Dictionary(grouping: articles) { site.narrationVoice(forArticleURL: $0.sourceURL) ?? NarrationVoice(openAIVoice) }
         var result: [PersistentIdentifier: Double] = [:]
         for (voice, group) in groups {
             let sources = group.map { (id: $0.persistentModelID, blocksData: $0.blocksData) }

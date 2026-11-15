@@ -139,8 +139,31 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
     /// tokens: the whole article.
     var access: String?
     var preview: Preview?
+    /// The voices the site has the whole narration in, the one it reads with by default first
+    /// (docs/site-api-for-ios.md §13). Missing when it has only one.
+    var voices: [VoiceOption]?
+    /// The voice this detail's narration is in, when one was asked for (`?voice=<id>`).
+    var voice: String?
 
     var isPreview: Bool { access == "preview" }
+
+    /// One of the voices an article is narrated in on the site.
+    nonisolated struct VoiceOption: Codable, Equatable, Hashable, Sendable, Identifiable {
+        /// A hash of the model, voice and style: it never changes.
+        var id: String
+        /// `openai`, `gemini` (Google) or `upload` (a recording).
+        var engine: String?
+        var model: String
+        var voice: String
+        var instructions: String?
+        /// "Alloy · OpenAI", "Kore · Google".
+        var name: String
+        var `default`: Bool?
+
+        var narration: NarrationVoice {
+            NarrationVoice(model: model, voice: voice, instructions: instructions ?? "")
+        }
+    }
 
     nonisolated struct Preview: Codable, Equatable, Sendable {
         var percent: Int?
@@ -162,6 +185,11 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         /// serves compressed copies (2026-11-05). Either way they play from this app's cache under the piece's key, and
         /// neither is ever uploaded to Drive from here (`DriveAudioStore` skips audio the site serves).
         var sourceIdentical: Bool?
+
+        /// The voice it is read in, which names its pieces.
+        var narrationVoice: NarrationVoice {
+            NarrationVoice(model: model, voice: voice, instructions: instructions ?? "")
+        }
     }
 
     nonisolated struct Block: Decodable, Equatable, Sendable {
@@ -184,7 +212,7 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         var wordStartsMs: [Int]?
     }
 
-    private enum Keys: String, CodingKey { case attribution, narration, blocks, access, preview }
+    private enum Keys: String, CodingKey { case attribution, narration, blocks, access, preview, voices, voice }
 
     init(from decoder: Decoder) throws {
         summary = try SiteArticleSummary(from: decoder)
@@ -194,6 +222,9 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         blocks = try container.decode([Block].self, forKey: .blocks)
         access = try container.decodeIfPresent(String.self, forKey: .access)
         preview = try container.decodeIfPresent(Preview.self, forKey: .preview)
+        // Optional extras: one the app can't read leaves the article readable in its default voice.
+        voices = (try? container.decodeIfPresent([VoiceOption].self, forKey: .voices)).flatMap { $0.isEmpty ? nil : $0 }
+        voice = try? container.decodeIfPresent(String.self, forKey: .voice)
     }
 
     /// The text as this app reads it: the readable blocks, a heading or a paragraph each (lists, quotes and the like
@@ -205,9 +236,9 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         }
     }
 
-    /// The audio files the site has for this article, by this app's cache key. Only pieces whose key is the one this
-    /// app gives their text in the narration's voice: so a mix-up on the site can never play the wrong sentence, the
-    /// reader finds them, and a narration made some other way (another model) is never taken for this app's.
+    /// The audio files the site has for this article, by cache key. Only pieces whose key is the one their text gets in
+    /// the narration's voice (its model, voice and style, as the site lists them): so a mix-up on the site can never
+    /// play the wrong sentence, and the reader finds them by the same name.
     var audioFiles: [String: URL] {
         guard let narration else { return [:] }
         var files: [String: URL] = [:]
@@ -241,9 +272,8 @@ nonisolated struct SiteArticleDetail: Decodable, Equatable, Sendable {
         }
     }
 
-    /// The key this app gives a piece's text in the narration's voice. The same as the site's when the narration's
-    /// model and instructions are the ones this app uses for that voice.
+    /// The key a piece's text gets in the narration's voice: the ios-v1 key the site names its files by.
     private static func key(of chunk: Chunk, in narration: Narration) -> String {
-        SpeechAudioCache.key(for: OpenAISpeechEngine.request(for: chunk.text, voice: narration.voice))
+        SpeechAudioCache.key(for: narration.narrationVoice.request(for: chunk.text))
     }
 }

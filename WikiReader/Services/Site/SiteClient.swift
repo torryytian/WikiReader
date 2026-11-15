@@ -75,8 +75,12 @@ nonisolated struct SiteClient: Sendable {
 
     /// One article in full, with the response itself, kept so it needn't be fetched again until it changes.
     @concurrent
-    func article(id: String) async throws(SiteError) -> (detail: SiteArticleDetail, data: Data) {
-        let data = try await get(baseURL.appending(path: "api/app/v1/articles").appending(path: id))
+    /// One article; with `voice` (an id from its detail's `voices`), its narration in that voice instead of the
+    /// default one (docs/site-api-for-ios.md §13). A voice it doesn't have (any more) is `notFound`.
+    func article(id: String, voice: String? = nil) async throws(SiteError) -> (detail: SiteArticleDetail, data: Data) {
+        var url = baseURL.appending(path: "api/app/v1/articles").appending(path: id)
+        if let voice { url.append(queryItems: [URLQueryItem(name: "voice", value: voice)]) }
+        let data = try await get(url)
         return (try Self.decodeArticle(data), data)
     }
 

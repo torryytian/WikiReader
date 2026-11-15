@@ -1,8 +1,9 @@
 import Foundation
 import SwiftData
 
-/// Which of an article's OpenAI audio is on disk, worked out the way the reader looks it up: each block's text split
-/// into request-sized pieces (`SpeechChunking`), each piece a file named after its request.
+/// Which of an article's audio is on disk, worked out the way the reader looks it up: each block's text split into
+/// request-sized pieces (`SpeechChunking`), each piece a file named after its request in a voice (`NarrationVoice`):
+/// one of this app's OpenAI voices, or English Reader's narration voice for an article from the site.
 nonisolated enum ArticleAudio {
     /// About what OpenAI charges for gpt-4o-mini-tts, per minute of audio.
     static let dollarsPerMinute = 0.015
@@ -17,17 +18,25 @@ nonisolated enum ArticleAudio {
     }
 
     /// The pieces that read `blocks` with `voice`, in reading order.
-    static func pieces(of blocks: [ContentBlock], voice: String) -> [Piece] {
+    static func pieces(of blocks: [ContentBlock], voice: NarrationVoice) -> [Piece] {
         var pieces: [Piece] = []
         for (index, block) in blocks.enumerated() {
             let text = block.text as NSString
             for chunk in SpeechChunking.chunks(of: block.text) {
                 let input = text.substring(with: chunk)
-                pieces.append(Piece(block: index, request: OpenAISpeechEngine.request(for: input, voice: voice), characters: input.count))
+                pieces.append(Piece(block: index, request: voice.request(for: input), characters: input.count))
             }
         }
         return pieces
     }
+
+    /// The pieces that read `blocks` with one of this app's voices.
+    static func pieces(of blocks: [ContentBlock], voice: String) -> [Piece] {
+        pieces(of: blocks, voice: NarrationVoice(voice))
+    }
+
+    /// This app's OpenAI voices, as `NarrationVoice`s.
+    static var appVoices: [NarrationVoice] { OpenAISpeechEngine.voices.map(NarrationVoice.init) }
 
     /// The texts sent for `blocks`, whatever the voice.
     static func inputs(of blocks: [ContentBlock]) -> Set<String> {
@@ -50,8 +59,14 @@ nonisolated enum ArticleAudio {
         minutes(forCharacters: characters) * dollarsPerMinute
     }
 
-    /// Where `blocks` stand with `voice`.
+    /// Where `blocks` stand with one of this app's voices.
     static func status(of blocks: [ContentBlock], voice: String, cache: SpeechAudioCache) -> ArticleAudioStatus {
+        status(of: blocks, voice: NarrationVoice(voice), cache: cache)
+    }
+
+    /// Where `blocks` stand with `voice`. `others`: voices besides this app's that the article may have audio in
+    /// (English Reader's other voices for it), counted in `otherVoiceBytes`.
+    static func status(of blocks: [ContentBlock], voice: NarrationVoice, others: [NarrationVoice] = [], cache: SpeechAudioCache) -> ArticleAudioStatus {
         let files = AudioFiles(cache)
         var status = ArticleAudioStatus(voice: voice, blockCharacters: Array(repeating: 0, count: blocks.count), cachedBlockCharacters: Array(repeating: 0, count: blocks.count))
         for piece in pieces(of: blocks, voice: voice) {
@@ -66,9 +81,10 @@ nonisolated enum ArticleAudio {
                 status.missing.append(piece)
             }
         }
+        let otherVoices = Set(appVoices + others).subtracting([voice])
         for input in inputs(of: blocks) {
-            for other in OpenAISpeechEngine.voices where other != voice {
-                if let size = files.sizes[cache.fileURL(for: OpenAISpeechEngine.request(for: input, voice: other)).lastPathComponent] {
+            for other in otherVoices {
+                if let size = files.sizes[cache.fileURL(for: other.request(for: input)).lastPathComponent] {
                     status.otherVoiceBytes += size
                 }
             }
@@ -76,17 +92,18 @@ nonisolated enum ArticleAudio {
         return status
     }
 
-    /// The audio files of `blocks`, in every voice (and the `recordings` that read them), that no article in
-    /// `keeping` uses too: what deleting the article's audio removes.
+    /// The audio files of `blocks`, in every voice of this app's (and the `siteVoices` English Reader narrates them
+    /// in), that no article in `keeping` uses too: what deleting the article's audio removes.
     static func files(
-        of blocks: [ContentBlock], notUsedBy keeping: [[ContentBlock]], recordings: [String] = [], cache: SpeechAudioCache
+        of blocks: [ContentBlock], notUsedBy keeping: [[ContentBlock]], siteVoices: [NarrationVoice] = [], cache: SpeechAudioCache
     ) -> [URL] {
         let shared = keeping.reduce(into: Set<String>()) { $0.formUnion(inputs(of: $1)) }
         let files = AudioFiles(cache)
+        let voices = Set(appVoices + siteVoices)
         var urls: [URL] = []
         for input in inputs(of: blocks) where !shared.contains(input) {
-            for voice in OpenAISpeechEngine.voices + recordings {
-                let url = cache.fileURL(for: OpenAISpeechEngine.request(for: input, voice: voice))
+            for voice in voices {
+                let url = cache.fileURL(for: voice.request(for: input))
                 if files.sizes[url.lastPathComponent] != nil { urls.append(url) }
             }
         }
@@ -94,9 +111,10 @@ nonisolated enum ArticleAudio {
     }
 
     /// How the whole audio folder is used by `library` (each article's blocks), with `voice` being the one chosen.
-    /// `narrations` has, for each article, English Reader's narration voice if it is read with that: such an article
-    /// counts in `siteBytes`, not in `voice`'s share, and its narration is neither another voice nor unused.
-    static func usage(of library: [[ContentBlock]], voice: String, narrations: [String?] = [], cache: SpeechAudioCache) -> LibraryAudioUsage {
+    /// `narrations` has, for each article, the voices English Reader narrates it in if it is read with the site's
+    /// narration (empty if not): such an article counts in `siteBytes`, not in `voice`'s share, and its narration (in
+    /// any of those voices) is neither another voice nor unused.
+    static func usage(of library: [[ContentBlock]], voice: String, narrations: [[NarrationVoice]] = [], cache: SpeechAudioCache) -> LibraryAudioUsage {
         let files = AudioFiles(cache)
         var usage = LibraryAudioUsage()
         usage.totalBytes = files.sizes.values.reduce(0, +)
@@ -104,11 +122,14 @@ nonisolated enum ArticleAudio {
         var inputs = library.reduce(into: Set<String>()) { $0.formUnion(Self.inputs(of: $1)) }
         var used = Set<String>()
         for (index, blocks) in library.enumerated() {
-            if let narration = narrations.indices.contains(index) ? narrations[index] : nil {
-                for piece in pieces(of: blocks, voice: narration) {
-                    let name = cache.fileURL(for: piece.request).lastPathComponent
-                    guard let size = files.sizes[name], used.insert(name).inserted else { continue }
-                    usage.siteBytes += size
+            let siteVoices = narrations.indices.contains(index) ? narrations[index] : []
+            if !siteVoices.isEmpty {
+                for narration in siteVoices {
+                    for piece in pieces(of: blocks, voice: narration) {
+                        let name = cache.fileURL(for: piece.request).lastPathComponent
+                        guard let size = files.sizes[name], used.insert(name).inserted else { continue }
+                        usage.siteBytes += size
+                    }
                 }
                 continue
             }
@@ -145,14 +166,16 @@ nonisolated enum ArticleAudio {
     // Articles come as their `blocksData`: decoding and hashing a long library takes a moment.
 
     @concurrent
-    static func status(ofBlocksData data: Data, voice: String, cache: SpeechAudioCache = .standard) async -> ArticleAudioStatus {
-        status(of: Article.decodeBlocks(data), voice: voice, cache: cache)
+    static func status(
+        ofBlocksData data: Data, voice: NarrationVoice, others: [NarrationVoice] = [], cache: SpeechAudioCache = .standard
+    ) async -> ArticleAudioStatus {
+        status(of: Article.decodeBlocks(data), voice: voice, others: others, cache: cache)
     }
 
     /// How much of each article has audio in `voice`, 0 to 1.
     @concurrent
     static func fractions(
-        of articles: [(id: PersistentIdentifier, blocksData: Data)], voice: String, cache: SpeechAudioCache = .standard
+        of articles: [(id: PersistentIdentifier, blocksData: Data)], voice: NarrationVoice, cache: SpeechAudioCache = .standard
     ) async -> [PersistentIdentifier: Double] {
         var fractions: [PersistentIdentifier: Double] = [:]
         for article in articles {
@@ -163,20 +186,20 @@ nonisolated enum ArticleAudio {
 
     @concurrent
     static func usage(
-        ofBlocksData library: [Data], voice: String, narrations: [String?] = [], cache: SpeechAudioCache = .standard
+        ofBlocksData library: [Data], voice: String, narrations: [[NarrationVoice]] = [], cache: SpeechAudioCache = .standard
     ) async -> LibraryAudioUsage {
         usage(of: library.map(Article.decodeBlocks), voice: voice, narrations: narrations, cache: cache)
     }
 
-    /// Deletes the audio of `removed` articles (with the `recordings` that read them) that the `keeping` ones don't
-    /// share. Returns the bytes freed.
+    /// Deletes the audio of `removed` articles (in this app's voices and the `siteVoices` English Reader narrates them
+    /// in) that the `keeping` ones don't share. Returns the bytes freed.
     @concurrent
     @discardableResult
     static func removeAudio(
-        of removed: [Data], keeping: [Data], recordings: [String] = [], cache: SpeechAudioCache = .standard
+        of removed: [Data], keeping: [Data], siteVoices: [NarrationVoice] = [], cache: SpeechAudioCache = .standard
     ) async -> Int64 {
         let kept = keeping.map(Article.decodeBlocks)
-        let urls = removed.flatMap { files(of: Article.decodeBlocks($0), notUsedBy: kept, recordings: recordings, cache: cache) }
+        let urls = removed.flatMap { files(of: Article.decodeBlocks($0), notUsedBy: kept, siteVoices: siteVoices, cache: cache) }
         return remove(Array(Set(urls)))
     }
 
@@ -212,9 +235,9 @@ nonisolated enum ArticleAudio {
     }
 }
 
-/// An article's OpenAI audio in one voice: how much of it is on disk.
+/// An article's audio in one voice: how much of it is on disk.
 nonisolated struct ArticleAudioStatus: Sendable {
-    var voice: String
+    var voice: NarrationVoice
     var totalPieces = 0
     var cachedPieces = 0
     /// Characters of each block, and how many of them have audio.
