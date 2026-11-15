@@ -46,7 +46,7 @@
 - 查词：`DictionaryLookup`（候选词顺序、词形还原、所在句子）、`WordPronouncer`（喇叭：先真人录音，没有就系统美式声音）。`Dictionary/`：`DictionaryDatabase`、`DictionaryEntry`（离线词库）、`WiktionaryClient` + `DefinitionCache`、`WordAudioClient`。
 - 钥匙串：`KeychainStore`（OpenAI Key）。
 - `OpenAI/`：
-  - 朗读：`OpenAITTSClient`、`OpenAISpeechEngine`、`SpeechChunking`、`SpeechAudioCache`、`AudioClip`、`SpeechGenerations`（全 App 共用的"正在生成"登记）、`ArticleAudio`（某篇文章/整个文库的语音缓存状态、清理）、`AudioDownloader`（批量下载）。
+  - 朗读：`OpenAITTSClient`、`OpenAISpeechEngine`、`SpeechChunking`、`SpeechAudioCache`、`AudioClip`、`SpeechGenerations`（全 App 共用的"正在生成"登记）、`ArticleAudio`（某篇文章/整个文库的语音缓存状态、清理）、`AudioDownloader`（批量下载）、`NarrationVoice`（朗读用的声音：模型 + 声音名 + 风格，三样都进音频的缓存编号；App 自己的 OpenAI 声音、网站的 Google 声音和真人录音都用它）。
   - 聊天（讲解、翻译）：`OpenAIChatClient`（共用请求层：Structured Outputs、错误映射 `OpenAIChatError`、专用 URLSession）、`OpenAIExplainClient`（单词讲解 + `WordExplanation`）、`OpenAITranslateClient`（翻译 + `PassageTranslation`）、`TranslationCache`（磁盘缓存）。
 
 **Views/**
@@ -341,6 +341,20 @@
   - **网站的音频改成压缩版后 App 原来不会用**：旧规则只用 `sourceIdentical: true` 的朗读，网站今天改成 48k（false），旧代码会当作网站没有音频、改用 Drive 或 OpenAI（要花钱）。按 §4.2 改成照常播放、不进 Drive。手机上还没装过带网站的版本，没受影响。
   - 音频文件名改成网站用密钥算的：App 本来就用接口给的 `url`；新加：某个地址 404 时重新取这篇的详情换新地址再试一次（`SiteLibrary.refreshAudio(forKey:)`）。
   - 测试 +6，共 618 个全过。截图看过设置页 English Reader 一节和卡片上的 Preview 标签（临时启动参数，已删）。
+
+### 网站文章的多个声音（2026-11-15，模拟器测过，未上真机）
+
+- 用户说网站上同一篇文章现在能选声音（原来的 OpenAI Alloy，加了 Google 的 Kore），要手机也能选。网站 11-08 就在 App 接口里做好了（网站 `docs/from-ios/site-api-for-ios.md` §13）：详情多一个 `voices`（有完整音频的声音，默认的排第一），`?voice=<id>` 返回那个声音的整套音频。线上目前 4 篇有两种声音：Australia、COVID-19、United States、Airbus A380。
+- **用户定的规则：App 不设默认声音、不存偏好，网站给什么就用什么**（理由：以后有的文章可能根本没有 Alloy，只有 Google 的声音）。所以打开时用网站排第一的；用户在这篇里换过就记住这篇的选择（`SiteLibrary.Link.voiceID`），网站不再提供那个声音时（`?voice=` 返回 404）自动回到第一个。网站的接口不看网页上存的偏好（`voicePref`），App 也不读。
+- 做法：
+  - 新类型 `NarrationVoice`（模型 + 声音 + 风格）取代原来只有一个声音名的写法。原来 App 按自己的模型和风格算网站音频的编号，Google 的声音会全部对不上；现在按接口给的三样算，对现有的 Alloy 和录音算出来完全一样（线上核对过：Australia 两种声音各 153 段、Airbus 183 段、Steve Jobs 录音 53 段全部对上）。
+  - 只有网站有的声音（模型不是 `gpt-4o-mini-tts` 的：录音 `upload`、Google `gemini-…`）走 `isSiteOnly`：取音频时只问网站，不问 Drive、不调 OpenAI（`SpeechGenerations`），属性页不显示 Drive 一节。
+  - `SiteLibrary.useVoice(_:for:)` 换声音：取那个声音的详情，记下音频地址和所选；文章的正文有变化时一起更新。阅读页换声音后 `ReadingSession.replaceEngine`，从当前的词接着读。
+  - 详情在非默认声音时有自己的 `contentVersion`，所以链接里另存目录的版本（`Link.catalogVersion`）来判断网站有没有改过；这个字段是新的，以前版本建的链接会多取一次详情，为了拿到 `voices`。
+  - 旧版本（另一台 Mac 装的）读 `Catalog.json` 里的 `voice`：只在声音是它能读的（App 自己的 OpenAI 声音或录音）时写，Google 的声音不写，免得它拿 "Kore" 去问 OpenAI。
+  - 下载、书架的“音频已下载”、存储页、属性页都按这篇当前的声音算；删除这篇的音频时它在网站上的每种声音一起删；存储页把它的几种声音都算作 English Reader 的。
+  - 界面：阅读页底部菜单的 Playback 一栏，在播放按钮上面多一行声音胶囊（只有两种以上声音的文章才有，名字用网站给的，如 "Kore · Google"）；属性页音频一节顶上一个 Voice 选择，标题显示当前声音。
+- 验证：新加 7 个测试（`SiteVoicesTests`，用线上 Australia 的两种声音截的样本），全部 678 个测试通过。模拟器连线上网站，用临时启动参数打开 Australia：先用 Alloy；换成 Kore 后日志是 `Using voice Kore (gemini-3.8-flash-tts)`，第一段从网站下载、播放了 38.14 秒（网站上这一段 38.08 秒），接着播第二段；再换回 Alloy 也接着播。截图看过阅读页的声音行（深色、米黄主题）和属性页的 Voice 一行（Kore 播过的部分算在 Other Voices 里）。临时代码已删。没验证：真机上点胶囊换声音、Kore 的音质。
 
 ### English Reader 书架改成书封网格（2026-11-07，模拟器截图看过，未上真机）
 
